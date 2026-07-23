@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>DOM extraction regression</title>
+    <style>
+      body { font: 16px/1.5 system-ui; margin: 0; }
+      header { display: flex; gap: 16px; padding: 12px; }
+      main { width: 720px; margin: 24px auto; }
+      h1 { text-align: center; }
+      form { border: 1px solid #999; padding: 20px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <div>Open menu Home Search Pull requests</div>
+        <button id="account-menu-trigger" aria-controls="account-menu">Account</button>
+      </nav>
+    </header>
+    <main>
+      <h1>Enable two-factor authentication (2FA)</h1>
+      <form>
+        <h2>Setup authenticator app</h2>
+        <div>Authenticator apps generate one-time passwords used during sign-in.</div>
+        <h3>Scan the QR code</h3>
+        <div>Use an authenticator app or browser extension to scan.</div>
+        <div><label>Verify the code from the app <input value="XXXXXX" /></label></div>
+        <dialog open><p>Alternative recovery options are available.</p></dialog>
+        <div role="menu" aria-label="Choose visibility">
+          <button role="menuitemradio" aria-checked="true">
+            <strong>Public</strong>
+            <span>Anyone on the internet can see this repository.</span>
+          </button>
+          <button role="menuitemradio" aria-checked="false">
+            <strong>Private</strong>
+            <span>You choose who can see and commit to this repository.</span>
+          </button>
+        </div>
+      </form>
+      <output id="result"></output>
+    </main>
+    <aside>
+      <div role="button"><span>Close menu</span></div>
+      <nav aria-label="Repository navigation">
+        <ul>
+          <li><a href="#home">Home</a></li>
+          <li><a href="#issues">All issues</a></li>
+          <li><a href="#repositories">All repositories</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <div id="account-menu" role="menu" aria-labelledby="account-menu-trigger">
+      <div role="menuitem">Profile settings and account preferences</div>
+    </div>
+    <script type="module" src="./dom-regression.ts"></script>
+  </body>
+</html>

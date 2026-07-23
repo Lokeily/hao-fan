@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Selection translation regression</title>
+    <style>
+      body { margin: 40px; font: 16px/1.6 system-ui; }
+      main { max-width: 680px; }
+    </style>
+    <script>
+      (() => {
+        const eventTarget = { addListener() {}, removeListener() {} };
+        const area = {
+          async get() { return {}; },
+          async set() {},
+          async remove() {},
+          async clear() {},
+        };
+        document.documentElement.dataset.translationCalls = '0';
+        globalThis.chrome = {
+          runtime: {
+            id: 'selection-regression',
+            onMessage: eventTarget,
+            async sendMessage(message) {
+              document.documentElement.dataset.translationCalls = String(
+                Number(document.documentElement.dataset.translationCalls || '0') + 1,
+              );
+              if (message?.type === 'TRANSLATE_ONE') {
+                return { ok: true, translation: '启用双重身份验证' };
+              }
+              if (message?.type === 'TRANSLATE_BATCH') {
+                return {
+                  ok: true,
+                  translations: message.payload.texts.map((text) => `译文：${text}`),
+                  stats: {},
+                };
+              }
+              return { ok: true };
+            },
+          },
+          storage: {
+            local: area,
+            session: area,
+            sync: area,
+            managed: area,
+            onChanged: eventTarget,
+          },
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <main>
+      <button id="create-selection" type="button">Create selection</button>
+      <h1 id="selection-source">Enable two-factor authentication</h1>
+      <p>The selection result should appear in an isolated popover without changing this paragraph.</p>
+      <aside id="side-navigation">
+        <div id="close-control" role="button"><span>Close menu</span></div>
+        <nav>
+          <ul>
+            <li>Home</li>
+            <li>All issues</li>
+            <li>All repositories</li>
+          </ul>
+        </nav>
+      </aside>
+    </main>
+    <script>
+      document.querySelector('#create-selection').addEventListener('click', () => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector('#selection-source'));
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      });
+    </script>
+    <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
+  </body>
+</html>
