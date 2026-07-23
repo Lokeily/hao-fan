@@ -264,6 +264,33 @@ export async function translateBatchDetailed(
     applyResult(item, translated.join(item.text.includes('\n') ? '\n' : compactTarget ? '' : ' '));
   };
 
+  // 少数 OpenAI 兼容模型始终不遵循批量 JSON 协议。先尝试一次拆半恢复；
+  // 若仍无法解析，则以有限并发逐条翻译，优先保证页面不漏译，同时避免请求突发。
+  const translateItemsIndividually = async (items: typeof toTranslate) => {
+    let next = 0;
+    const worker = async () => {
+      while (next < items.length) {
+        const item = items[next++];
+        signal?.throwIfAborted();
+        const block = useGlossary
+          ? buildGlossaryBlock(relevantTerms([item.text], cfg.targetLang, glossary))
+          : '';
+        try {
+          const response = await callChat(cfg, item.text, undefined, block, signal);
+          addChatUsage(stats, response);
+          applyResult(item, response.text);
+        } catch (error) {
+          if (!(error instanceof TruncatedOutputError)) throw error;
+          stats.requests++;
+          stats.promptTokens += error.promptTokens;
+          stats.completionTokens += error.completionTokens;
+          await translateLongItem(item);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, items.length) }, () => worker()));
+  };
+
   let recoveryRequests = 0;
   const translateGroup = async (items: typeof toTranslate, recovery = false): Promise<void> => {
     signal?.throwIfAborted();
@@ -293,12 +320,19 @@ export async function translateBatchDetailed(
       return;
     }
     if (items.length === 1) {
-      // 单项批次常被兼容模型直接返回纯文本；复用已有响应，避免重复请求。
-      applyResult(items[0], response.text);
+      if (recovery) {
+        // 从大批次拆出的单项仍未遵循 JSON 协议时，改走普通单句提示；
+        // 避免把模型的解释、拒答或格式错误原样显示成译文。
+        await translateItemsIndividually(items);
+      } else {
+        // 原本就是单项的批次常被兼容模型直接返回纯文本，复用响应避免重复请求。
+        applyResult(items[0], response.text);
+      }
       return;
     }
     if (recovery || recoveryRequests + 2 > MAX_BATCH_RECOVERY_REQUESTS) {
-      throw new Error('模型没有返回完整的批量译文，请更换兼容模型或减小批次');
+      await translateItemsIndividually(items);
+      return;
     }
     recoveryRequests += 2;
     const middle = Math.ceil(items.length / 2);

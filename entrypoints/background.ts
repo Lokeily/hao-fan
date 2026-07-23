@@ -186,9 +186,31 @@ export default defineBackground(() => {
     if (message.type === 'TRANSLATE_ONE') {
       return respond(async () => {
         const text = readSingle(message);
+        const jobId = readJobId(message);
+        return withTranslationJob(jobId, async (signal) => {
+          const cfg = await getCfg();
+          assertProviderReady(cfg);
+          const result = await translateOneDetailed(cfg, text, signal);
+          await recordUsage(result.stats);
+          return { translation: result.translation, stats: result.stats };
+        });
+      }, sendResponse);
+    }
+
+    if (message.type === 'TEST_CONNECTION') {
+      return respond(async () => {
         const cfg = await getCfg();
         assertProviderReady(cfg);
-        const result = await translateOneDetailed(cfg, text);
+        // 禁用缓存与本地跳过，确保“测试连接”确实访问当前服务商，而不是产生假成功。
+        const probeConfig: AppConfig = {
+          ...cfg,
+          sourceLang: 'English',
+          targetLang: '中文',
+          cacheEnabled: false,
+          glossaryEnabled: false,
+          customGlossary: '',
+        };
+        const result = await translateOneDetailed(probeConfig, 'Connection test.');
         await recordUsage(result.stats);
         return { translation: result.translation, stats: result.stats };
       }, sendResponse);

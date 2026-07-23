@@ -23,6 +23,7 @@ import { accumulateUsage, createStats, estimateTokens, EMPTY_USAGE_TOTALS } from
 import { planTextChunks, splitLongText, takeFirstTextChunk } from '../utils/chunking.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
+import { randomId } from '../utils/id.ts';
 
 test('migrates a legacy API key without exposing it to another provider', () => {
   const migrated = normalizeConfig({
@@ -286,4 +287,11 @@ test('reuses translations within a page session and evicts the least recently us
 
   cache.clear();
   assert.equal(cache.size, 0);
+});
+
+test('generates RFC 4122 version 4 IDs without randomUUID', () => {
+  const first = randomId();
+  const second = randomId();
+  assert.match(first, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.notEqual(first, second);
 });

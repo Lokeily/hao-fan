@@ -13,13 +13,13 @@
   <a href="#-快速开始"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
   <a href="#-快速开始"><img src="https://img.shields.io/badge/Edge-兼容-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
-  <a href="#"><img src="https://img.shields.io/badge/version-0.1.1-blue" alt="v0.1.1"></a>
+  <a href="https://github.com/Lokeily/Hao-Fan/releases"><img src="https://img.shields.io/badge/version-0.1.2-blue" alt="v0.1.2"></a>
   <img src="https://img.shields.io/badge/WXT-0.20-blueviolet" alt="WXT">
 </p>
 
 ---
 
-**好翻** 是一款在浏览器里直接工作的 AI 翻译工具。你用自己的 API Key 连接大模型，翻译请求从浏览器直发服务商，不经过任何中转服务器。没有月费，没有用量限制，数据只留在你手里。
+**好翻** 是一款在浏览器里直接工作的 AI 翻译工具。你用自己的 API Key 连接大模型，翻译请求从浏览器直发服务商，不经过任何中转服务器。插件本身免费且不设置额度；第三方 API 的费用与限额由对应服务商决定。
 
 > "翻译，本就该这样简单和透明。"
 
@@ -99,12 +99,12 @@
 
 ### 安装
 
-从 [Releases](https://github.com/your-username/open-translator-cn/releases) 下载对应浏览器的 `.zip` 包：
+从 [Releases](https://github.com/Lokeily/Hao-Fan/releases) 下载对应浏览器的 `.zip` 包：
 
 - `open-translator-cn-x.x.x-chrome.zip` → Chrome / Edge
 - `open-translator-cn-x.x.x-firefox.zip` → Firefox
 
-然后打开浏览器扩展管理页面加载：
+先解压下载的 ZIP，然后打开浏览器扩展管理页面加载：
 
 - Chrome / Edge：`chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」
 - Firefox：`about:debugging#/runtime/this-firefox` →「临时载入附加组件」
@@ -112,8 +112,8 @@
 ### 开发
 
 ```bash
-git clone https://github.com/your-username/open-translator-cn.git
-cd open-translator-cn
+git clone https://github.com/Lokeily/Hao-Fan.git
+cd Hao-Fan
 npm install
 npm run dev          # Chrome 开发模式，支持热重载
 ```
@@ -157,8 +157,12 @@ open-translator-cn/
 │   ├── background.ts          # Service Worker：消息路由 / API 调用 / 右键菜单
 │   ├── content.ts             # 内容脚本：文本提取 / 译文注入 / 划词气泡 / 悬浮按钮
 │   ├── image-translate.html   # 图片翻译结果页
-│   ├── options.ts             # 设置页
-│   └── popup.ts               # 弹窗（快速翻译 + 图片上传 + 配置入口）
+│   ├── options.html           # 设置页入口
+│   └── popup.html             # 弹窗入口
+├── src/pages/
+│   ├── image-translate.ts     # 图片翻译结果页逻辑
+│   ├── options.ts             # 设置页逻辑
+│   └── popup.ts               # 弹窗逻辑（快速翻译 + 图片上传 + 配置入口）
 ├── utils/
 │   ├── providers.ts           # 15 家引擎预设（LLM / MT / vision 标记）
 │   ├── translator.ts          # OpenAI 兼容调用 + 批量翻译 + 传统 MT
@@ -185,7 +189,7 @@ open-translator-cn/
 - 项目**没有遥测、广告追踪或数据收集**
 - 已显式声明 CSP（`script-src 'self'`），禁止内联/远程脚本
 - 翻译缓存保存在本地，含 30 天 TTL 与容量上限，可在设置中关闭
-- `<all_urls>` 权限用于内容脚本跨域读取网页以及后台调用用户所选大模型 API
+- `<all_urls>` 权限用于在用户访问的网页中运行内容脚本，以及由后台直连用户所选大模型 API
 
 ---
 
