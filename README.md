@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Lokeily/Hao-Fan-/actions/workflows/build.yml"><img src="https://github.com/Lokeily/Hao-Fan-/actions/workflows/build.yml/badge.svg?branch=main" alt="Build"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
@@ -23,6 +24,21 @@
 扩展本身免费，不设置使用额度。你可以连接自己的 DeepSeek、OpenAI、Gemini、智谱、通义千问等 API，也可以使用 Ollama 本地模型或传统机器翻译。
 
 需要注意：第三方 AI 服务可能收费，具体价格和额度由对应服务商决定。
+
+## 目录
+
+- [主要功能](#主要功能)
+- [安装扩展](#安装扩展)
+- [第一次使用](#第一次使用)
+- [三种翻译方式](#三种翻译方式)
+- [支持的服务](#支持的服务)
+- [怎样节省 Token](#怎样节省-token)
+- [常见问题](#常见问题)
+- [隐私与权限](#隐私与权限)
+- [问题反馈](#问题反馈)
+- [参与社区](#参与社区)
+- [开发者说明](#开发者说明)
+- [许可证](#许可证)
 
 ## 主要功能
 
@@ -190,10 +206,21 @@
 
 遇到漏译、译文错位、动态内容未翻译或其他问题，可以通过以下方式反馈：
 
-- [GitHub Issues](https://github.com/Lokeily/Hao-Fan-/issues)
+- [提交 Bug 报告](https://github.com/Lokeily/Hao-Fan-/issues/new?template=bug_report.yml)
+- [提出功能建议](https://github.com/Lokeily/Hao-Fan-/issues/new?template=feature_request.yml)
 - 联系作者 QQ：<code>3084614411</code>
 
 反馈时请尽量提供浏览器名称和版本、问题页面、截图以及复现步骤。请勿提交 API Key、账号密码或其他敏感信息。
+
+## 参与社区
+
+欢迎修正文档、补充测试、报告兼容性问题或提交代码。第一次参与开源项目也没有关系，可以从修改说明文字或提交可复现的 Bug 报告开始。
+
+- 提交代码前请阅读 [贡献指南](./CONTRIBUTING.md)。
+- 参与讨论和协作时请遵守 [社区行为准则](./CODE_OF_CONDUCT.md)。
+- 安全漏洞不要发布到公开 Issue，请按照 [安全政策](./SECURITY.md) 联系作者。
+- 每个版本的主要变化记录在 [更新日志](./CHANGELOG.md) 中。
+- 所有参与者都应尊重他人，围绕技术事实进行讨论，不公开他人的隐私信息。
 
 ## 开发者说明
 
