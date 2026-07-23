@@ -193,6 +193,17 @@ open-translator-cn/
 
 ---
 
+## 问题反馈
+
+遇到漏译、译文错位、动态内容未翻译或其他 Bug，可以通过以下渠道反馈：
+
+- [GitHub Issues](https://github.com/Lokeily/Hao-Fan-/issues)
+- 联系作者 QQ：`3084614411`
+
+反馈时建议附上浏览器版本、问题页面和复现步骤，请勿提交 API Key 等敏感信息。
+
+---
+
 ## 路线图
 
 - [ ] PDF / ePub 翻译
