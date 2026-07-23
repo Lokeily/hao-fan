@@ -6,7 +6,7 @@ export default defineConfig({
     name: '好翻',
     description:
       '好翻 · 开源免费的沉浸式 AI 翻译插件，直连 DeepSeek、智谱、腾讯混元等国内大模型，用户自配 API Key，不经中转服务器。',
-    // WXT 会自动根据 entrypoints/options.ts 与 popup.ts 生成 options_ui / action.default_popup
+    // WXT 根据 entrypoints/options.html 与 popup.html 生成 options_ui / action.default_popup
     permissions: ['storage', 'activeTab', 'contextMenus', 'scripting'],
     // 后台需要跨域调用各家大模型 API，故放开 host 权限
     host_permissions: ['<all_urls>'],

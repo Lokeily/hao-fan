@@ -539,26 +539,46 @@ export default defineContentScript({
     ): Promise<void> {
       const snapshotRevision = translationConfigRevision;
       let inserted = 0;
-      await Promise.all(
-        items.map(async (item) => {
+      let firstError: unknown;
+      const stale: TranslationItem[] = [];
+      const failures = await runChunkQueue(
+        items.map((item) => [item]),
+        LAZY_CONCURRENCY,
+        async ([item]) => {
           if (jobId && activePageJobId !== jobId) return;
           try {
             const r: any = await sendRuntimeMessage({
               type: 'TRANSLATE_ONE',
-              payload: { text: item.text },
+              payload: { text: item.text, jobId },
             });
-            const t = r?.ok && typeof r.translation === 'string' ? r.translation : '';
+            if (!r?.ok) throw new Error(r?.error || '逐条翻译失败');
+            const t = typeof r.translation === 'string' ? r.translation : '';
+            if (!t) throw new Error('翻译服务返回了空结果');
+            if (jobId && activePageJobId !== jobId) return;
             if (snapshotRevision === translationConfigRevision) {
-              sessionTranslations.remember(item.text, t || item.text);
+              sessionTranslations.remember(item.text, t);
             }
-            if (applyTranslation(item.el, item.text, t) === 'inserted') inserted++;
-          } catch {
-            /* 单条失败不影响整页其余内容 */
+            const outcome = applyTranslation(item.el, item.text, t);
+            if (outcome === 'inserted') inserted++;
+            else if (outcome === 'stale') {
+              const currentText = textOfBlock(item.el);
+              if (currentText.length >= 2) stale.push({ el: item.el, text: currentText });
+            }
+            estimatedTokensSaved += Math.max(0, Number(r.stats?.estimatedTokensSaved) || 0);
+            retryCounts.delete(item.el);
+          } catch (error) {
+            firstError ??= error;
+            throw error;
           }
-        }),
+        },
       );
+      if (jobId && activePageJobId !== jobId) return;
+      if (stale.length > 0) observeForLazyTranslation(stale);
       translatedCount += inserted;
       if (inserted > 0) showStatus(`翻译中… 已译 ${translatedCount} 段`);
+      if (failures > 0) {
+        throw firstError instanceof Error ? firstError : new Error(`${failures} 段逐条翻译失败`);
+      }
     }
 
     async function translateChunk(items: { el: Element; text: string }[], jobId?: string) {
@@ -792,6 +812,16 @@ export default defineContentScript({
         }, 80);
       };
 
+      const scheduleControlledRoots = (control: Element) => {
+        const ids = `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
+          .split(/\s+/)
+          .filter(Boolean);
+        ids.forEach((id) => {
+          const controlled = document.getElementById(id);
+          if (controlled) scheduleRoot(controlled);
+        });
+      };
+
       const refreshChangedText = (element: Element) => {
         const anchor = closestTextBlock(element, true);
         if (!anchor) return;
@@ -822,6 +852,9 @@ export default defineContentScript({
               normalizedSiteClasses(m.oldValue) === normalizedSiteClasses(target.getAttribute('class'))
             ) continue;
             scheduleRoot(target);
+            if (m.attributeName === 'aria-expanded' || m.attributeName === 'aria-controls' || m.attributeName === 'aria-owns') {
+              scheduleControlledRoots(target);
+            }
             continue;
           }
           let parentTextChanged = false;
@@ -862,7 +895,10 @@ export default defineContentScript({
         characterData: true,
         attributes: true,
         attributeOldValue: true,
-        attributeFilter: ['class', 'style', 'hidden', 'open', 'aria-hidden'],
+        attributeFilter: [
+          'class', 'style', 'hidden', 'open', 'inert', 'aria-hidden',
+          'aria-expanded', 'aria-controls', 'aria-owns', 'data-state',
+        ],
         subtree: true,
       });
 
@@ -879,24 +915,38 @@ export default defineContentScript({
           // 只对点击元素子树做有界扫描，避免每次点击都遍历整棵 DOM 造成卡顿
           //（回归 0.1.0 修复前的“翻译变慢”问题）。Portal 菜单 / 显隐切换由 MutationObserver 接管。
           if (root === document.body || root === document.documentElement) return;
-          const blocks = collectTextBlocks(root, 200);
+          const roots = [root];
+          const control = root.closest('[aria-controls], [aria-owns]');
+          if (control) {
+            const ids = `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
+              .split(/\s+/)
+              .filter(Boolean);
+            ids.forEach((id) => {
+              const controlled = document.getElementById(id);
+              if (controlled && !roots.includes(controlled)) roots.push(controlled);
+            });
+          }
           const newFound: TranslationItem[] = [];
-          for (const b of blocks) {
-            const el = b as HTMLElement;
-            if (
-              el.classList.contains(PENDING_CLASS) ||
-              el.classList.contains(TRANSLATED_CLASS) ||
-              el.classList.contains(OBSERVED_CLASS) ||
-              el.classList.contains('ot-translation')
-            )
-              continue;
-            const txt = textOfBlock(el);
-            if (txt.length < 2) continue;
-            if (!isVisible(el)) continue;
-            // 额外保护：跳过我们自己的节点
-            if (el.closest('.ot-translation, .ot-img-panel, .ot-toolbar, #ot-toolbar, #ot-status, .ot-selbtn'))
-              continue;
-            newFound.push({ el, text: txt });
+          for (const scanRoot of roots) {
+            const blocks = collectTextBlocks(scanRoot, Math.max(0, 200 - newFound.length));
+            for (const b of blocks) {
+              const el = b as HTMLElement;
+              if (
+                el.classList.contains(PENDING_CLASS) ||
+                el.classList.contains(TRANSLATED_CLASS) ||
+                el.classList.contains(OBSERVED_CLASS) ||
+                el.classList.contains('ot-translation')
+              )
+                continue;
+              const txt = textOfBlock(el);
+              if (txt.length < 2) continue;
+              if (!isVisible(el)) continue;
+              // 额外保护：跳过我们自己的节点
+              if (el.closest('.ot-translation, .ot-img-panel, .ot-toolbar, #ot-toolbar, #ot-status, .ot-selbtn'))
+                continue;
+              newFound.push({ el, text: txt });
+            }
+            if (newFound.length >= 200) break;
           }
           observeForLazyTranslation(newFound);
         }, 120);

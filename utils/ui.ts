@@ -294,8 +294,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     testBtn.disabled = true;
     try {
       const res: any = await browser.runtime.sendMessage({
-        type: 'TRANSLATE_ONE',
-        payload: { text: 'Hello, world!' },
+        type: 'TEST_CONNECTION',
       });
       if (res?.ok) {
         setStatus(`连接成功 ✓ 译文：「${res.translation}」`);
