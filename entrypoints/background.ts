@@ -10,6 +10,7 @@ import { ensureCacheLoaded } from '../utils/cache';
 import { fetchWithTimeout } from '../utils/requester';
 import { asRecord, readBatch, readJobId, readSingle } from '../utils/messages';
 import { accumulateUsage, EMPTY_USAGE_TOTALS, type TranslationStats } from '../utils/usage';
+import { randomId } from '../utils/id';
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const translationJobs = new Map<string, Set<AbortController>>();
@@ -200,7 +201,7 @@ export default defineBackground(() => {
         const dataUrl = typeof payload?.dataUrl === 'string' ? payload.dataUrl : undefined;
         const result = await doTranslateImage(srcUrl, dataUrl);
         // 弹窗上传的图片没有网页中的图元素可锚定，仍用结果页展示。
-        const id = crypto.randomUUID();
+        const id = randomId();
         await storage.setItem(`local:imageJob:${id}`, result);
         await browser.tabs.create({
           url: browser.runtime.getURL(`/image-translate.html?job=${id}`),

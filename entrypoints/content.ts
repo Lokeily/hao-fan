@@ -15,6 +15,7 @@ import { planTextChunks, takeFirstTextChunk } from '../utils/chunking';
 import { configItem } from '../utils/storage';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy';
 import { SessionTranslationCache } from '../utils/session-translation-cache';
+import { randomId } from '../utils/id';
 import '../styles/content.css';
 
 let activeImageCleanup: (() => void) | null = null;
@@ -530,6 +531,36 @@ export default defineContentScript({
       lazyFlushRunning = false;
     }
 
+    // 批量响应条目数异常（模型偶发漏条目）时的逐条回退：确保整页翻译不被单批错误中断，
+    // 其余批次与懒翻译继续正常进行，且不会触发 notice 刷屏。
+    async function fallbackTranslateIndividually(
+      items: { el: Element; text: string }[],
+      jobId: string | undefined,
+    ): Promise<void> {
+      const snapshotRevision = translationConfigRevision;
+      let inserted = 0;
+      await Promise.all(
+        items.map(async (item) => {
+          if (jobId && activePageJobId !== jobId) return;
+          try {
+            const r: any = await sendRuntimeMessage({
+              type: 'TRANSLATE_ONE',
+              payload: { text: item.text },
+            });
+            const t = r?.ok && typeof r.translation === 'string' ? r.translation : '';
+            if (snapshotRevision === translationConfigRevision) {
+              sessionTranslations.remember(item.text, t || item.text);
+            }
+            if (applyTranslation(item.el, item.text, t) === 'inserted') inserted++;
+          } catch {
+            /* 单条失败不影响整页其余内容 */
+          }
+        }),
+      );
+      translatedCount += inserted;
+      if (inserted > 0) showStatus(`翻译中… 已译 ${translatedCount} 段`);
+    }
+
     async function translateChunk(items: { el: Element; text: string }[], jobId?: string) {
       if (jobId && (activePageJobId !== jobId || blockedPageJobId === jobId)) {
         items.forEach((item) => (item.el as HTMLElement).classList.remove(PENDING_CLASS));
@@ -551,7 +582,9 @@ export default defineContentScript({
         if (!res?.ok) throw new Error(res?.error || '翻译失败');
         const translations = res.translations;
         if (!Array.isArray(translations) || translations.length !== items.length) {
-          throw new Error('翻译结果数量与原文不一致');
+          // 批量响应条目数异常：逐条回退翻译，避免整页翻译被单批错误中断。
+          await fallbackTranslateIndividually(items, jobId);
+          return;
         }
         const saved = Number(res.stats?.estimatedTokensSaved) || 0;
         estimatedTokensSaved += Math.max(0, saved);
@@ -616,7 +649,7 @@ export default defineContentScript({
       try {
         // 先清理旧译文层，防止堆叠
         clearTranslations();
-        jobId = crypto.randomUUID();
+        jobId = randomId();
         activePageJobId = jobId;
         setToolbarLoading(true);
         showStatus('翻译中…');
@@ -841,9 +874,12 @@ export default defineContentScript({
         dynamicClickTimer = setTimeout(() => {
           dynamicClickTimer = null;
           if (!dynamicActive || !target || target.nodeType !== 1) return;
-          // 点击可能通过 Portal 在 body 末尾打开菜单/面板，也可能只切换已有节点的可见性。
-          // 有界重扫只会发现尚未处理的块，最终仍由视口观察器决定是否调用翻译 API。
-          const blocks = collectTextBlocks(document.body, 400);
+          const root = target as Element;
+          // 全页点击（点到 body / html 本身）直接交给 MutationObserver，不再整页重扫；
+          // 只对点击元素子树做有界扫描，避免每次点击都遍历整棵 DOM 造成卡顿
+          //（回归 0.1.0 修复前的“翻译变慢”问题）。Portal 菜单 / 显隐切换由 MutationObserver 接管。
+          if (root === document.body || root === document.documentElement) return;
+          const blocks = collectTextBlocks(root, 200);
           const newFound: TranslationItem[] = [];
           for (const b of blocks) {
             const el = b as HTMLElement;
@@ -1057,7 +1093,7 @@ export default defineContentScript({
     async function translateSelectionInPopover(
       snapshot: SelectionSnapshot,
       host: HTMLDivElement,
-      operationId = `selection-${crypto.randomUUID()}`,
+      operationId = `selection-${randomId()}`,
     ) {
       selectionPinned = true;
       renderSelectionPanel(host, snapshot);
@@ -1142,7 +1178,7 @@ export default defineContentScript({
       if (msg?.type === 'TRANSLATE_PAGE') translatePage(true);
       else if (msg?.type === 'SHOW_IMAGE_RESULT') showImageResult(msg.payload?.srcUrl, msg.payload?.result);
       else if (msg?.type === 'SHOW_ERROR') {
-        showNotice(msg.payload?.message || '操作失败', `external-${crypto.randomUUID()}`);
+        showNotice(msg.payload?.message || '操作失败', `external-${randomId()}`);
       }
       else if (msg?.type === 'TRANSLATE_SELECTION') {
         const snapshot = captureSelection();
