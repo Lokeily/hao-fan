@@ -1,0 +1,616 @@
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --text: #202124;
+  --text-2: #5f6368;
+  --text-3: #80868b;
+  --border: #dadce0;
+  --soft: #f1f3f4;
+  --accent: #1a73e8;
+  --accent-hover: #1765cc;
+  --green: #137333;
+  --red: #c5221f;
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+select,
+textarea,
+summary {
+  letter-spacing: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+.ot-file:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ot-page {
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+
+.ot-page-head {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ot-page-brand {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.ot-hint {
+  margin: 16px 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ot-form {
+  margin: 0;
+}
+
+.ot-form-section {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ot-form-section h2 {
+  margin: 0 0 16px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.ot-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ot-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ot-field > span {
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.ot-field-wide {
+  grid-column: 1 / -1;
+}
+
+.ot-form input,
+.ot-form select,
+.ot-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ot-form input,
+.ot-form select {
+  min-height: 40px;
+  padding: 8px 11px;
+}
+
+.ot-form textarea {
+  min-height: 82px;
+  padding: 10px 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.ot-form input:focus,
+.ot-form select:focus,
+.ot-form textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+  outline: none;
+}
+
+.ot-form input:read-only {
+  background: var(--soft);
+  color: var(--text-3);
+}
+
+.ot-switches {
+  border-top: 1px solid var(--border);
+}
+
+.ot-form .ot-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ot-form .ot-check input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.ot-check span,
+.ot-check strong,
+.ot-check small {
+  display: block;
+}
+
+.ot-check strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ot-check small {
+  margin-top: 3px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.ot-advanced {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ot-advanced summary {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ot-advanced[open] summary {
+  margin-bottom: 14px;
+}
+
+.ot-form-actions {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  gap: 14px;
+}
+
+.ot-test-btn {
+  flex: 0 0 auto;
+  min-height: 38px;
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ot-test-btn:hover {
+  background: var(--soft);
+}
+
+.ot-test-btn:disabled {
+  opacity: 0.58;
+  cursor: progress;
+}
+
+.ot-status {
+  min-width: 0;
+  color: var(--green);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ot-status.is-error {
+  color: var(--red);
+}
+
+/* Popup */
+.ot-popup {
+  width: 100%;
+  padding: 14px 16px 16px;
+}
+
+.ot-popup-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  margin-bottom: 12px;
+}
+
+.ot-brand-mark {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.ot-brand-copy strong,
+.ot-brand-copy span {
+  display: block;
+}
+
+.ot-brand-copy strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.ot-brand-copy span {
+  margin-top: 1px;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.ot-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin-bottom: 16px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+
+.ot-popup .ot-tab {
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ot-popup .ot-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16);
+}
+
+.ot-panel.hidden {
+  display: none;
+}
+
+.ot-section-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ot-popup #ot-input {
+  display: block;
+  width: 100%;
+  min-height: 94px;
+  max-height: 180px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.ot-popup #ot-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+  outline: none;
+}
+
+.ot-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ot-popup .ot-btn-primary,
+.ot-popup .ot-btn-secondary {
+  min-width: 0;
+  min-height: 38px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ot-popup .ot-btn-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.ot-popup .ot-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.ot-popup .ot-btn-secondary {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.ot-popup .ot-btn-secondary:hover {
+  background: var(--soft);
+}
+
+.ot-popup button:disabled {
+  opacity: 0.58;
+  cursor: progress;
+}
+
+.ot-out {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border-left: 3px solid var(--accent);
+  background: #f8fafd;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.ot-out:empty {
+  display: none;
+}
+
+.ot-stats {
+  margin-top: 14px;
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.ot-stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 11px;
+  font-size: 12px;
+}
+
+.ot-popup .ot-stats-head button {
+  margin: 0;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ot-popup .ot-stats-head button:hover {
+  color: var(--accent);
+}
+
+.ot-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ot-stats-grid div {
+  min-width: 0;
+}
+
+.ot-stats-grid span,
+.ot-stats-grid small {
+  display: block;
+}
+
+.ot-stats-grid span {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ot-stats-grid small,
+.ot-stats-detail {
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ot-stats-grid small {
+  margin-top: 2px;
+}
+
+.ot-stats-detail {
+  margin-top: 9px;
+}
+
+.ot-img-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px 10px;
+  padding-top: 12px;
+}
+
+.ot-file {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ot-file:hover {
+  background: var(--soft);
+}
+
+.ot-img-caption {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.ot-img-status {
+  grid-column: 1 / -1;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ot-img-status:empty {
+  display: none;
+}
+
+.ot-popup #panel-settings {
+  max-height: 500px;
+  padding-right: 4px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.ot-popup .ot-form-section {
+  padding: 14px 0;
+}
+
+.ot-popup .ot-form-section:first-child {
+  padding-top: 0;
+}
+
+.ot-popup .ot-form-section h2 {
+  margin-bottom: 11px;
+  font-size: 13px;
+}
+
+.ot-popup .ot-field-grid {
+  grid-template-columns: 1fr;
+  gap: 11px;
+}
+
+.ot-popup .ot-field-wide {
+  grid-column: auto;
+}
+
+.ot-popup .ot-form input,
+.ot-popup .ot-form select {
+  min-height: 36px;
+  padding: 7px 9px;
+  font-size: 13px;
+}
+
+.ot-popup .ot-form textarea {
+  font-size: 13px;
+}
+
+.ot-popup .ot-form .ot-check {
+  min-height: 52px;
+}
+
+.ot-popup .ot-form-actions {
+  min-height: 58px;
+}
+
+@media (max-width: 600px) {
+  .ot-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ot-field-wide {
+    grid-column: auto;
+  }
+
+  .ot-form-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 15px 0;
+  }
+}

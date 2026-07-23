@@ -1,0 +1,74 @@
+name: Build & Release
+
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Package zip
+        run: npm run zip
+
+      - name: Package Firefox zip
+        run: npm run zip:firefox
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: haofan-extension
+          path: .output/*.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: haofan-extension
+          path: .output
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .output/*.zip
+          generate_release_notes: true
