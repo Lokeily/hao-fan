@@ -1,219 +1,226 @@
-# 好翻 · Open Translator CN
+# 好翻 Open Translator CN
 
 <p align="center">
   <img src="public/icon-128.png" alt="好翻" width="96" height="96">
 </p>
 
 <p align="center">
-  <strong>开源、免费的沉浸式 AI 翻译浏览器插件，国内大模型优先。</strong>
+  <strong>免费、开源、可以使用自己 API 的双语网页翻译扩展。</strong>
 </p>
 
 <p align="center">
-  <a href="#-快速开始"><img src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome"></a>
-  <a href="#-快速开始"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
-  <a href="#-快速开始"><img src="https://img.shields.io/badge/Edge-兼容-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
+  <a href="#安装扩展"><img src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome"></a>
+  <a href="#安装扩展"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
+  <a href="#安装扩展"><img src="https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
-  <a href="https://github.com/Lokeily/Hao-Fan/releases"><img src="https://img.shields.io/badge/version-0.1.2-blue" alt="v0.1.2"></a>
-  <img src="https://img.shields.io/badge/WXT-0.20-blueviolet" alt="WXT">
+  <a href="https://github.com/Lokeily/Hao-Fan-/releases/latest"><img src="https://img.shields.io/badge/version-0.1.2-blue" alt="v0.1.2"></a>
 </p>
 
----
+## 这是什么
 
-**好翻** 是一款在浏览器里直接工作的 AI 翻译工具。你用自己的 API Key 连接大模型，翻译请求从浏览器直发服务商，不经过任何中转服务器。插件本身免费且不设置额度；第三方 API 的费用与限额由对应服务商决定。
+好翻是一款浏览器翻译扩展。翻译后会保留网页原文，并把译文自然地显示在原文下面，方便逐段对照阅读。
 
-> "翻译，本就该这样简单和透明。"
+扩展本身免费，不设置使用额度。你可以连接自己的 DeepSeek、OpenAI、Gemini、智谱、通义千问等 API，也可以使用 Ollama 本地模型或传统机器翻译。
 
----
+需要注意：第三方 AI 服务可能收费，具体价格和额度由对应服务商决定。
 
-## 为什么选择好翻
+## 主要功能
 
-| 特性 | 说明 |
+| 功能 | 说明 |
 |------|------|
-| 🔑 **数据自主** | API Key 只存本地，请求直连服务商，零中转 |
-| 🧠 **15 家引擎** | DeepSeek / OpenAI / Gemini / 智谱 / 混元 / 千问 / Kimi / 百川 / 豆包 / Ollama 本地 + Google / DeepL / Microsoft 传统翻译 |
-| 👁️ **图片翻译** | 右键网页图片或本地上传，视觉模型 OCR + 译文中文叠加 |
-| 💰 **省 Token 设计** | 视口优先翻译 · 本地缓存 · 术语库零请求命中 · 目标语言自动跳过 · 重复文本合并 · 实时用量面板 |
-| 🌊 **动态内容** | 页面弹出菜单、无限滚动、异步加载内容自动检测并翻译 |
-| ⚡ **低延迟** | 首屏小批次优先返回，滚动内容按需加载，不翻不译 |
-| 🎯 **精准回填** | 带 ID 的 JSON 批量协议，不怕分隔符被模型改写造成错位 |
-| 🎨 **沉浸式** | 译文直接插入原文下方，继承字体颜色对齐，Shadow DOM 隔离站点样式 |
-| 📦 **双平台** | Chrome / Edge / Firefox 一套代码构建 |
+| 网页双语翻译 | 原文保留，译文显示在原文下方 |
+| 可见区域优先 | 先翻译当前屏幕内容，滚动后再翻译新内容 |
+| 动态内容翻译 | 菜单、弹窗、无限滚动和异步加载内容会自动补译 |
+| 划词翻译 | 选中文字后显示独立翻译窗口，不修改原网页文字 |
+| 图片翻译 | 支持网页图片和本地图片，需要使用支持视觉的 AI 模型 |
+| 自定义 API | 支持预设服务商和 OpenAI 兼容接口 |
+| 节省 Token | 使用缓存、重复文本合并、目标语言跳过和按需翻译 |
+| 隐私保护 | API Key 保存在本地，翻译请求不经过项目中转服务器 |
 
----
+## 安装扩展
 
-## 三种用法
+### 第一步：下载安装包
 
-### 1. 网页翻译
+打开 [Releases](https://github.com/Lokeily/Hao-Fan-/releases/latest)，在页面底部找到 Assets，然后下载对应文件：
 
-访问任意网页，点右下角蓝色的「**译**」按钮，或右键菜单选择「翻译本页（好翻）」。
+| 文件 | 用途 |
+|------|------|
+| <code>open-translator-cn-x.x.x-chrome.zip</code> | Chrome、Edge 和其他 Chromium 浏览器 |
+| <code>open-translator-cn-x.x.x-firefox.zip</code> | Firefox |
+| <code>open-translator-cn-x.x.x-sources.zip</code> | 源码审核包，普通用户不需要下载 |
 
-- 首屏内容秒出双语对照，滚动时继续按需翻译
-- 动态弹出的菜单、弹窗、无限滚动内容自动跟进翻译
-- 翻译中可随时点击「取消翻译」停止 Token 消耗
+下载后先解压 ZIP。浏览器不能直接加载 ZIP 文件。
 
-### 2. 划词翻译
+### 第二步：安装到 Chrome 或 Edge
 
-在网页上选中一段文字，松开鼠标，译文气泡随即出现。
+1. 在地址栏输入 <code>chrome://extensions</code>。Edge 用户输入 <code>edge://extensions</code>。
+2. 打开页面右上角的“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择刚刚解压的 Chrome 文件夹。
+5. 浏览器工具栏出现“好翻”图标后，安装完成。
 
-### 3. 图片翻译
+如果选错文件夹，请选择其中能够直接看到 <code>manifest.json</code> 的那一层目录。
 
-- **右键网页图片** →「翻译图片（好翻）」：译文悬浮面板出现在图片旁边，原图叠加半透明翻译框，侧边对照原文/译文
-- **弹窗上传** → 适合没有网页图片锚定的场景，结果在新标签页展示
+### 第二步：安装到 Firefox
 
-> 图片翻译需要支持视觉的模型：GPT-4o、Gemini、GLM-4V、千问 VL、豆包 vision 等。Google 翻译是纯文本引擎，不支持图片。
+1. 在地址栏输入 <code>about:debugging#/runtime/this-firefox</code>。
+2. 点击“临时载入附加组件”。
+3. 打开解压后的 Firefox 文件夹。
+4. 选择其中的 <code>manifest.json</code>。
 
----
+通过这种方式安装的 Firefox 扩展在浏览器重启后会消失，这是 Firefox 对未签名扩展的限制。
 
-## 支持的翻译引擎
+## 第一次使用
 
-### LLM（大语言模型）
+### 只想先试一下
 
-| 引擎 | 视觉 | 免 Key | 默认模型 |
-|------|:---:|:-----:|----------|
-| DeepSeek | | | `deepseek-chat` |
-| OpenAI (GPT) | ✅ | | `gpt-4o-mini` |
-| Google Gemini | ✅ | | `gemini-2.0-flash` |
-| OpenRouter | ✅ | | `openai/gpt-4o-mini` |
-| 智谱 GLM | ✅ | | `glm-4.5-flash` |
-| 腾讯混元 | ✅ | | `hunyuan-turbos-latest` |
-| 通义千问 | ✅ | | `qwen-plus` |
-| Kimi（月之暗面） | | | `moonshot-v1-8k` |
-| 百川智能 | | | `baichuan4` |
-| 豆包（火山方舟） | ✅ | | `doubao-lite-32k` |
-| Ollama（本地） | ✅ | ✅ | `qwen2.5` |
-| 自定义（OpenAI 兼容） | 可选 | | — |
+1. 点击浏览器工具栏中的“好翻”图标。
+2. 打开“设置”。
+3. 选择不需要 API Key 的“Google 翻译”。
+4. 打开一个普通网页。
+5. 点击网页右下角蓝色的“译”按钮。
+
+### 使用自己的 AI
+
+1. 点击浏览器工具栏中的“好翻”图标。
+2. 打开“设置”。
+3. 选择你使用的 AI 服务商。
+4. 填写该服务商提供的 API Key。
+5. 选择模型，初次使用建议先保留默认模型。
+6. 设置目标语言，例如“中文”。
+7. 点击“测试连接”。
+8. 显示连接成功后，回到网页并点击右下角的“译”按钮。
+
+设置修改后会自动保存。每个服务商的 API Key 分开保存，切换服务商时不会把 Key 发送到其他平台。
+
+## 三种翻译方式
+
+### 翻译整个网页
+
+打开普通网页后，点击右下角蓝色的“译”按钮。也可以在网页空白处点击右键，然后选择“翻译本页（好翻）”。
+
+扩展会先处理当前可见内容。向下或向上滚动时，新进入屏幕的内容会继续翻译。翻译过程中再次点击按钮可以取消任务。
+
+### 划词翻译
+
+用鼠标选中一段文字，松开鼠标后点击出现的“译”按钮。译文会显示在独立窗口中，不会改变原网页排版。
+
+### 图片翻译
+
+在网页图片上点击右键，然后选择“翻译图片（好翻）”。也可以在扩展弹窗中上传本地图片。
+
+图片翻译需要支持视觉的模型，例如 GPT-4o、Gemini、GLM-4V、通义千问 VL 或豆包视觉模型。纯文本模型和传统机器翻译不能识别图片。
+
+## 支持的服务
+
+### AI 服务
+
+- DeepSeek
+- OpenAI
+- Google Gemini
+- OpenRouter
+- 智谱 GLM
+- 腾讯混元
+- 通义千问
+- Kimi
+- 百川智能
+- 豆包
+- Ollama 本地模型
+- 自定义 OpenAI 兼容接口
 
 ### 传统机器翻译
 
-| 引擎 | 免 Key |
-|------|:-----:|
-| Google 翻译 | ✅ |
-| DeepL | |
-| Microsoft 翻译 | |
+- Google 翻译
+- DeepL
+- Microsoft 翻译
 
-> 全部 LLM 引擎走 OpenAI 兼容协议，一套适配器通吃。视觉模型走多模态消息。
+不同模型的文字质量、图片能力、速度和价格不同。无法确定时，先使用服务商的默认文本模型完成连接测试。
 
----
+## 怎样节省 Token
 
-## 快速开始
+好翻会通过以下方式减少重复请求：
 
-### 安装
+- 只优先翻译当前屏幕中能看到的内容。
+- 已翻译内容保存在本地缓存中。
+- 同一页面的重复文本只请求一次。
+- 已经是目标语言的内容会自动跳过。
+- 命中本地术语表时不调用 AI。
+- 菜单或弹窗反复打开时复用已有译文。
 
-从 [Releases](https://github.com/Lokeily/Hao-Fan/releases) 下载对应浏览器的 `.zip` 包：
+关闭扩展的本地缓存后，重复内容可能重新请求翻译服务。
 
-- `open-translator-cn-x.x.x-chrome.zip` → Chrome / Edge
-- `open-translator-cn-x.x.x-firefox.zip` → Firefox
+## 常见问题
 
-先解压下载的 ZIP，然后打开浏览器扩展管理页面加载：
+### 点击翻译后提示没有填写 API Key
 
-- Chrome / Edge：`chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」
-- Firefox：`about:debugging#/runtime/this-firefox` →「临时载入附加组件」
+打开扩展设置，确认当前服务商对应的 API Key 已填写，然后点击“测试连接”。切换服务商后，需要填写新服务商自己的 Key。
 
-### 开发
+### 安装后网页上没有“译”按钮
 
-```bash
-git clone https://github.com/Lokeily/Hao-Fan.git
-cd Hao-Fan
-npm install
-npm run dev          # Chrome 开发模式，支持热重载
-```
+刷新已经打开的网页。浏览器扩展安装前打开的页面通常需要刷新后才能加载扩展。
 
-在浏览器加载 `.output/chrome-mv3/dev` 目录即可。
+浏览器设置页、扩展商店、空白新标签页等内部页面不允许扩展运行，这些页面无法翻译。
 
-### 构建
+### 有些新出现的内容没有翻译
 
-```bash
-npm run build           # Chrome/Edge 生产构建
-npm run zip             # 生成 Chrome/Edge ZIP 包
-npm run build:firefox   # Firefox 生产构建
-npm run zip:firefox     # 生成 Firefox ZIP 包
-```
+先让内容进入当前可见区域并稍等片刻。如果仍然没有翻译，请通过下方的问题反馈渠道提交页面地址和复现步骤。
 
-构建产物位于 `.output/`。
+### 译文显示错位或覆盖网页
 
----
+请提供浏览器版本、网页地址、截图和复现步骤。不要在截图或日志中暴露 API Key。
 
-## 配置
+### 扩展是否完全免费
 
-安装后点击插件图标 →「设置」标签页：
+扩展代码和功能免费。使用第三方 AI API 时，服务商可能按照 Token 或请求次数收费。使用 Ollama 本地模型时不需要云端 API Key。
 
-1. **选择翻译引擎** — 如 DeepSeek、智谱、OpenAI
-2. **选择模型** — 使用预设，或选择「自定义模型」填入新模型名
-3. **填入 API Key** — 每个服务商独立保存，切换引擎不会错发 Key
-4. **设置源语言与目标语言** — 默认「自动检测」→「中文」
-5. **可选**：自定义系统提示词、术语表、翻译风格；自定义接口可手动开启视觉能力
+### 如何更新扩展
 
-点击「测试连接」验证配置是否正确。
+下载新版 ZIP 并解压，用新版文件覆盖原来的扩展目录，然后在扩展管理页点击“重新加载”。不要先删除旧扩展，也不要随意更换目录，否则浏览器可能把它识别为新的扩展并丢失原配置。升级前仍建议记录自己的服务商和模型设置。
 
-各厂商 API Key 申请地址见 `utils/providers.ts` 中的 `docUrl` 字段。
+## 隐私与权限
 
----
-
-## 目录结构
-
-```
-open-translator-cn/
-├── entrypoints/
-│   ├── background.ts          # Service Worker：消息路由 / API 调用 / 右键菜单
-│   ├── content.ts             # 内容脚本：文本提取 / 译文注入 / 划词气泡 / 悬浮按钮
-│   ├── image-translate.html   # 图片翻译结果页
-│   ├── options.html           # 设置页入口
-│   └── popup.html             # 弹窗入口
-├── src/pages/
-│   ├── image-translate.ts     # 图片翻译结果页逻辑
-│   ├── options.ts             # 设置页逻辑
-│   └── popup.ts               # 弹窗逻辑（快速翻译 + 图片上传 + 配置入口）
-├── utils/
-│   ├── providers.ts           # 15 家引擎预设（LLM / MT / vision 标记）
-│   ├── translator.ts          # OpenAI 兼容调用 + 批量翻译 + 传统 MT
-│   ├── vision.ts              # 视觉模型图片翻译（OCR + 坐标）
-│   ├── languages.ts           # 18 种语言映射
-│   ├── cache.ts               # 翻译缓存
-│   ├── storage.ts             # 配置持久化
-│   ├── dom.ts                 # 网页文本提取
-│   └── ui.ts                  # 设置 / 弹窗共用表单
-├── styles/                    # 样式
-├── tests/                     # 单元测试
-├── scripts/                   # 构建与 CI 辅助脚本
-├── wxt.config.ts              # WXT 配置
-├── tsconfig.json
-└── package.json
-```
-
----
-
-## 隐私与安全
-
-- 你的 **API Key 仅保存在浏览器本地**（`storage.local`），随请求直发所选服务商
-- 翻译请求由浏览器扩展**直接发起**，不经过本项目的中转服务器
-- 项目**没有遥测、广告追踪或数据收集**
-- 已显式声明 CSP（`script-src 'self'`），禁止内联/远程脚本
-- 翻译缓存保存在本地，含 30 天 TTL 与容量上限，可在设置中关闭
-- `<all_urls>` 权限用于在用户访问的网页中运行内容脚本，以及由后台直连用户所选大模型 API
-
----
+- API Key 只保存在浏览器本地的 <code>storage.local</code> 中。
+- 翻译内容直接发送给你选择的服务商，不经过本项目的中转服务器。
+- 项目没有遥测、广告追踪或用户行为统计。
+- 本地翻译缓存默认包含 30 天有效期和容量上限，可在设置中关闭。
+- <code>&lt;all_urls&gt;</code> 权限用于在用户打开的网页中运行翻译脚本，并从后台连接所选翻译服务。
+- 项目使用内容安全策略，禁止扩展页面加载远程脚本。
 
 ## 问题反馈
 
-遇到漏译、译文错位、动态内容未翻译或其他 Bug，可以通过以下渠道反馈：
+遇到漏译、译文错位、动态内容未翻译或其他问题，可以通过以下方式反馈：
 
 - [GitHub Issues](https://github.com/Lokeily/Hao-Fan-/issues)
-- 联系作者 QQ：`3084614411`
+- 联系作者 QQ：<code>3084614411</code>
 
-反馈时建议附上浏览器版本、问题页面和复现步骤，请勿提交 API Key 等敏感信息。
+反馈时请尽量提供浏览器名称和版本、问题页面、截图以及复现步骤。请勿提交 API Key、账号密码或其他敏感信息。
 
----
+## 开发者说明
 
-## 路线图
+### 本地运行
 
-- [ ] PDF / ePub 翻译
-- [ ] YouTube / 流媒体字幕双语
-- [ ] TTS 朗读（Edge TTS）
-- [ ] 油猴脚本版本（免安装）
-- [ ] 跨设备配置同步
+~~~bash
+git clone https://github.com/Lokeily/Hao-Fan-.git
+cd Hao-Fan-
+npm install
+npm run dev
+~~~
 
----
+开发模式构建结果位于 <code>.output/chrome-mv3-dev</code>。在 Chrome 扩展管理页加载该目录即可。
+
+### 测试和构建
+
+~~~bash
+npm test
+npm run typecheck
+npm run build
+npm run zip
+npm run build:firefox
+npm run zip:firefox
+~~~
+
+正式构建和 ZIP 文件位于 <code>.output/</code>。
 
 ## 许可证
 
-[MIT](./LICENSE) — 自由使用、修改、再分发。
+本项目使用 [MIT 许可证](./LICENSE)，允许使用、修改和再分发。
