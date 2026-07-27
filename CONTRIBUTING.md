@@ -42,8 +42,11 @@ npm run dev
 npm test
 npm run typecheck
 npm run build
+npm run test:browser
 npm run build:firefox
 ~~~
+
+浏览器回归测试需要 Chrome；CI 会自动安装对应的 Chromium 测试运行时。
 
 ## 提交 Pull Request
 

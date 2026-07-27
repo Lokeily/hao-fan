@@ -1,0 +1,279 @@
+:root {
+  --image-bg: #f5f5f7;
+  --image-surface: #ffffff;
+  --image-text: #1d1d1f;
+  --image-text-2: #6e6e73;
+  --image-text-3: #86868b;
+  --image-border: #d2d2d7;
+  --image-accent: #0071e3;
+  --image-red: #c93434;
+  --image-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--image-bg);
+  color: var(--image-text);
+  font-family: var(--image-font);
+  letter-spacing: 0;
+}
+
+button,
+input {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.ot-brand-mark {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.ot-brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ot-image-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--image-border);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.ot-image-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.ot-image-brand strong,
+.ot-image-brand h1 {
+  display: block;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.ot-image-brand strong {
+  font-size: 11px;
+  color: var(--image-text-3);
+}
+
+.ot-image-brand h1 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ot-image-tools {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--image-text-2);
+  font-size: 12px;
+}
+
+.ot-image-tools > span {
+  color: var(--image-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-image-tools label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.ot-image-tools input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--image-accent);
+}
+
+.ot-image-layout {
+  display: grid;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 20px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.ot-image-stage {
+  min-width: 0;
+  min-height: 220px;
+  padding: 12px;
+  border: 1px solid var(--image-border);
+  border-radius: 8px;
+  background: var(--image-surface);
+}
+
+.ot-image-canvas {
+  position: relative;
+  min-width: 0;
+}
+
+.ot-image-stage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.ot-image-segment {
+  position: absolute;
+  overflow: hidden;
+  padding: 2px 4px;
+  border: 1px solid rgba(26, 115, 232, 0.78);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #202124;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.ot-image-list-shell {
+  min-width: 0;
+  max-height: calc(100vh - 106px);
+  padding-left: 20px;
+  border-left: 1px solid var(--image-border);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.ot-image-list-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0 10px;
+  background: var(--image-bg);
+}
+
+.ot-image-list-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ot-image-list-head span {
+  color: var(--image-text-3);
+  font-size: 11px;
+}
+
+.ot-image-item {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--image-border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ot-image-source {
+  color: var(--image-text-2);
+}
+
+.ot-image-translation {
+  margin-top: 4px;
+  color: var(--image-text);
+  font-weight: 550;
+}
+
+.ot-image-loading,
+.ot-image-list-empty {
+  padding: 44px 20px;
+  color: var(--image-text-2);
+  font-size: 13px;
+  text-align: center;
+}
+
+.ot-image-loading.is-error {
+  color: var(--image-red);
+}
+
+.ot-image-state {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 32px;
+  text-align: center;
+}
+
+.ot-image-state h1 {
+  margin: 16px 0 0;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.ot-image-state p {
+  max-width: 420px;
+  margin: 8px 0 0;
+  color: var(--image-text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .ot-image-head {
+    position: static;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .ot-image-tools {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .ot-image-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 12px;
+  }
+
+  .ot-image-stage {
+    min-height: 160px;
+    padding: 8px;
+  }
+
+  .ot-image-list-shell {
+    max-height: none;
+    padding: 14px 0 0;
+    border-top: 1px solid var(--image-border);
+    border-left: 0;
+  }
+}

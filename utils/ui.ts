@@ -8,11 +8,6 @@ import { getProviderApiKey, normalizeConfig, withProviderApiKey, type AppConfig 
 export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   let cfg: AppConfig = normalizeConfig(configItem.defaultValue);
 
-  configItem.getValue().then((v) => {
-    cfg = normalizeConfig(v);
-    fill();
-  }).catch(() => {});
-
   const advancedFields = `
     <div class="ot-field-grid">
       <label class="ot-field ot-field-wide">API Base URL
@@ -96,6 +91,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   const parsedForm = new DOMParser().parseFromString(formMarkup, 'text/html');
   mount.replaceChildren(...Array.from(parsedForm.body.childNodes));
 
+  const form = mount.querySelector('.ot-form') as HTMLFormElement;
   const providerSel = mount.querySelector('[data-f=provider]') as HTMLSelectElement;
   const modelSel = mount.querySelector('[data-f=model]') as HTMLSelectElement;
   const modelText = mount.querySelector('[data-f=modelText]') as HTMLInputElement;
@@ -118,6 +114,21 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   let statusTimer: ReturnType<typeof setTimeout> | null = null;
   let saveQueue: Promise<void> = Promise.resolve();
   let inputSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function setFormLoading(loading: boolean) {
+    form.classList.toggle('is-loading', loading);
+    form.setAttribute('aria-busy', String(loading));
+    Array.from(form.elements).forEach((element) => {
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement ||
+        element instanceof HTMLButtonElement
+      ) {
+        element.disabled = loading;
+      }
+    });
+  }
 
   function setStatus(message: string, error = false, clearAfter = 0) {
     if (statusTimer) clearTimeout(statusTimer);
@@ -206,7 +217,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     customVisionChk.checked = cfg.customVision === true;
   }
 
-  function save(): Promise<void> {
+  function save(): Promise<boolean> {
     cfg.provider = providerSel.value;
     // 取当前可见的模型字段（P1-2）
     cfg.model = modelField.hidden
@@ -225,12 +236,17 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.customGlossary = glossaryInput.value;
     cfg.customVision = customVisionChk.checked;
     const snapshot: AppConfig = { ...cfg, apiKeys: { ...cfg.apiKeys } };
-    saveQueue = saveQueue
+    const write = saveQueue
       .catch(() => {})
-      .then(() => configItem.setValue(snapshot))
-      .then(() => setStatus('已保存 ✓', false, 1500))
-      .catch(() => setStatus('保存失败，请重试', true));
-    return saveQueue;
+      .then(() => configItem.setValue(snapshot));
+    saveQueue = write.then(
+      () => setStatus('已保存 ✓', false, 1500),
+      () => setStatus('保存失败，请重试', true),
+    );
+    return write.then(
+      () => true,
+      () => false,
+    );
   }
 
   function scheduleSave(delay = 400) {
@@ -289,7 +305,8 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
 
   // 测试连接：保存当前配置后翻译一句测试文本，验证 Key / 端点是否可用（P2-3）
   testBtn.addEventListener('click', async () => {
-    await save(); // 先等配置落盘，再发测试请求，避免用旧配置误测
+    const saved = await save(); // 先等配置落盘，再发测试请求，避免用旧配置误测
+    if (!saved) return;
     setStatus('测试中…');
     testBtn.disabled = true;
     try {
@@ -316,4 +333,12 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   }
 
   fill();
+  setFormLoading(true);
+  void configItem.getValue()
+    .then((value) => {
+      cfg = normalizeConfig(value);
+      fill();
+    })
+    .catch(() => setStatus('读取设置失败，当前显示默认配置', true))
+    .finally(() => setFormLoading(false));
 }

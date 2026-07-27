@@ -24,6 +24,13 @@ import { planTextChunks, splitLongText, takeFirstTextChunk } from '../utils/chun
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
 import { randomId } from '../utils/id.ts';
+import {
+  isSiteDisabled,
+  normalizeDisabledSites,
+  siteKeyOf,
+  withSiteDisabled,
+} from '../utils/site-policy.ts';
+import { TranslationJobRegistry } from '../utils/translation-jobs.ts';
 
 test('migrates a legacy API key without exposing it to another provider', () => {
   const migrated = normalizeConfig({
@@ -47,6 +54,56 @@ test('keeps an existing provider key when legacy data is also present', () => {
     apiKeys: { openai: 'current-secret' },
   });
   assert.equal(getProviderApiKey(migrated), 'current-secret');
+});
+
+test('normalizes and updates per-site translation pauses', () => {
+  assert.equal(siteKeyOf('https://Example.com/article'), 'example.com');
+  assert.equal(siteKeyOf('http://example.com/other'), 'example.com');
+  assert.equal(siteKeyOf('chrome://extensions'), null);
+  assert.equal(siteKeyOf('file:///tmp/page.html'), null);
+
+  const stored = normalizeDisabledSites([
+    'Example.com',
+    'https://example.com/old-path',
+    'localhost:4173',
+    'invalid site',
+  ]);
+  assert.deepEqual(stored, ['example.com', 'localhost:4173']);
+  assert.equal(isSiteDisabled(stored, 'http://example.com/page'), true);
+  assert.equal(isSiteDisabled(stored, 'https://open.example.com/page'), false);
+
+  const enabled = withSiteDisabled(stored, 'https://example.com/page', false);
+  assert.deepEqual(enabled, ['localhost:4173']);
+  assert.deepEqual(withSiteDisabled(enabled, 'http://docs.example.com', true), [
+    'localhost:4173',
+    'docs.example.com',
+  ]);
+  assert.deepEqual(stored, ['example.com', 'localhost:4173']);
+
+  const full = Array.from({ length: 500 }, (_, index) => `site-${index}.example`);
+  const capped = withSiteDisabled(full, 'https://latest.example', true);
+  assert.equal(capped.length, 500);
+  assert.equal(capped.includes('site-0.example'), false);
+  assert.equal(capped.at(-1), 'latest.example');
+});
+
+test('cancels active translation jobs and rejects requests that arrive late', async () => {
+  const jobs = new TranslationJobRegistry(2);
+  let release;
+  const active = jobs.run('page-job', (signal) => new Promise((resolve, reject) => {
+    release = resolve;
+    signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }));
+
+  jobs.cancel('page-job');
+  await assert.rejects(active, (error) => error?.name === 'AbortError');
+  await assert.rejects(
+    jobs.run('page-job', async () => 'should not run'),
+    (error) => error?.name === 'AbortError',
+  );
+
+  release?.();
+  assert.equal(await jobs.run('another-job', async () => 'ok'), 'ok');
 });
 
 test('migrates retired display settings and keeps custom vision opt-in', () => {

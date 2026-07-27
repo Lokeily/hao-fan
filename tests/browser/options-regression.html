@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Options regression</title>
+    <script src="./browser-mock.js"></script>
+  </head>
+  <body>
+    <script type="module">
+      const response = await fetch('../../.output/chrome-mv3/options.html');
+      const html = await response.text();
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      for (const link of parsed.querySelectorAll('link[rel="stylesheet"]')) {
+        const clone = document.createElement('link');
+        clone.rel = 'stylesheet';
+        clone.href = new URL(`../../.output/chrome-mv3/${link.getAttribute('href')}`, location.href);
+        document.head.appendChild(clone);
+      }
+      const modulePath = parsed.querySelector('script[type="module"]')?.getAttribute('src');
+      if (!modulePath) throw new Error('Options module not found');
+      await import(new URL(`../../.output/chrome-mv3/${modulePath}`, location.href));
+    </script>
+  </body>
+</html>

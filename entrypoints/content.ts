@@ -12,10 +12,11 @@ import {
   closestTextBlock,
 } from '../utils/dom';
 import { planTextChunks, takeFirstTextChunk } from '../utils/chunking';
-import { configItem } from '../utils/storage';
+import { configItem, disabledSitesItem } from '../utils/storage';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy';
 import { SessionTranslationCache } from '../utils/session-translation-cache';
 import { randomId } from '../utils/id';
+import { isSiteDisabled } from '../utils/site-policy';
 import '../styles/content.css';
 
 let activeImageCleanup: (() => void) | null = null;
@@ -67,6 +68,28 @@ export default defineContentScript({
     let noticeHost: HTMLElement | null = null;
     const noticeCycles = new NoticeCycleGate();
     let blockedPageJobId: string | null = null;
+    let siteDisabled = false;
+    let sitePolicyLoaded = false;
+    let sitePolicyRevision = 0;
+
+    try {
+      disabledSitesItem.watch((sites) => {
+        sitePolicyRevision++;
+        setSiteDisabledState(isSiteDisabled(sites, location.href));
+      });
+    } catch {
+      /* 存储监听不可用时，仍使用首次读取到的站点规则。 */
+    }
+    const initialSitePolicyRevision = sitePolicyRevision;
+    const sitePolicyReady = disabledSitesItem.getValue()
+      .then((sites) => {
+        if (sitePolicyRevision === initialSitePolicyRevision) {
+          setSiteDisabledState(isSiteDisabled(sites, location.href));
+        }
+      })
+      .catch(() => {
+        if (!sitePolicyLoaded) setSiteDisabledState(false);
+      });
 
     // 页面内的开关/弹层反复创建相同 DOM 时直接复用译文；配置变化后立即失效，
     // 避免把旧语言或旧模型的结果继续显示出来。
@@ -662,6 +685,10 @@ export default defineContentScript({
 
     // ===== 整页翻译（沉浸式叠加层：译文贴在原文正下方，不改动原网页）=====
     async function translatePage(initial = true) {
+      if (siteDisabled) {
+        showSitePausedNotice();
+        return;
+      }
       if (busy) return;
       busy = true;
 
@@ -757,9 +784,13 @@ export default defineContentScript({
       } catch (e: any) {
         showNotice(e?.message || '翻译失败', jobId || 'page-translation');
       } finally {
-        busy = false;
-        setToolbarLoading(false);
-        if (initial && activePageJobId === jobId) startDynamicTranslation();
+        // 取消后用户可能已经开始了新任务。旧任务的异步收尾不能清掉新任务的
+        // busy / 按钮状态，也不能替新任务提前启动动态监听。
+        if (activePageJobId === jobId) {
+          busy = false;
+          setToolbarLoading(false);
+          if (initial) startDynamicTranslation();
+        }
       }
     }
 
@@ -967,6 +998,27 @@ export default defineContentScript({
       dynamicActive = false;
     }
 
+    function setSiteDisabledState(disabled: boolean) {
+      const changed = !sitePolicyLoaded || siteDisabled !== disabled;
+      sitePolicyLoaded = true;
+      siteDisabled = disabled;
+      if (!changed) return;
+      if (disabled) {
+        clearTranslations();
+        busy = false;
+        setToolbarLoading(false);
+        hideSelectionUi();
+        closeNotice();
+        document.getElementById('ot-toolbar')?.remove();
+      } else {
+        mountToolbar();
+      }
+    }
+
+    function showSitePausedNotice() {
+      showNotice('当前网站已暂停翻译，请在扩展弹窗中恢复', `site-policy-${randomId()}`);
+    }
+
     // ---- 划词翻译：结果留在独立浮层中，不改写正文，也不会覆盖整段译文。 ----
     type SelectionSnapshot = { text: string; rect: DOMRect };
     let selectionHost: HTMLDivElement | null = null;
@@ -974,9 +1026,17 @@ export default defineContentScript({
     let selectionPinned = false;
     let selectionTimer: ReturnType<typeof setTimeout> | null = null;
     let selectionRequestId = 0;
+    let activeSelectionJobId: string | null = null;
 
     function hideSelectionUi() {
       selectionRequestId++;
+      if (activeSelectionJobId) {
+        sendRuntimeMessage({
+          type: 'CANCEL_TRANSLATION',
+          payload: { jobId: activeSelectionJobId },
+        }).catch(() => {});
+        activeSelectionJobId = null;
+      }
       selectionHost?.remove();
       selectionHost = null;
       selectionSnapshot = null;
@@ -1154,8 +1214,13 @@ export default defineContentScript({
         return;
       }
       const requestConfigRevision = translationConfigRevision;
+      const jobId = randomId();
+      activeSelectionJobId = jobId;
       try {
-        const res: any = await sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text: snapshot.text } });
+        const res: any = await sendRuntimeMessage({
+          type: 'TRANSLATE_ONE',
+          payload: { text: snapshot.text, jobId },
+        });
         if (requestId !== selectionRequestId || host !== selectionHost) return;
         if (!res?.ok) throw new Error(res?.error || '翻译失败');
         const translation = typeof res.translation === 'string' ? res.translation : '';
@@ -1168,10 +1233,13 @@ export default defineContentScript({
         if (requestId !== selectionRequestId || host !== selectionHost) return;
         renderSelectionPanel(host, snapshot, '翻译失败');
         showNotice(error instanceof Error ? error.message : '翻译失败', operationId);
+      } finally {
+        if (activeSelectionJobId === jobId) activeSelectionJobId = null;
       }
     }
 
     function showSelectionUi(snapshot: SelectionSnapshot, translateImmediately = false) {
+      if (siteDisabled) return;
       const host = createSelectionHost(snapshot);
       positionSelectionUi(host, snapshot.rect, false);
       if (translateImmediately) {
@@ -1194,6 +1262,10 @@ export default defineContentScript({
     }
 
     function refreshSelectionUi() {
+      if (siteDisabled) {
+        hideSelectionUi();
+        return;
+      }
       if (selectionPinned) return;
       const snapshot = captureSelection();
       if (snapshot) showSelectionUi(snapshot);
@@ -1225,14 +1297,29 @@ export default defineContentScript({
 
     // 接收来自 background 的指令
     runtime.onMessage.addListener((msg: any) => {
-      if (msg?.type === 'TRANSLATE_PAGE') translatePage(true);
-      else if (msg?.type === 'SHOW_IMAGE_RESULT') showImageResult(msg.payload?.srcUrl, msg.payload?.result);
+      if (msg?.type === 'SITE_POLICY_CHANGED' && typeof msg.payload?.disabled === 'boolean') {
+        sitePolicyRevision++;
+        setSiteDisabledState(msg.payload.disabled);
+      }
+      else if (msg?.type === 'TRANSLATE_PAGE') {
+        void sitePolicyReady.then(() => siteDisabled ? showSitePausedNotice() : translatePage(true));
+      }
+      else if (msg?.type === 'SHOW_IMAGE_RESULT') {
+        if (siteDisabled) showSitePausedNotice();
+        else showImageResult(msg.payload?.srcUrl, msg.payload?.result);
+      }
       else if (msg?.type === 'SHOW_ERROR') {
         showNotice(msg.payload?.message || '操作失败', `external-${randomId()}`);
       }
       else if (msg?.type === 'TRANSLATE_SELECTION') {
-        const snapshot = captureSelection();
-        if (snapshot) showSelectionUi(snapshot, true);
+        void sitePolicyReady.then(() => {
+          if (siteDisabled) {
+            showSitePausedNotice();
+            return;
+          }
+          const snapshot = captureSelection();
+          if (snapshot) showSelectionUi(snapshot, true);
+        });
       }
     });
 
@@ -1240,6 +1327,7 @@ export default defineContentScript({
     // ★ 悬浮工具按钮 — 彻底重构：确保在任何网页上都可见
     // ============================================================
     function mountToolbar() {
+      if (!sitePolicyLoaded || siteDisabled) return;
       if (document.getElementById('ot-toolbar')) return;
 
       const btn = document.createElement('button');
@@ -1345,12 +1433,10 @@ export default defineContentScript({
       }
     }
 
-    mountToolbar();
-
     // SPA 自愈：toolbar 被页面 JS 移除时自动重建
     if (document.body) {
       new MutationObserver(() => {
-        if (!document.getElementById('ot-toolbar')) mountToolbar();
+        if (sitePolicyLoaded && !siteDisabled && !document.getElementById('ot-toolbar')) mountToolbar();
       }).observe(document.body, { childList: true });
     }
   },

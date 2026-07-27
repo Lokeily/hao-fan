@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>DOM extraction regression</title>
+    <script src="./browser-mock.js"></script>
     <style>
       body { font: 16px/1.5 system-ui; margin: 0; }
       header { display: flex; gap: 16px; padding: 12px; }
@@ -20,6 +21,7 @@
     </header>
     <main>
       <h1>Enable two-factor authentication (2FA)</h1>
+      <button id="add-dynamic" type="button">Add dynamic content</button>
       <form>
         <h2>Setup authenticator app</h2>
         <div>Authenticator apps generate one-time passwords used during sign-in.</div>
@@ -38,7 +40,7 @@
           </button>
         </div>
       </form>
-      <output id="result"></output>
+      <section id="processed-parent" class="ot-translated"></section>
     </main>
     <aside>
       <div role="button"><span>Close menu</span></div>
@@ -53,6 +55,13 @@
     <div id="account-menu" role="menu" aria-labelledby="account-menu-trigger">
       <div role="menuitem">Profile settings and account preferences</div>
     </div>
-    <script type="module" src="./dom-regression.ts"></script>
+    <script>
+      document.querySelector('#add-dynamic').addEventListener('click', () => {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = 'New content loaded inside an already translated container.';
+        document.querySelector('#processed-parent').appendChild(paragraph);
+      });
+    </script>
+    <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
   </body>
 </html>

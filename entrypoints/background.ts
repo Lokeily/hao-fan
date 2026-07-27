@@ -1,7 +1,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { browser } from 'wxt/browser';
 import { storage } from 'wxt/utils/storage';
-import { configItem, usageItem } from '../utils/storage';
+import { configItem, disabledSitesItem, usageItem } from '../utils/storage';
 import { getProviderApiKey, normalizeConfig, type AppConfig } from '../utils/config';
 import { getProvider } from '../utils/providers';
 import { translateBatchDetailed, translateOneDetailed } from '../utils/translator';
@@ -11,9 +11,11 @@ import { fetchWithTimeout } from '../utils/requester';
 import { asRecord, readBatch, readJobId, readSingle } from '../utils/messages';
 import { accumulateUsage, EMPTY_USAGE_TOTALS, type TranslationStats } from '../utils/usage';
 import { randomId } from '../utils/id';
+import { isSiteDisabled } from '../utils/site-policy';
+import { TranslationJobRegistry } from '../utils/translation-jobs';
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
-const translationJobs = new Map<string, Set<AbortController>>();
+const translationJobs = new TranslationJobRegistry();
 let usageWriteQueue: Promise<void> = Promise.resolve();
 
 // 配置读取：每次都重新读取最新值，避免“刚在设置页改完 Key，测试连接却用了旧配置”的竞态。
@@ -59,22 +61,11 @@ async function withTranslationJob<T>(
   jobId: string | undefined,
   task: (signal?: AbortSignal) => Promise<T>,
 ): Promise<T> {
-  if (!jobId) return task();
-  const controller = new AbortController();
-  const controllers = translationJobs.get(jobId) || new Set<AbortController>();
-  controllers.add(controller);
-  translationJobs.set(jobId, controllers);
-  try {
-    return await task(controller.signal);
-  } finally {
-    controllers.delete(controller);
-    if (controllers.size === 0) translationJobs.delete(jobId);
-  }
+  return translationJobs.run(jobId, task);
 }
 
 function cancelTranslationJob(jobId: string): void {
-  translationJobs.get(jobId)?.forEach((controller) => controller.abort());
-  translationJobs.delete(jobId);
+  translationJobs.cancel(jobId);
 }
 
 function recordUsage(stats: TranslationStats): Promise<void> {
@@ -264,6 +255,12 @@ export default defineBackground(() => {
     }
   }
 
+  async function assertSiteEnabled(pageUrl?: string): Promise<void> {
+    if (pageUrl && isSiteDisabled(await disabledSitesItem.getValue(), pageUrl)) {
+      throw new Error('当前网站已暂停翻译，请在扩展弹窗中恢复');
+    }
+  }
+
   browser.contextMenus?.onClicked.addListener((info, tab) => {
     if (!tab?.id) return;
     if (info.menuItemId === 'ot-translate-page') {
@@ -273,6 +270,7 @@ export default defineBackground(() => {
     } else if (info.menuItemId === 'ot-translate-image' && info.srcUrl) {
       // 右键图片：在后台翻译，再把结果发回内容脚本，在原网页图片旁悬浮展示
       ensureContent(tab.id)
+        .then(() => assertSiteEnabled(tab.url))
         .then(() => doTranslateImage(info.srcUrl))
         .then((result) =>
           browser.tabs.sendMessage(tab.id!, {

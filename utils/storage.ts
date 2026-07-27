@@ -10,3 +10,8 @@ export const configItem = storage.defineItem<AppConfig>('local:config', {
 export const usageItem = storage.defineItem<UsageTotals>('local:usageStats', {
   defaultValue: EMPTY_USAGE_TOTALS,
 });
+
+// 与模型配置分开保存，避免修改 API / 语言偏好时覆盖用户的站点暂停列表。
+export const disabledSitesItem = storage.defineItem<string[]>('local:disabledSites', {
+  defaultValue: [],
+});

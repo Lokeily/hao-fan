@@ -14,7 +14,7 @@
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
-  <a href="https://github.com/Lokeily/Hao-Fan-/releases/latest"><img src="https://img.shields.io/badge/version-0.1.2-blue" alt="v0.1.2"></a>
+  <a href="https://github.com/Lokeily/Hao-Fan-/releases/latest"><img src="https://img.shields.io/badge/version-0.1.3-blue" alt="v0.1.3"></a>
 </p>
 
 ## 这是什么
@@ -49,6 +49,7 @@
 | 动态内容翻译 | 菜单、弹窗、无限滚动和异步加载内容会自动补译 |
 | 划词翻译 | 选中文字后显示独立翻译窗口，不修改原网页文字 |
 | 图片翻译 | 支持网页图片和本地图片，需要使用支持视觉的 AI 模型 |
+| 按网站暂停 | 在扩展弹窗中暂停当前网站，立即清理译文且无需刷新即可恢复 |
 | 自定义 API | 支持预设服务商和 OpenAI 兼容接口 |
 | 节省 Token | 使用缓存、重复文本合并、目标语言跳过和按需翻译 |
 | 隐私保护 | API Key 保存在本地，翻译请求不经过项目中转服务器 |
@@ -116,6 +117,10 @@
 打开普通网页后，点击右下角蓝色的“译”按钮。也可以在网页空白处点击右键，然后选择“翻译本页（好翻）”。
 
 扩展会先处理当前可见内容。向下或向上滚动时，新进入屏幕的内容会继续翻译。翻译过程中再次点击按钮可以取消任务。
+
+### 暂停某个网站
+
+打开扩展弹窗，在“当前网站翻译”一栏关闭开关。扩展会取消正在进行的任务、清理已有译文，并隐藏该网站上的翻译入口。再次打开开关即可立即恢复，不需要刷新网页。文本框翻译和扩展设置不受影响。
 
 ### 划词翻译
 
@@ -199,6 +204,7 @@
 - 翻译内容直接发送给你选择的服务商，不经过本项目的中转服务器。
 - 项目没有遥测、广告追踪或用户行为统计。
 - 本地翻译缓存默认包含 30 天有效期和容量上限，可在设置中关闭。
+- 暂停翻译的网站列表只保存在浏览器本地，不会发送给翻译服务商。
 - <code>&lt;all_urls&gt;</code> 权限用于在用户打开的网页中运行翻译脚本，并从后台连接所选翻译服务。
 - 项目使用内容安全策略，禁止扩展页面加载远程脚本。
 
@@ -241,6 +247,7 @@ npm run dev
 npm test
 npm run typecheck
 npm run build
+npm run test:browser
 npm run zip
 npm run build:firefox
 npm run zip:firefox

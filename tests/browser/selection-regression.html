@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-batch-mode="mismatch">
   <head>
     <meta charset="UTF-8" />
     <title>Selection translation regression</title>
@@ -9,65 +9,7 @@
       #controlled-panel { display: none; }
       #toggle-panel[aria-expanded="true"] + #controlled-panel { display: block; }
     </style>
-    <script>
-      (() => {
-        const eventTarget = { addListener() {}, removeListener() {} };
-        const area = {
-          async get() { return {}; },
-          async set() {},
-          async remove() {},
-          async clear() {},
-        };
-        document.documentElement.dataset.translationCalls = '0';
-        document.documentElement.dataset.singleRequests = '0';
-        document.documentElement.dataset.activeSingles = '0';
-        document.documentElement.dataset.maxActiveSingles = '0';
-        globalThis.chrome = {
-          runtime: {
-            id: 'selection-regression',
-            onMessage: eventTarget,
-            async sendMessage(message) {
-              document.documentElement.dataset.translationCalls = String(
-                Number(document.documentElement.dataset.translationCalls || '0') + 1,
-              );
-              if (message?.type === 'TRANSLATE_ONE') {
-                document.documentElement.dataset.singleRequests = String(
-                  Number(document.documentElement.dataset.singleRequests || '0') + 1,
-                );
-                const active = Number(document.documentElement.dataset.activeSingles || '0') + 1;
-                document.documentElement.dataset.activeSingles = String(active);
-                document.documentElement.dataset.maxActiveSingles = String(Math.max(
-                  active,
-                  Number(document.documentElement.dataset.maxActiveSingles || '0'),
-                ));
-                await new Promise((resolve) => setTimeout(resolve, 20));
-                document.documentElement.dataset.activeSingles = String(active - 1);
-                const text = message.payload.text;
-                return {
-                  ok: true,
-                  translation: text === 'Enable two-factor authentication'
-                    ? '启用双重身份验证'
-                    : `译文：${text}`,
-                  stats: {},
-                };
-              }
-              if (message?.type === 'TRANSLATE_BATCH') {
-                // 故意返回错误数量，验证内容脚本的有限并发逐条兜底。
-                return { ok: true, translations: [], stats: {} };
-              }
-              return { ok: true };
-            },
-          },
-          storage: {
-            local: area,
-            session: area,
-            sync: area,
-            managed: area,
-            onChanged: eventTarget,
-          },
-        };
-      })();
-    </script>
+    <script src="./browser-mock.js"></script>
   </head>
   <body>
     <main>
