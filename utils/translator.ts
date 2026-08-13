@@ -529,6 +529,9 @@ async function callChat(
       { role: 'user', content: userContent },
     ],
     temperature: 0.3,
+    // 显式输出上限：多数兼容端点默认上限偏低，长段落频繁触发截断降级；
+    // 设 4096 让模型一次产出完整译文，减少拆批重试的额外请求。
+    max_tokens: 4096,
   });
 
   // 统一的超时 + 重试 + 错误体处理（见 utils/requester.ts）

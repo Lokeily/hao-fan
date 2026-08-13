@@ -50,6 +50,7 @@ export async function translateImage(
         },
       ],
       temperature: 0.2,
+      max_tokens: 4096,
     }),
     { timeout: 45000, retries: 1, signal },
   );
