@@ -19,22 +19,106 @@
   const cancelledJobs = new Set();
   const memory = {
     disabledSites: disabledFromQuery ? [location.host] : [],
-    ...(imageResultFromQuery
-      ? {
-        'imageJob:test': {
-          image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-          segments: [{
-            text: 'Hello',
-            translation: '你好',
-            x: 0.08,
-            y: 0.1,
-            w: 0.36,
-            h: 0.2,
-          }],
-        },
-      }
-      : {}),
   };
+  // ===== IndexedDB 最小 mock =====
+  // 图片翻译任务已从 storage.local 迁移到 IndexedDB（见 utils/image-job-store.ts），
+  // 因此这里提供内存版 indexedDB，并在 imageResult=1 时预置一份 'test' 任务。
+  const idbDatabases = new Map();
+  const idbQueued = (fn) => setTimeout(fn, 0);
+
+  function createIdbRequest() {
+    return { onsuccess: null, onerror: null, result: undefined, error: null };
+  }
+  function completeIdbRequest(request, value) {
+    request.result = value;
+    idbQueued(() => request.onsuccess && request.onsuccess({ target: request }));
+  }
+
+  function createIdbStore() {
+    const data = new Map();
+    return {
+      data,
+      put(value, key) {
+        const request = createIdbRequest();
+        data.set(String(key), value);
+        completeIdbRequest(request);
+        return request;
+      },
+      get(key) {
+        const request = createIdbRequest();
+        completeIdbRequest(request, data.get(String(key)));
+        return request;
+      },
+      delete(key) {
+        const request = createIdbRequest();
+        data.delete(String(key));
+        completeIdbRequest(request);
+        return request;
+      },
+    };
+  }
+
+  function createIdbDb(name) {
+    const stores = new Map();
+    return {
+      name,
+      objectStoreNames: { contains: (storeName) => stores.has(storeName) },
+      createObjectStore(storeName) {
+        const store = createIdbStore();
+        stores.set(storeName, store);
+        return store;
+      },
+      transaction(storeName) {
+        const store = stores.get(storeName);
+        const tx = {
+          objectStore: (requested) => (requested === storeName ? store : null),
+          oncomplete: null,
+          onerror: null,
+          error: null,
+        };
+        idbQueued(() => tx.oncomplete && tx.oncomplete({}));
+        return tx;
+      },
+    };
+  }
+
+  globalThis.indexedDB = {
+    open(name) {
+      const request = createIdbRequest();
+      let db = idbDatabases.get(name);
+      if (!db) {
+        db = createIdbDb(name);
+        idbDatabases.set(name, db);
+        request.result = db;
+        idbQueued(() => request.onupgradeneeded && request.onupgradeneeded({ target: request }));
+      } else {
+        request.result = db;
+      }
+      idbQueued(() => request.onsuccess && request.onsuccess({ target: request }));
+      return request;
+    },
+  };
+
+  if (imageResultFromQuery) {
+    const seed = indexedDB.open('haofan-image-jobs');
+    seed.onupgradeneeded = () => {
+      if (!seed.result.objectStoreNames.contains('jobs')) seed.result.createObjectStore('jobs');
+    };
+    seed.onsuccess = () => {
+      const tx = seed.result.transaction('jobs', 'readwrite');
+      tx.objectStore('jobs').put({
+        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        segments: [{
+          text: 'Hello',
+          translation: '你好',
+          x: 0.08,
+          y: 0.1,
+          w: 0.36,
+          h: 0.2,
+        }],
+      }, 'test');
+    };
+  }
   const area = {
     onChanged: storageEvents,
     async get(keys) {
