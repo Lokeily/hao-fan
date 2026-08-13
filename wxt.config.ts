@@ -8,6 +8,13 @@ export default defineConfig({
       '好翻 · 开源免费的沉浸式 AI 翻译插件，直连 DeepSeek、智谱、腾讯混元等国内大模型，用户自配 API Key，不经中转服务器。',
     // WXT 根据 entrypoints/options.html 与 popup.html 生成 options_ui / action.default_popup
     permissions: ['storage', 'activeTab', 'contextMenus', 'scripting'],
+    // 快捷键：Alt+T 翻译当前网页（浏览器设置页可自定义）
+    commands: {
+      'translate-page': {
+        suggested_key: { default: 'Alt+T' },
+        description: '翻译当前网页（好翻）',
+      },
+    },
     // 后台需要跨域调用各家大模型 API，故放开 host 权限
     host_permissions: ['<all_urls>'],
     browser_specific_settings:

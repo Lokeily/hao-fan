@@ -262,6 +262,25 @@ export default defineBackground(() => {
     }
   }
 
+  // 快捷键：Alt+T 翻译当前网页。复用右键"翻译本页"的注入与站点策略逻辑。
+  browser.commands?.onCommand.addListener((command) => {
+    if (command !== 'translate-page') return;
+    void (async () => {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+      try {
+        await assertSiteEnabled(tab.url);
+        await ensureContent(tab.id);
+        await browser.tabs.sendMessage(tab.id, { type: 'TRANSLATE_PAGE' });
+      } catch (error) {
+        browser.tabs.sendMessage(tab.id, {
+          type: 'SHOW_ERROR',
+          payload: { message: errorMessage(error) },
+        }).catch(() => {});
+      }
+    })();
+  });
+
   browser.contextMenus?.onClicked.addListener((info, tab) => {
     if (!tab?.id) return;
     if (info.menuItemId === 'ot-translate-page') {
