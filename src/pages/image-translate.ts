@@ -1,5 +1,5 @@
-import { storage } from 'wxt/utils/storage';
 import { browser } from 'wxt/browser';
+import { takeImageJob } from '../../utils/image-job-store';
 import type { ImageResult } from '../../utils/vision';
 import '../../styles/image-translate.css';
 
@@ -52,8 +52,9 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
     `;
 
     try {
-      const result = (await storage.getItem<ImageResult>(`local:imageJob:${job}`)) ?? null;
-      await storage.removeItem(`local:imageJob:${job}`).catch(() => {});
+      // 图片任务已从 storage.local 迁移到 IndexedDB（见 utils/image-job-store.ts），
+      // 读取即消费，避免大图长期占用存储。
+      const result = (await takeImageJob(job)) ?? null;
       if (!result || typeof result.image !== 'string') {
         renderState('翻译结果已失效', '结果可能已被读取或浏览器已清理存储，请重新翻译图片。');
       } else {

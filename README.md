@@ -9,12 +9,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Lokeily/Hao-Fan-/actions/workflows/build.yml"><img src="https://github.com/Lokeily/Hao-Fan-/actions/workflows/build.yml/badge.svg?branch=main" alt="Build"></a>
+  <a href="https://github.com/Lokeily/hao-fan/actions/workflows/build.yml"><img src="https://github.com/Lokeily/hao-fan/actions/workflows/build.yml/badge.svg?branch=main" alt="Build"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
   <a href="#安装扩展"><img src="https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
-  <a href="https://github.com/Lokeily/Hao-Fan-/releases/latest"><img src="https://img.shields.io/badge/version-0.1.3-blue" alt="v0.1.3"></a>
+  <a href="https://github.com/Lokeily/hao-fan/releases/latest"><img src="https://img.shields.io/badge/version-0.1.3-blue" alt="v0.1.3"></a>
 </p>
 
 ## 这是什么
@@ -58,7 +58,7 @@
 
 ### 第一步：下载安装包
 
-打开 [Releases](https://github.com/Lokeily/Hao-Fan-/releases/latest)，在页面底部找到 Assets，然后下载对应文件：
+打开 [Releases](https://github.com/Lokeily/hao-fan/releases/latest)，在页面底部找到 Assets，然后下载对应文件：
 
 | 文件 | 用途 |
 |------|------|
@@ -96,6 +96,8 @@
 3. 选择不需要 API Key 的“Google 翻译”。
 4. 打开一个普通网页。
 5. 点击网页右下角蓝色的“译”按钮。
+
+> ⚠️ Google 翻译（免 Key）走的是**非官方免费端点**，没有服务等级保证，偶尔会被限流或临时不可用。如果第一次体验失败，多半是端点波动——可稍后重试，或改用支持 API Key 的翻译服务（DeepSeek、智谱、混元等）获得稳定体验。
 
 ### 使用自己的 AI
 
@@ -151,7 +153,7 @@
 
 ### 传统机器翻译
 
-- Google 翻译
+- Google 翻译（免 Key 的非官方端点，稳定性不保证，建议仅用于体验）
 - DeepL
 - Microsoft 翻译
 
@@ -207,13 +209,14 @@
 - 暂停翻译的网站列表只保存在浏览器本地，不会发送给翻译服务商。
 - <code>&lt;all_urls&gt;</code> 权限用于在用户打开的网页中运行翻译脚本，并从后台连接所选翻译服务。
 - 项目使用内容安全策略，禁止扩展页面加载远程脚本。
+- 译文内容经过注入防护处理：待译文本会被标记为「数据而非指令」，降低恶意网页夹带指令操纵译文的风险（译文本身仍按原样渲染，不含可执行脚本）。
 
 ## 问题反馈
 
 遇到漏译、译文错位、动态内容未翻译或其他问题，可以通过以下方式反馈：
 
-- [提交 Bug 报告](https://github.com/Lokeily/Hao-Fan-/issues/new?template=bug_report.yml)
-- [提出功能建议](https://github.com/Lokeily/Hao-Fan-/issues/new?template=feature_request.yml)
+- [提交 Bug 报告](https://github.com/Lokeily/hao-fan/issues/new?template=bug_report.yml)
+- [提出功能建议](https://github.com/Lokeily/hao-fan/issues/new?template=feature_request.yml)
 - 联系作者 QQ：<code>3084614411</code>
 
 反馈时请尽量提供浏览器名称和版本、问题页面、截图以及复现步骤。请勿提交 API Key、账号密码或其他敏感信息。
@@ -233,8 +236,8 @@
 ### 本地运行
 
 ~~~bash
-git clone https://github.com/Lokeily/Hao-Fan-.git
-cd Hao-Fan-
+git clone https://github.com/Lokeily/hao-fan.git
+cd hao-fan
 npm install
 npm run dev
 ~~~

@@ -1,7 +1,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { browser } from 'wxt/browser';
-import { storage } from 'wxt/utils/storage';
 import { configItem, disabledSitesItem, usageItem } from '../utils/storage';
+import { putImageJob } from '../utils/image-job-store';
 import { getProviderApiKey, normalizeConfig, type AppConfig } from '../utils/config';
 import { getProvider } from '../utils/providers';
 import { translateBatchDetailed, translateOneDetailed } from '../utils/translator';
@@ -214,8 +214,9 @@ export default defineBackground(() => {
         const dataUrl = typeof payload?.dataUrl === 'string' ? payload.dataUrl : undefined;
         const result = await doTranslateImage(srcUrl, dataUrl);
         // 弹窗上传的图片没有网页中的图元素可锚定，仍用结果页展示。
+        // 结果可能包含数 MB 的 base64 原图，存入 IndexedDB 规避 storage.local 配额限制。
         const id = randomId();
-        await storage.setItem(`local:imageJob:${id}`, result);
+        await putImageJob(id, result);
         await browser.tabs.create({
           url: browser.runtime.getURL(`/image-translate.html?job=${id}`),
         });

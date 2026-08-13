@@ -20,8 +20,8 @@
 需要安装 Node.js 22 和 npm。
 
 ~~~bash
-git clone https://github.com/Lokeily/Hao-Fan-.git
-cd Hao-Fan-
+git clone https://github.com/Lokeily/hao-fan.git
+cd hao-fan
 npm install
 npm run dev
 ~~~
