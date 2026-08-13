@@ -11,8 +11,8 @@
   --green: #248a3d;
   --red: #c93434;
   --radius: 10px;
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  --font:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
 * {
@@ -154,7 +154,9 @@ h1 {
   color: var(--text);
   font-size: 14px;
   font-weight: 400;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ot-form input,
@@ -355,7 +357,10 @@ h1 {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ot-popup .ot-tab.active {
@@ -549,17 +554,17 @@ h1 {
   white-space: pre-wrap;
 }
 
-.ot-out[data-tone="busy"] {
+.ot-out[data-tone='busy'] {
   color: var(--text-2);
 }
 
-.ot-out[data-tone="success"] {
+.ot-out[data-tone='success'] {
   border-left-color: var(--green);
   background: #f3faf5;
   color: #0d652d;
 }
 
-.ot-out[data-tone="error"] {
+.ot-out[data-tone='error'] {
   border-left-color: var(--red);
   background: #fdf5f5;
   color: #a50e0e;

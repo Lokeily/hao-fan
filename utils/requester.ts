@@ -33,11 +33,7 @@ class HttpRequestError extends Error {
   readonly status: number;
   readonly retryAfter: number | null;
 
-  constructor(
-    status: number,
-    detail: string,
-    retryAfter: number | null,
-  ) {
+  constructor(status: number, detail: string, retryAfter: number | null) {
     super(`请求失败 (${status})${detail ? `：${detail.slice(0, 300)}` : ''}`);
     this.name = 'HttpRequestError';
     this.status = status;
@@ -94,6 +90,7 @@ export function cleanSecret(key: string): string {
 
 // 兜底：保证任意 header 值都是 Latin-1，避免 fetch 在 Service Worker 中崩溃。
 function toLatin1(v: string): string {
+  // eslint-disable-next-line no-control-regex -- 故意匹配并剔除控制字符/非 Latin-1 字符
   return String(v).replace(/[^\u0000-\u00FF]/g, '');
 }
 
@@ -155,7 +152,11 @@ export async function postJson(
       );
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
-        throw new HttpRequestError(res.status, detail, retryAfterMs(res.headers.get('retry-after')));
+        throw new HttpRequestError(
+          res.status,
+          detail,
+          retryAfterMs(res.headers.get('retry-after')),
+        );
       }
       const data = await res.json();
       if (data?.error) {

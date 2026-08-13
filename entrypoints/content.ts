@@ -13,7 +13,11 @@ import {
 } from '../utils/dom';
 import { planTextChunks, takeFirstTextChunk } from '../utils/chunking';
 import { configItem, disabledSitesItem } from '../utils/storage';
-import { createTranslationNode, createNoticeHost, createSelectionUiStyle } from '../utils/content-ui';
+import {
+  createTranslationNode,
+  createNoticeHost,
+  createSelectionUiStyle,
+} from '../utils/content-ui';
 import { mountImageResultOverlay } from '../utils/image-overlay';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy';
 import { SessionTranslationCache } from '../utils/session-translation-cache';
@@ -60,7 +64,7 @@ export default defineContentScript({
     let activePageJobId: string | null = null;
     type TranslationItem = { el: Element; text: string };
     let viewportObserver: IntersectionObserver | null = null;
-    let lazyPending = new Map<Element, TranslationItem>();
+    const lazyPending = new Map<Element, TranslationItem>();
     let lazyFlushTimer: ReturnType<typeof setTimeout> | null = null;
     let lazyFlushRunning = false;
     let translationNodes = new WeakMap<Element, HTMLSpanElement>();
@@ -83,7 +87,8 @@ export default defineContentScript({
       /* 存储监听不可用时，仍使用首次读取到的站点规则。 */
     }
     const initialSitePolicyRevision = sitePolicyRevision;
-    const sitePolicyReady = disabledSitesItem.getValue()
+    const sitePolicyReady = disabledSitesItem
+      .getValue()
       .then((sites) => {
         if (sitePolicyRevision === initialSitePolicyRevision) {
           setSiteDisabledState(isSiteDisabled(sites, location.href));
@@ -110,7 +115,7 @@ export default defineContentScript({
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         if (/context invalidated|extension context|runtime.*undefined/i.test(detail)) {
-          throw new Error('扩展已更新，请刷新当前网页后重试');
+          throw new Error('扩展已更新，请刷新当前网页后重试', { cause: error });
         }
         throw error;
       }
@@ -166,7 +171,9 @@ export default defineContentScript({
         return;
       }
       if (tag === 'LI') {
-        const nestedList = Array.from(el.children).find((child) => child.tagName === 'UL' || child.tagName === 'OL');
+        const nestedList = Array.from(el.children).find(
+          (child) => child.tagName === 'UL' || child.tagName === 'OL',
+        );
         el.insertBefore(node, nestedList || null);
         return;
       }
@@ -174,13 +181,19 @@ export default defineContentScript({
       // Flex/Grid 的直接子项不能新增兄弟项，否则会改变轨道布局，此时嵌入原语义块末尾。
       const parentDisplay = el.parentElement ? getComputedStyle(el.parentElement).display : '';
       const parentCreatesLayout =
-        parentDisplay === 'flex' || parentDisplay === 'inline-flex' ||
-        parentDisplay === 'grid' || parentDisplay === 'inline-grid';
+        parentDisplay === 'flex' ||
+        parentDisplay === 'inline-flex' ||
+        parentDisplay === 'grid' ||
+        parentDisplay === 'inline-grid';
       if (parentCreatesLayout) el.appendChild(node);
       else el.insertAdjacentElement('afterend', node);
     }
 
-    function applyTranslation(el: Element, original: string, translation: string): 'inserted' | 'skipped' | 'stale' {
+    function applyTranslation(
+      el: Element,
+      original: string,
+      translation: string,
+    ): 'inserted' | 'skipped' | 'stale' {
       if (!el.isConnected || textOfBlock(el) !== original) return 'stale';
       if (!translation || translation === original) {
         markTranslated(el);
@@ -261,16 +274,16 @@ export default defineContentScript({
       // 移除所有译文节点（核心：防止多次点击叠加）
       document.querySelectorAll('.ot-translation').forEach((el) => el.remove());
       // 清除所有已翻译标记（让 collectTextBlocks 可重新收集）
-      document.querySelectorAll(`.${TRANSLATED_CLASS}`).forEach((el) =>
-        (el as HTMLElement).classList.remove(TRANSLATED_CLASS),
-      );
+      document
+        .querySelectorAll(`.${TRANSLATED_CLASS}`)
+        .forEach((el) => (el as HTMLElement).classList.remove(TRANSLATED_CLASS));
       // 清除排队中标记
-      document.querySelectorAll(`.${PENDING_CLASS}`).forEach((el) =>
-        (el as HTMLElement).classList.remove(PENDING_CLASS),
-      );
-      document.querySelectorAll(`.${OBSERVED_CLASS}`).forEach((el) =>
-        (el as HTMLElement).classList.remove(OBSERVED_CLASS),
-      );
+      document
+        .querySelectorAll(`.${PENDING_CLASS}`)
+        .forEach((el) => (el as HTMLElement).classList.remove(PENDING_CLASS));
+      document
+        .querySelectorAll(`.${OBSERVED_CLASS}`)
+        .forEach((el) => (el as HTMLElement).classList.remove(OBSERVED_CLASS));
       translationNodes = new WeakMap<Element, HTMLSpanElement>();
       retryCounts = new WeakMap<Element, number>();
       blockedPageJobId = null;
@@ -342,18 +355,21 @@ export default defineContentScript({
 
     function ensureViewportObserver(): IntersectionObserver {
       if (viewportObserver) return viewportObserver;
-      viewportObserver = new IntersectionObserver((entries) => {
-        let queued = false;
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          if (enqueueLazyItem(entry.target)) queued = true;
-        }
-        if (queued) scheduleLazyFlush();
-      }, {
-        root: null,
-        rootMargin: '320px 0px',
-        threshold: 0,
-      });
+      viewportObserver = new IntersectionObserver(
+        (entries) => {
+          let queued = false;
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            if (enqueueLazyItem(entry.target)) queued = true;
+          }
+          if (queued) scheduleLazyFlush();
+        },
+        {
+          root: null,
+          rootMargin: '320px 0px',
+          threshold: 0,
+        },
+      );
       return viewportObserver;
     }
 
@@ -367,7 +383,8 @@ export default defineContentScript({
           html.classList.contains(TRANSLATED_CLASS) ||
           html.classList.contains(PENDING_CLASS) ||
           html.classList.contains(OBSERVED_CLASS)
-        ) continue;
+        )
+          continue;
         if (restoreSessionTranslation(item)) continue;
         html.classList.add(OBSERVED_CLASS);
         observer.observe(item.el);
@@ -393,7 +410,9 @@ export default defineContentScript({
           maxItems: DYNAMIC_CHUNK_ITEMS,
           maxCharacters: DYNAMIC_CHUNK_CHARACTERS,
         });
-        const failures = await runChunkQueue(chunks, LAZY_CONCURRENCY, (chunk) => translateChunk(chunk, jobId));
+        const failures = await runChunkQueue(chunks, LAZY_CONCURRENCY, (chunk) =>
+          translateChunk(chunk, jobId),
+        );
         if (activePageJobId === jobId) {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
           const failureText = failures > 0 ? ` · ${failures} 批失败` : '';
@@ -475,15 +494,17 @@ export default defineContentScript({
       const requestConfigRevision = translationConfigRevision;
       try {
         const texts = items.map((x) => x.text);
-        const res = await sendRuntimeMessage({
+        const res = (await sendRuntimeMessage({
           type: 'TRANSLATE_BATCH',
           payload: { texts, jobId },
-        }) as {
-          ok?: boolean;
-          translations?: unknown;
-          stats?: { estimatedTokensSaved?: number };
-          error?: string;
-        } | undefined;
+        })) as
+          | {
+              ok?: boolean;
+              translations?: unknown;
+              stats?: { estimatedTokensSaved?: number };
+              error?: string;
+            }
+          | undefined;
         if (jobId && activePageJobId !== jobId) return;
         if (!res?.ok) throw new Error(res?.error || '翻译失败');
         const translations = res.translations;
@@ -527,13 +548,15 @@ export default defineContentScript({
         showNotice(message, jobId || 'page-translation');
         const canRetry = isRetryableTranslationError(error);
         if (!canRetry && jobId) blockedPageJobId = jobId;
-        const retryable = canRetry ? items.filter((item) => {
-          if (!item.el.isConnected) return false;
-          const attempts = retryCounts.get(item.el) || 0;
-          if (attempts >= MAX_TRANSLATION_RETRIES) return false;
-          retryCounts.set(item.el, attempts + 1);
-          return true;
-        }) : [];
+        const retryable = canRetry
+          ? items.filter((item) => {
+              if (!item.el.isConnected) return false;
+              const attempts = retryCounts.get(item.el) || 0;
+              if (attempts >= MAX_TRANSLATION_RETRIES) return false;
+              retryCounts.set(item.el, attempts + 1);
+              return true;
+            })
+          : [];
         if (retryable.length > 0) {
           setTimeout(() => {
             if (!jobId || activePageJobId === jobId) observeForLazyTranslation(retryable);
@@ -583,7 +606,7 @@ export default defineContentScript({
             if (activePageJobId !== jobId) return;
             const deferred: TranslationItem[] = [];
             for (const item of blocks) {
-              const { el, text } = item;
+              const { el } = item;
               foundCount++;
               if (isInViewport(el)) visible.push(item);
               else deferred.push(item);
@@ -637,7 +660,8 @@ export default defineContentScript({
         if (failures > 0) {
           showStatus(`已翻译 ${translatedCount} 段，${failures} 个批次失败`, true);
         } else if (translatedCount === 0) {
-          const savedText = estimatedTokensSaved > 0 ? `，本地约省 ${estimatedTokensSaved} Token` : '';
+          const savedText =
+            estimatedTokensSaved > 0 ? `，本地约省 ${estimatedTokensSaved} Token` : '';
           showStatus(`无需翻译（内容已为目标语言）${savedText}`, true);
         } else {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
@@ -688,7 +712,13 @@ export default defineContentScript({
       };
 
       const scheduleRoot = (root: Element) => {
-        if (!root.isConnected || root.closest('#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn')) return;
+        if (
+          !root.isConnected ||
+          root.closest(
+            '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
+          )
+        )
+          return;
         dynamicRoots.add(root);
         if (dynamicQueueTimer) clearTimeout(dynamicQueueTimer);
         dynamicQueueTimer = setTimeout(() => {
@@ -699,17 +729,19 @@ export default defineContentScript({
             queue(document.body);
             return;
           }
-          const compact = roots.filter((root, index) =>
-            !roots.some((other, otherIndex) => otherIndex !== index && other.contains(root)),
+          const compact = roots.filter(
+            (root, index) =>
+              !roots.some((other, otherIndex) => otherIndex !== index && other.contains(root)),
           );
           compact.forEach(queue);
         }, 80);
       };
 
       const scheduleControlledRoots = (control: Element) => {
-        const ids = `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
-          .split(/\s+/)
-          .filter(Boolean);
+        const ids =
+          `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
+            .split(/\s+/)
+            .filter(Boolean);
         ids.forEach((id) => {
           const controlled = document.getElementById(id);
           if (controlled) scheduleRoot(controlled);
@@ -727,7 +759,10 @@ export default defineContentScript({
         (value || '')
           .split(/\s+/)
           .filter(Boolean)
-          .filter((name) => name !== PENDING_CLASS && name !== OBSERVED_CLASS && name !== TRANSLATED_CLASS)
+          .filter(
+            (name) =>
+              name !== PENDING_CLASS && name !== OBSERVED_CLASS && name !== TRANSLATED_CLASS,
+          )
           .sort()
           .join(' ');
 
@@ -740,13 +775,24 @@ export default defineContentScript({
           }
           if (m.type === 'attributes') {
             const target = m.target as Element;
-            if (target.closest('#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn')) continue;
+            if (
+              target.closest(
+                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
+              )
+            )
+              continue;
             if (
               m.attributeName === 'class' &&
-              normalizedSiteClasses(m.oldValue) === normalizedSiteClasses(target.getAttribute('class'))
-            ) continue;
+              normalizedSiteClasses(m.oldValue) ===
+                normalizedSiteClasses(target.getAttribute('class'))
+            )
+              continue;
             scheduleRoot(target);
-            if (m.attributeName === 'aria-expanded' || m.attributeName === 'aria-controls' || m.attributeName === 'aria-owns') {
+            if (
+              m.attributeName === 'aria-expanded' ||
+              m.attributeName === 'aria-controls' ||
+              m.attributeName === 'aria-owns'
+            ) {
               scheduleControlledRoots(target);
             }
             continue;
@@ -790,8 +836,16 @@ export default defineContentScript({
         attributes: true,
         attributeOldValue: true,
         attributeFilter: [
-          'class', 'style', 'hidden', 'open', 'inert', 'aria-hidden',
-          'aria-expanded', 'aria-controls', 'aria-owns', 'data-state',
+          'class',
+          'style',
+          'hidden',
+          'open',
+          'inert',
+          'aria-hidden',
+          'aria-expanded',
+          'aria-controls',
+          'aria-owns',
+          'data-state',
         ],
         subtree: true,
       });
@@ -812,9 +866,10 @@ export default defineContentScript({
           const roots = [root];
           const control = root.closest('[aria-controls], [aria-owns]');
           if (control) {
-            const ids = `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
-              .split(/\s+/)
-              .filter(Boolean);
+            const ids =
+              `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
+                .split(/\s+/)
+                .filter(Boolean);
             ids.forEach((id) => {
               const controlled = document.getElementById(id);
               if (controlled && !roots.includes(controlled)) roots.push(controlled);
@@ -836,7 +891,11 @@ export default defineContentScript({
               if (txt.length < 2) continue;
               if (!isVisible(el)) continue;
               // 额外保护：跳过我们自己的节点
-              if (el.closest('.ot-translation, .ot-img-panel, .ot-toolbar, #ot-toolbar, #ot-status, .ot-selbtn'))
+              if (
+                el.closest(
+                  '.ot-translation, .ot-img-panel, .ot-toolbar, #ot-toolbar, #ot-status, .ot-selbtn',
+                )
+              )
                 continue;
               newFound.push({ el, text: txt });
             }
@@ -885,7 +944,6 @@ export default defineContentScript({
     // ---- 划词翻译：结果留在独立浮层中，不改写正文，也不会覆盖整段译文。 ----
     type SelectionSnapshot = { text: string; rect: DOMRect };
     let selectionHost: HTMLDivElement | null = null;
-    let selectionSnapshot: SelectionSnapshot | null = null;
     let selectionPinned = false;
     let selectionTimer: ReturnType<typeof setTimeout> | null = null;
     let selectionRequestId = 0;
@@ -902,7 +960,6 @@ export default defineContentScript({
       }
       selectionHost?.remove();
       selectionHost = null;
-      selectionSnapshot = null;
       selectionPinned = false;
     }
 
@@ -912,14 +969,19 @@ export default defineContentScript({
       const text = selection.toString().replace(/\s+/g, ' ').trim();
       if (!text) return null;
       const range = selection.getRangeAt(0);
-      const start = range.startContainer.nodeType === Node.TEXT_NODE
-        ? range.startContainer.parentElement
-        : range.startContainer as Element;
-      if (!start || start.closest('#ot-selection-ui, #ot-error-modal, .ot-translation, #ot-toolbar, #ot-status')) {
+      const start =
+        range.startContainer.nodeType === Node.TEXT_NODE
+          ? range.startContainer.parentElement
+          : (range.startContainer as Element);
+      if (
+        !start ||
+        start.closest('#ot-selection-ui, #ot-error-modal, .ot-translation, #ot-toolbar, #ot-status')
+      ) {
         return null;
       }
       const root = start.getRootNode();
-      if (root instanceof ShadowRoot && root.host.matches('#ot-selection-ui, .ot-translation')) return null;
+      if (root instanceof ShadowRoot && root.host.matches('#ot-selection-ui, .ot-translation'))
+        return null;
       const rects = range.getClientRects();
       const rect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return null;
@@ -934,16 +996,21 @@ export default defineContentScript({
       );
       const estimatedHeight = expanded ? 190 : 36;
       const below = rect.bottom + 8;
-      const top = below + estimatedHeight <= window.innerHeight - 8
-        ? below
-        : Math.max(8, rect.top - estimatedHeight - 8);
+      const top =
+        below + estimatedHeight <= window.innerHeight - 8
+          ? below
+          : Math.max(8, rect.top - estimatedHeight - 8);
       host.style.setProperty('left', `${left}px`, 'important');
       host.style.setProperty('top', `${top}px`, 'important');
       requestAnimationFrame(() => {
         if (!host.isConnected) return;
         const box = host.getBoundingClientRect();
         if (box.right > window.innerWidth - 8) {
-          host.style.setProperty('left', `${Math.max(8, window.innerWidth - box.width - 8)}px`, 'important');
+          host.style.setProperty(
+            'left',
+            `${Math.max(8, window.innerWidth - box.width - 8)}px`,
+            'important',
+          );
         }
         if (box.bottom > window.innerHeight - 8) {
           host.style.setProperty('top', `${Math.max(8, rect.top - box.height - 8)}px`, 'important');
@@ -951,7 +1018,7 @@ export default defineContentScript({
       });
     }
 
-    function createSelectionHost(snapshot: SelectionSnapshot): HTMLDivElement {
+    function createSelectionHost(): HTMLDivElement {
       hideSelectionUi();
       const host = document.createElement('div');
       host.id = 'ot-selection-ui';
@@ -964,11 +1031,14 @@ export default defineContentScript({
       shadow.appendChild(createSelectionUiStyle());
       document.documentElement.appendChild(host);
       selectionHost = host;
-      selectionSnapshot = snapshot;
       return host;
     }
 
-    function renderSelectionPanel(host: HTMLDivElement, snapshot: SelectionSnapshot, translation?: string) {
+    function renderSelectionPanel(
+      host: HTMLDivElement,
+      snapshot: SelectionSnapshot,
+      translation?: string,
+    ) {
       const shadow = host.shadowRoot!;
       shadow.querySelectorAll(':not(style)').forEach((node) => node.remove());
       const panel = document.createElement('section');
@@ -990,7 +1060,8 @@ export default defineContentScript({
       head.append(title, close);
       const source = document.createElement('div');
       source.className = 'source';
-      source.textContent = snapshot.text.length > 180 ? `${snapshot.text.slice(0, 180)}…` : snapshot.text;
+      source.textContent =
+        snapshot.text.length > 180 ? `${snapshot.text.slice(0, 180)}…` : snapshot.text;
       const result = document.createElement('div');
       result.className = translation === undefined ? 'result loading' : 'result';
       result.setAttribute('aria-live', 'polite');
@@ -1007,7 +1078,9 @@ export default defineContentScript({
           try {
             await navigator.clipboard.writeText(translation);
             copy.textContent = '已复制';
-            setTimeout(() => { if (copy.isConnected) copy.textContent = '复制'; }, 1200);
+            setTimeout(() => {
+              if (copy.isConnected) copy.textContent = '复制';
+            }, 1200);
           } catch {
             copy.textContent = '复制失败';
           }
@@ -1059,7 +1132,7 @@ export default defineContentScript({
 
     function showSelectionUi(snapshot: SelectionSnapshot, translateImmediately = false) {
       if (siteDisabled) return;
-      const host = createSelectionHost(snapshot);
+      const host = createSelectionHost();
       positionSelectionUi(host, snapshot.rect, false);
       if (translateImmediately) {
         void translateSelectionInPopover(snapshot, host);
@@ -1107,30 +1180,36 @@ export default defineContentScript({
       if (selectionTimer) clearTimeout(selectionTimer);
       selectionTimer = setTimeout(refreshSelectionUi, 160);
     });
-    document.addEventListener('pointerdown', (event) => {
-      if (selectionHost && !event.composedPath().includes(selectionHost)) hideSelectionUi();
-    }, true);
-    window.addEventListener('scroll', () => {
-      if (!selectionPinned) hideSelectionUi();
-    }, true);
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (selectionHost && !event.composedPath().includes(selectionHost)) hideSelectionUi();
+      },
+      true,
+    );
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (!selectionPinned) hideSelectionUi();
+      },
+      true,
+    );
 
     // 接收来自 background 的指令
     runtime.onMessage.addListener((msg: any) => {
       if (msg?.type === 'SITE_POLICY_CHANGED' && typeof msg.payload?.disabled === 'boolean') {
         sitePolicyRevision++;
         setSiteDisabledState(msg.payload.disabled);
-      }
-      else if (msg?.type === 'TRANSLATE_PAGE') {
-        void sitePolicyReady.then(() => siteDisabled ? showSitePausedNotice() : translatePage(true));
-      }
-      else if (msg?.type === 'SHOW_IMAGE_RESULT') {
+      } else if (msg?.type === 'TRANSLATE_PAGE') {
+        void sitePolicyReady.then(() =>
+          siteDisabled ? showSitePausedNotice() : translatePage(true),
+        );
+      } else if (msg?.type === 'SHOW_IMAGE_RESULT') {
         if (siteDisabled) showSitePausedNotice();
         else showImageResult(msg.payload?.srcUrl, msg.payload?.result);
-      }
-      else if (msg?.type === 'SHOW_ERROR') {
+      } else if (msg?.type === 'SHOW_ERROR') {
         showNotice(msg.payload?.message || '操作失败', `external-${randomId()}`);
-      }
-      else if (msg?.type === 'TRANSLATE_SELECTION') {
+      } else if (msg?.type === 'TRANSLATE_SELECTION') {
         void sitePolicyReady.then(() => {
           if (siteDisabled) {
             showSitePausedNotice();
@@ -1255,7 +1334,8 @@ export default defineContentScript({
     // SPA 自愈：toolbar 被页面 JS 移除时自动重建
     if (document.body) {
       new MutationObserver(() => {
-        if (sitePolicyLoaded && !siteDisabled && !document.getElementById('ot-toolbar')) mountToolbar();
+        if (sitePolicyLoaded && !siteDisabled && !document.getElementById('ot-toolbar'))
+          mountToolbar();
       }).observe(document.body, { childList: true });
     }
   },

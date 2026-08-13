@@ -44,12 +44,17 @@ export function parseImageSegmentsResult(content: string): ImageSegmentParseResu
         y,
         w: Math.min(numberInRange(record.w), 1 - x),
         h: Math.min(numberInRange(record.h), 1 - y),
-        text: String(record.text ?? '').trim().slice(0, 2_000),
-        translation: String(record.translation ?? '').trim().slice(0, 2_000),
+        text: String(record.text ?? '')
+          .trim()
+          .slice(0, 2_000),
+        translation: String(record.translation ?? '')
+          .trim()
+          .slice(0, 2_000),
       };
     })
-    .filter((segment): segment is ImageSegment =>
-      segment !== null && Boolean(segment.text || segment.translation),
+    .filter(
+      (segment): segment is ImageSegment =>
+        segment !== null && Boolean(segment.text || segment.translation),
     );
   return { segments, valid: true };
 }

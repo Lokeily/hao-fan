@@ -1,6 +1,5 @@
 import { browser } from 'wxt/browser';
 import { takeImageJob } from '../../utils/image-job-store';
-import type { ImageResult } from '../../utils/vision';
 import '../../styles/image-translate.css';
 
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {
@@ -76,9 +75,14 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
         const img = document.createElement('img');
         img.src = result.image;
         img.alt = '图片翻译预览';
-        img.addEventListener('error', () => {
-          stage.innerHTML = '<div class="ot-image-loading is-error">图片加载失败，请重新翻译。</div>';
-        }, { once: true });
+        img.addEventListener(
+          'error',
+          () => {
+            stage.innerHTML =
+              '<div class="ot-image-loading is-error">图片加载失败，请重新翻译。</div>';
+          },
+          { once: true },
+        );
         canvas.appendChild(img);
         stage.appendChild(canvas);
 

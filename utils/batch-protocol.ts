@@ -38,13 +38,21 @@ export function parseBatchTranslations(content: string, expectedCount: number): 
     return null;
   }
   if (!parsed || typeof parsed !== 'object') return null;
-  if (Array.isArray(parsed) && parsed.length === expectedCount && parsed.every((item) => typeof item === 'string')) {
+  if (
+    Array.isArray(parsed) &&
+    parsed.length === expectedCount &&
+    parsed.every((item) => typeof item === 'string')
+  ) {
     const translations = parsed.map((item) => item.trim());
     return translations.every(Boolean) ? translations : null;
   }
   const record = parsed as Record<string, unknown>;
   const direct = record.translations;
-  if (Array.isArray(direct) && direct.length === expectedCount && direct.every((item) => typeof item === 'string')) {
+  if (
+    Array.isArray(direct) &&
+    direct.length === expectedCount &&
+    direct.every((item) => typeof item === 'string')
+  ) {
     const translations = direct.map((item) => item.trim());
     return translations.every(Boolean) ? translations : null;
   }

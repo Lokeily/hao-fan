@@ -15,10 +15,7 @@ export class TranslationJobRegistry {
     this.cancelledJobLimit = cancelledJobLimit;
   }
 
-  async run<T>(
-    jobId: string | undefined,
-    task: (signal?: AbortSignal) => Promise<T>,
-  ): Promise<T> {
+  async run<T>(jobId: string | undefined, task: (signal?: AbortSignal) => Promise<T>): Promise<T> {
     if (!jobId) return task();
     if (this.cancelled.has(jobId)) throw cancellationError();
 

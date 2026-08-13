@@ -1,18 +1,47 @@
 // 以语义段落为单位抽取文本。稳定的块级锚点既能保留句子上下文，也能避免把译文
 // 插进链接、图标或行内 span 后面导致页面布局断裂。
 const SKIP_TAGS = new Set([
-  'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION',
-  'CODE', 'PRE', 'SVG', 'IMG', 'VIDEO', 'AUDIO', 'CANVAS',
+  'SCRIPT',
+  'STYLE',
+  'NOSCRIPT',
+  'TEXTAREA',
+  'INPUT',
+  'SELECT',
+  'OPTION',
+  'CODE',
+  'PRE',
+  'SVG',
+  'IMG',
+  'VIDEO',
+  'AUDIO',
+  'CANVAS',
 ]);
 
 const SEMANTIC_TAGS = new Set([
-  'P', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE',
-  'FIGCAPTION', 'TD', 'TH', 'DT', 'DD', 'CAPTION',
+  'P',
+  'LI',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'BLOCKQUOTE',
+  'FIGCAPTION',
+  'TD',
+  'TH',
+  'DT',
+  'DD',
+  'CAPTION',
 ]);
 
 const FALLBACK_TAGS = new Set(['DIV', 'SECTION', 'ARTICLE', 'ASIDE', 'MAIN']);
 const INTERACTIVE_ROLES = new Set([
-  'menuitem', 'menuitemradio', 'menuitemcheckbox', 'option', 'treeitem',
+  'menuitem',
+  'menuitemradio',
+  'menuitemcheckbox',
+  'option',
+  'treeitem',
 ]);
 const INTERACTIVE_SELECTOR = [
   '[role="menuitem"]',
@@ -24,9 +53,27 @@ const INTERACTIVE_SELECTOR = [
   '[role="listbox"] button',
 ].join(',');
 const CANDIDATE_SELECTOR = [
-  'p', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
-  'figcaption', 'td', 'th', 'dt', 'dd', 'caption', 'div', 'section',
-  'article', 'aside', 'main', INTERACTIVE_SELECTOR,
+  'p',
+  'li',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'blockquote',
+  'figcaption',
+  'td',
+  'th',
+  'dt',
+  'dd',
+  'caption',
+  'div',
+  'section',
+  'article',
+  'aside',
+  'main',
+  INTERACTIVE_SELECTOR,
 ].join(',');
 
 export const TRANSLATED_CLASS = 'ot-translated';
@@ -44,11 +91,7 @@ const OWN_SELECTOR = [
   '#ot-toolbar',
 ].join(',');
 
-const PAGE_CHROME_SELECTOR = [
-  '[role="banner"]',
-  '[role="toolbar"]',
-  '[role="search"]',
-].join(',');
+const PAGE_CHROME_SELECTOR = ['[role="banner"]', '[role="toolbar"]', '[role="search"]'].join(',');
 
 function isDirectPageChrome(element: Element): boolean {
   if (element.closest(PAGE_CHROME_SELECTOR)) return true;
@@ -65,16 +108,20 @@ function isPageChrome(element: Element): boolean {
   // Portal 菜单虽然被挂到 body 末尾，仍可通过无障碍关系找到触发按钮。
   // 由站点页眉/导航触发的菜单继续排除，正文表单触发的菜单则允许翻译。
   const labelledIds = (popup.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
-  if (labelledIds.some((id) => {
-    const control = document.getElementById(id);
-    return Boolean(control && isDirectPageChrome(control));
-  })) return true;
+  if (
+    labelledIds.some((id) => {
+      const control = document.getElementById(id);
+      return Boolean(control && isDirectPageChrome(control));
+    })
+  )
+    return true;
 
   if (!popup.id) return false;
   return Array.from(document.querySelectorAll('[aria-controls], [aria-owns]')).some((control) => {
-    const ids = `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
-      .split(/\s+/)
-      .filter(Boolean);
+    const ids =
+      `${control.getAttribute('aria-controls') || ''} ${control.getAttribute('aria-owns') || ''}`
+        .split(/\s+/)
+        .filter(Boolean);
     return ids.includes(popup.id) && isDirectPageChrome(control);
   });
 }
@@ -95,7 +142,7 @@ function isProcessed(element: Element): boolean {
   return Boolean(
     classes?.contains(TRANSLATED_CLASS) ||
     classes?.contains(PENDING_CLASS) ||
-    classes?.contains(OBSERVED_CLASS)
+    classes?.contains(OBSERVED_CLASS),
   );
 }
 
@@ -112,7 +159,8 @@ function walkerDecision(element: Element): number {
 
 function isCandidate(element: Element): boolean {
   const role = element.getAttribute('role');
-  const isMenuButton = element.tagName === 'BUTTON' && Boolean(element.closest('[role="menu"], [role="listbox"]'));
+  const isMenuButton =
+    element.tagName === 'BUTTON' && Boolean(element.closest('[role="menu"], [role="listbox"]'));
   return (
     SEMANTIC_TAGS.has(element.tagName) ||
     FALLBACK_TAGS.has(element.tagName) ||
@@ -141,7 +189,9 @@ export function textOfBlock(element: Element): string {
       const parent = node.parentElement;
       if (!parent || !node.textContent?.trim()) return NodeFilter.FILTER_REJECT;
       if (isPageChrome(parent)) return NodeFilter.FILTER_REJECT;
-      const excluded = parent.closest(`${OWN_SELECTOR},script,style,noscript,textarea,input,select,option,code,pre,svg`);
+      const excluded = parent.closest(
+        `${OWN_SELECTOR},script,style,noscript,textarea,input,select,option,code,pre,svg`,
+      );
       if (excluded || isExcludedControlText(parent)) return NodeFilter.FILTER_REJECT;
       const nearestBlock = parent.closest(CANDIDATE_SELECTOR);
       if (nearestBlock && nearestBlock !== element && element.contains(nearestBlock)) {
@@ -162,13 +212,17 @@ export function closestTextBlock(element: Element, includeProcessed = false): El
       isCandidate(current) &&
       !rejectsSubtree(current) &&
       (includeProcessed || !isProcessed(current))
-    ) return current;
+    )
+      return current;
     current = current.parentElement;
   }
   return null;
 }
 
-export function collectTextBlocks(root: Document | Element = document, limit = Infinity): Element[] {
+export function collectTextBlocks(
+  root: Document | Element = document,
+  limit = Infinity,
+): Element[] {
   const candidates: Element[] = [];
   const consider = (element: Element) => {
     if (isRejected(element) || !isCandidate(element) || !isVisible(element)) return;

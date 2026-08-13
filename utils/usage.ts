@@ -44,7 +44,9 @@ export function createStats(inputSegments = 0): TranslationStats {
 export function estimateTokens(text: string): number {
   const compact = text.trim();
   if (!compact) return 0;
-  const wideScript = compact.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)?.length || 0;
+  const wideScript =
+    compact.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)
+      ?.length || 0;
   return wideScript + Math.ceil((compact.length - wideScript) / 4);
 }
 

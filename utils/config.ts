@@ -41,8 +41,7 @@ export function normalizeConfig(stored?: StoredAppConfig | null): AppConfig {
   const provider = values.provider || DEFAULT_CONFIG.provider;
   const apiKeys = { ...(values.apiKeys || {}) };
   const storedBaseUrl = values.baseUrl?.replace(/\/+$/, '');
-  const baseUrl =
-    (storedBaseUrl && RETIRED_BASE_URLS[provider]?.[storedBaseUrl]) || values.baseUrl;
+  const baseUrl = (storedBaseUrl && RETIRED_BASE_URLS[provider]?.[storedBaseUrl]) || values.baseUrl;
 
   // 0.1.x 只保存一个 Key；首次读取时归入当时选中的服务商。
   if (legacyApiKey && !apiKeys[provider]) apiKeys[provider] = legacyApiKey;

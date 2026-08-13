@@ -9,9 +9,10 @@ import { MAX_TEXT_CHARS } from '../../utils/messages';
 import '../../styles/options.css';
 
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {
-  const logoUrl = typeof browser.runtime.getURL === 'function'
-    ? browser.runtime.getURL('/icon-128.png')
-    : '/public/icon-128.png';
+  const logoUrl =
+    typeof browser.runtime.getURL === 'function'
+      ? browser.runtime.getURL('/icon-128.png')
+      : '/public/icon-128.png';
   document.body.innerHTML = `
     <div class="ot-popup">
       <header class="ot-popup-head">
@@ -184,14 +185,17 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       await disabledSitesItem.setValue(withSiteDisabled(sites, activePageUrl, !enabled));
       renderSitePolicy(!enabled);
       if (activeTabId) {
-        await browser.tabs.sendMessage(activeTabId, {
-          type: 'SITE_POLICY_CHANGED',
-          payload: { disabled: !enabled },
-        }).catch(() => {});
+        await browser.tabs
+          .sendMessage(activeTabId, {
+            type: 'SITE_POLICY_CHANGED',
+            payload: { disabled: !enabled },
+          })
+          .catch(() => {});
       }
-      setOutput(enabled
-        ? '已恢复当前网站翻译，无需刷新页面。'
-        : '已暂停当前网站翻译，并清理页面上的译文。', 'success');
+      setOutput(
+        enabled ? '已恢复当前网站翻译，无需刷新页面。' : '已暂停当前网站翻译，并清理页面上的译文。',
+        'success',
+      );
     } catch {
       renderSitePolicy(enabled);
       setOutput('网站设置保存失败，请重试', 'error');
@@ -203,10 +207,15 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   void loadSitePolicy();
 
   function renderUsage(stats: UsageTotals) {
-    document.getElementById('ot-saved')!.textContent = numberFormat.format(stats.estimatedTokensSaved);
-    document.getElementById('ot-used')!.textContent = numberFormat.format(stats.promptTokens + stats.completionTokens);
+    document.getElementById('ot-saved')!.textContent = numberFormat.format(
+      stats.estimatedTokensSaved,
+    );
+    document.getElementById('ot-used')!.textContent = numberFormat.format(
+      stats.promptTokens + stats.completionTokens,
+    );
     document.getElementById('ot-local')!.textContent = numberFormat.format(stats.localSkipped);
-    document.getElementById('ot-hits')!.textContent = `${numberFormat.format(stats.cacheHits)} / ${numberFormat.format(stats.glossaryHits)}`;
+    document.getElementById('ot-hits')!.textContent =
+      `${numberFormat.format(stats.cacheHits)} / ${numberFormat.format(stats.glossaryHits)}`;
     document.getElementById('ot-stats-detail')!.textContent = stats.translations
       ? `累计 ${numberFormat.format(stats.inputSegments)} 段 · 少发送约 ${numberFormat.format(stats.estimatedTokensSaved)} Token · ${numberFormat.format(stats.requests)} 次请求`
       : '尚无翻译记录';
@@ -214,7 +223,7 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
 
   async function loadUsage() {
     try {
-      const response = await browser.runtime.sendMessage({ type: 'GET_USAGE_STATS' }) as
+      const response = (await browser.runtime.sendMessage({ type: 'GET_USAGE_STATS' })) as
         { ok?: boolean; stats?: UsageTotals } | undefined;
       renderUsage(response?.ok && response.stats ? response.stats : EMPTY_USAGE_TOTALS);
     } catch {
@@ -227,7 +236,7 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
     button.disabled = true;
     button.textContent = '清零中…';
     try {
-      const response = await browser.runtime.sendMessage({ type: 'RESET_USAGE_STATS' }) as
+      const response = (await browser.runtime.sendMessage({ type: 'RESET_USAGE_STATS' })) as
         { ok?: boolean; stats?: UsageTotals } | undefined;
       if (response?.ok) renderUsage(response.stats || EMPTY_USAGE_TOTALS);
       else document.getElementById('ot-stats-detail')!.textContent = '统计清零失败，请重试';
@@ -251,10 +260,10 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
         setOutput('请先在「设置」页填写 API Key', 'error');
         return;
       }
-      const res = await browser.runtime.sendMessage({
+      const res = (await browser.runtime.sendMessage({
         type: 'TRANSLATE_ONE',
         payload: { text },
-      }) as { ok?: boolean; translation?: string; error?: string } | undefined;
+      })) as { ok?: boolean; translation?: string; error?: string } | undefined;
       setOutput(
         res?.ok ? res.translation || '' : res?.error || '翻译失败',
         res?.ok ? 'neutral' : 'error',
@@ -296,8 +305,9 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       setOutput('已发送翻译指令，译文将显示在原文下方。', 'success');
     } catch (e: any) {
       setOutput(
-        '无法翻译此页面：' + (e?.message || '不支持的页面') +
-        '\nPDF 或浏览器内部页可改用文本翻译或图片翻译。',
+        '无法翻译此页面：' +
+          (e?.message || '不支持的页面') +
+          '\nPDF 或浏览器内部页可改用文本翻译或图片翻译。',
         'error',
       );
     } finally {
@@ -329,14 +339,15 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       setImageStatus('图片翻译中…');
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
-        r.onload = () => typeof r.result === 'string' ? resolve(r.result) : reject(new Error('读取图片失败'));
+        r.onload = () =>
+          typeof r.result === 'string' ? resolve(r.result) : reject(new Error('读取图片失败'));
         r.onerror = () => reject(new Error('读取图片失败'));
         r.readAsDataURL(file);
       });
-      const res = await browser.runtime.sendMessage({
+      const res = (await browser.runtime.sendMessage({
         type: 'TRANSLATE_IMAGE',
         payload: { dataUrl },
-      }) as { ok?: boolean; error?: string } | undefined;
+      })) as { ok?: boolean; error?: string } | undefined;
       setImageStatus(res?.ok ? '已打开图片翻译结果' : res?.error || '图片翻译失败', !res?.ok);
     } catch (error) {
       setImageStatus(error instanceof Error ? error.message : '图片翻译失败', true);

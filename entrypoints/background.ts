@@ -223,7 +223,6 @@ export default defineBackground(() => {
         return {};
       }, sendResponse);
     }
-
   });
 
   // MV3 下 service worker 可能被回收重建，菜单会残留，先清空再建避免 duplicate id 报错
@@ -273,10 +272,12 @@ export default defineBackground(() => {
         await ensureContent(tab.id);
         await browser.tabs.sendMessage(tab.id, { type: 'TRANSLATE_PAGE' });
       } catch (error) {
-        browser.tabs.sendMessage(tab.id, {
-          type: 'SHOW_ERROR',
-          payload: { message: errorMessage(error) },
-        }).catch(() => {});
+        browser.tabs
+          .sendMessage(tab.id, {
+            type: 'SHOW_ERROR',
+            payload: { message: errorMessage(error) },
+          })
+          .catch(() => {});
       }
     })();
   });
@@ -301,10 +302,12 @@ export default defineBackground(() => {
         )
         .catch((error) => {
           console.error('好翻图片翻译失败', error);
-          browser.tabs.sendMessage(tab.id!, {
-            type: 'SHOW_ERROR',
-            payload: { message: errorMessage(error) },
-          }).catch(() => {});
+          browser.tabs
+            .sendMessage(tab.id!, {
+              type: 'SHOW_ERROR',
+              payload: { message: errorMessage(error) },
+            })
+            .catch(() => {});
         });
     } else if (info.menuItemId === 'ot-translate-selection') {
       ensureContent(tab.id).then(() =>

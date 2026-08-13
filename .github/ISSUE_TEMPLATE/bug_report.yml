@@ -1,6 +1,6 @@
 name: Bug 报告
 description: 报告可以重复出现的功能或显示问题
-title: "[Bug] "
+title: '[Bug] '
 body:
   - type: markdown
     attributes:

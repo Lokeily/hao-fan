@@ -1,6 +1,6 @@
 name: 功能建议
 description: 建议新的功能或使用体验改进
-title: "[Feature] "
+title: '[Feature] '
 body:
   - type: textarea
     id: problem

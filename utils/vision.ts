@@ -17,7 +17,9 @@ export async function translateImage(
   const provider = getProvider(cfg.provider);
   const supportsVision = provider?.vision || (provider?.id === 'custom' && cfg.customVision);
   if (!provider || provider.type !== 'llm' || !supportsVision) {
-    throw new Error('当前引擎不支持图片翻译，请选择支持视觉的模型（如 GPT-4o / Gemini / 智谱 GLM-4V / 通义千问 VL）');
+    throw new Error(
+      '当前引擎不支持图片翻译，请选择支持视觉的模型（如 GPT-4o / Gemini / 智谱 GLM-4V / 通义千问 VL）',
+    );
   }
   const base = (cfg.baseUrl || '').replace(/\/+$/, '');
   if (!base) throw new Error('未配置 API Base URL');

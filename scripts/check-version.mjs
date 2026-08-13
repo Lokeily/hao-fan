@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-const lockJson = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+const lockJson = JSON.parse(
+  await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'),
+);
 const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 const issueTemplate = await readFile(
   new URL('../.github/ISSUE_TEMPLATE/bug_report.yml', import.meta.url),

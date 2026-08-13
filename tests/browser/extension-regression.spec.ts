@@ -15,7 +15,9 @@ test('selection translation works on an insecure page', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-single-requests', '1');
 });
 
-test('batch mismatch falls back with bounded concurrency and translates revealed content', async ({ page }) => {
+test('batch mismatch falls back with bounded concurrency and translates revealed content', async ({
+  page,
+}) => {
   await page.goto('/tests/browser/selection-regression.html');
   const toolbar = page.locator('#ot-toolbar');
   await expect(toolbar).toBeVisible();
@@ -23,13 +25,16 @@ test('batch mismatch falls back with bounded concurrency and translates revealed
   await expect(toolbar).toHaveAttribute('aria-busy', 'false');
 
   const root = page.locator('html');
-  await expect.poll(async () => Number(await root.getAttribute('data-single-requests'))).toBeGreaterThan(0);
+  await expect
+    .poll(async () => Number(await root.getAttribute('data-single-requests')))
+    .toBeGreaterThan(0);
   expect(Number(await root.getAttribute('data-max-active-singles'))).toBeLessThanOrEqual(2);
 
   const callsBeforeReveal = Number(await root.getAttribute('data-translation-calls'));
   await page.getByRole('button', { name: 'Toggle panel' }).click();
   await expect(page.locator('#controlled-panel .ot-translation')).toBeVisible();
-  await expect.poll(async () => Number(await root.getAttribute('data-translation-calls')))
+  await expect
+    .poll(async () => Number(await root.getAttribute('data-translation-calls')))
     .toBeGreaterThan(callsBeforeReveal);
 });
 
@@ -52,10 +57,12 @@ test('page extraction excludes site chrome while keeping reading content', async
 
   await page.getByRole('button', { name: 'Add dynamic content' }).click();
   await expect(page.locator('#processed-parent .ot-translation')).toBeVisible();
-  await expect.poll(async () => {
-    const value = await page.locator('html').getAttribute('data-requested-texts');
-    return JSON.parse(value || '[]').some((text: string) => text.includes('New content loaded'));
-  }).toBe(true);
+  await expect
+    .poll(async () => {
+      const value = await page.locator('html').getAttribute('data-requested-texts');
+      return JSON.parse(value || '[]').some((text: string) => text.includes('New content loaded'));
+    })
+    .toBe(true);
 });
 
 test('a cancelled task cannot clear the loading state of its replacement', async ({ page }) => {
@@ -118,10 +125,12 @@ test('closing a translating selection cancels its background job', async ({ page
   await page.getByRole('button', { name: 'Create selection' }).click();
   const selectionUi = page.locator('#ot-selection-ui');
   await selectionUi.getByRole('button', { name: '翻译选中内容' }).click();
-  await expect.poll(async () => Number(await page.locator('html').getAttribute('data-single-requests')))
+  await expect
+    .poll(async () => Number(await page.locator('html').getAttribute('data-single-requests')))
     .toBe(1);
   await selectionUi.getByRole('button', { name: '关闭划词翻译' }).click();
-  await expect.poll(async () => Number(await page.locator('html').getAttribute('data-cancel-requests')))
+  await expect
+    .poll(async () => Number(await page.locator('html').getAttribute('data-cancel-requests')))
     .toBe(1);
 });
 
@@ -147,7 +156,9 @@ test('the popup can pause and resume translation for the active site', async ({ 
   await expect(page.locator('#ot-out')).toContainText('已恢复当前网站翻译');
 });
 
-test('the popup resets a rejected image so the same file can be selected again', async ({ page }) => {
+test('the popup resets a rejected image so the same file can be selected again', async ({
+  page,
+}) => {
   await page.goto('/tests/browser/popup-regression.html');
   const input = page.locator('#ot-file');
   const status = page.locator('#ot-img-status');
@@ -157,7 +168,9 @@ test('the popup resets a rejected image so the same file can be selected again',
   await expect(input).toBeEnabled();
   await expect(input).toHaveValue('');
 
-  await status.evaluate((element) => { element.textContent = '等待重试'; });
+  await status.evaluate((element) => {
+    element.textContent = '等待重试';
+  });
   await input.setInputFiles('public/icon-16.png');
   await expect(status).toContainText('当前引擎不支持图片');
   await expect(input).toHaveValue('');
@@ -180,7 +193,8 @@ test('menu pages load the configured brand logo asset', async ({ page }) => {
   await page.goto('/tests/browser/popup-regression.html');
   const logo = page.locator('.ot-brand-mark img');
   await expect(logo).toHaveAttribute('src', '/public/icon-128.png');
-  await expect.poll(async () => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+  await expect
+    .poll(async () => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBe(128);
 });
 
@@ -203,7 +217,9 @@ test('image result page renders counts and toggles overlays', async ({ page }) =
   await expect(overlay).toBeHidden();
 });
 
-test('image result page explains missing tasks instead of leaving a blank page', async ({ page }) => {
+test('image result page explains missing tasks instead of leaving a blank page', async ({
+  page,
+}) => {
   await page.goto('/tests/browser/image-regression.html');
   await expect(page.getByRole('heading', { name: '缺少图片翻译任务' })).toBeVisible();
 });

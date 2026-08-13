@@ -78,9 +78,11 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
         </div>
       </section>
 
-      ${compact
-        ? `<details class="ot-advanced"><summary>高级设置</summary>${advancedFields}</details>`
-        : `<section class="ot-form-section"><h2>高级设置</h2>${advancedFields}</section>`}
+      ${
+        compact
+          ? `<details class="ot-advanced"><summary>高级设置</summary>${advancedFields}</details>`
+          : `<section class="ot-form-section"><h2>高级设置</h2>${advancedFields}</section>`
+      }
 
       <div class="ot-form-actions">
         <button type="button" data-f="test" class="ot-test-btn">测试连接</button>
@@ -236,9 +238,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.customGlossary = glossaryInput.value;
     cfg.customVision = customVisionChk.checked;
     const snapshot: AppConfig = { ...cfg, apiKeys: { ...cfg.apiKeys } };
-    const write = saveQueue
-      .catch(() => {})
-      .then(() => configItem.setValue(snapshot));
+    const write = saveQueue.catch(() => {}).then(() => configItem.setValue(snapshot));
     saveQueue = write.then(
       () => setStatus('已保存 ✓', false, 1500),
       () => setStatus('保存失败，请重试', true),
@@ -296,12 +296,16 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   [modelText, baseInput, keyInput, promptInput, glossaryInput].forEach((el) => {
     el.addEventListener('input', () => scheduleSave());
   });
-  window.addEventListener('pagehide', () => {
-    if (!inputSaveTimer) return;
-    clearTimeout(inputSaveTimer);
-    inputSaveTimer = null;
-    void save();
-  }, { once: true });
+  window.addEventListener(
+    'pagehide',
+    () => {
+      if (!inputSaveTimer) return;
+      clearTimeout(inputSaveTimer);
+      inputSaveTimer = null;
+      void save();
+    },
+    { once: true },
+  );
 
   // 测试连接：保存当前配置后翻译一句测试文本，验证 Key / 端点是否可用（P2-3）
   testBtn.addEventListener('click', async () => {
@@ -334,7 +338,8 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
 
   fill();
   setFormLoading(true);
-  void configItem.getValue()
+  void configItem
+    .getValue()
     .then((value) => {
       cfg = normalizeConfig(value);
       fill();

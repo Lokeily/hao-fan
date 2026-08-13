@@ -12,15 +12,23 @@
     "test:unit": "node --experimental-strip-types --test tests/core.test.mjs",
     "test:browser": "playwright test",
     "check:version": "node scripts/check-version.mjs",
-    "test:all": "npm run check:version && npm run test && npm run typecheck && npm run build && npm run test:browser",
+    "test:all": "npm run check:version && npm run lint && npm run test && npm run typecheck && npm run build && npm run test:browser",
     "typecheck": "tsc --noEmit",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "lint": "eslint .",
+    "format": "prettier --write \"entrypoints/**/*.ts\" \"src/**/*.ts\" \"utils/**/*.ts\" \"tests/**/*.{ts,js,mjs,html}\" \"scripts/**/*.mjs\" \"*.config.{ts,js}\" \"styles/*.css\""
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.0",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.67.0",
     "wxt": "^0.20.0"
   },
   "overrides": {

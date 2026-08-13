@@ -2,9 +2,15 @@
   const createEventTarget = () => {
     const listeners = new Set();
     return {
-      addListener(listener) { listeners.add(listener); },
-      removeListener(listener) { listeners.delete(listener); },
-      emit(...args) { listeners.forEach((listener) => listener(...args)); },
+      addListener(listener) {
+        listeners.add(listener);
+      },
+      removeListener(listener) {
+        listeners.delete(listener);
+      },
+      emit(...args) {
+        listeners.forEach((listener) => listener(...args));
+      },
     };
   };
   const runtimeEvents = createEventTarget();
@@ -106,17 +112,23 @@
     };
     seed.onsuccess = () => {
       const tx = seed.result.transaction('jobs', 'readwrite');
-      tx.objectStore('jobs').put({
-        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        segments: [{
-          text: 'Hello',
-          translation: '你好',
-          x: 0.08,
-          y: 0.1,
-          w: 0.36,
-          h: 0.2,
-        }],
-      }, 'test');
+      tx.objectStore('jobs').put(
+        {
+          image:
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          segments: [
+            {
+              text: 'Hello',
+              translation: '你好',
+              x: 0.08,
+              y: 0.1,
+              w: 0.36,
+              h: 0.2,
+            },
+          ],
+        },
+        'test',
+      );
     };
   }
   const area = {
@@ -128,10 +140,14 @@
       if (policyMessageRaceFromQuery && !policyRaceTriggered && keys === 'disabledSites') {
         policyRaceTriggered = true;
         const snapshot = memory.disabledSites;
-        setTimeout(() => runtimeEvents.emit({
-          type: 'SITE_POLICY_CHANGED',
-          payload: { disabled: true },
-        }), 0);
+        setTimeout(
+          () =>
+            runtimeEvents.emit({
+              type: 'SITE_POLICY_CHANGED',
+              payload: { disabled: true },
+            }),
+          0,
+        );
         await new Promise((resolve) => setTimeout(resolve, 40));
         return { disabledSites: snapshot };
       }
@@ -199,24 +215,21 @@
           root.dataset.singleRequests = String(Number(root.dataset.singleRequests || '0') + 1);
           const active = Number(root.dataset.activeSingles || '0') + 1;
           root.dataset.activeSingles = String(active);
-          root.dataset.maxActiveSingles = String(Math.max(
-            active,
-            Number(root.dataset.maxActiveSingles || '0'),
-          ));
+          root.dataset.maxActiveSingles = String(
+            Math.max(active, Number(root.dataset.maxActiveSingles || '0')),
+          );
           const singleDelay = Number(root.dataset.singleDelay) || 20;
           await new Promise((resolve) => setTimeout(resolve, singleDelay));
-          root.dataset.activeSingles = String(Math.max(
-            0,
-            Number(root.dataset.activeSingles || '0') - 1,
-          ));
+          root.dataset.activeSingles = String(
+            Math.max(0, Number(root.dataset.activeSingles || '0') - 1),
+          );
           if (cancelledJobs.has(message.payload?.jobId)) {
             return { ok: false, error: '翻译任务已取消' };
           }
           return {
             ok: true,
-            translation: text === 'Enable two-factor authentication'
-              ? '启用双重身份验证'
-              : `译文：${text}`,
+            translation:
+              text === 'Enable two-factor authentication' ? '启用双重身份验证' : `译文：${text}`,
             stats: {},
           };
         }
@@ -228,14 +241,11 @@
           const delays = JSON.parse(root.dataset.batchDelays || '[]');
           const delay = Number(delays[requestIndex]) || 0;
           if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
-          root.dataset.batchCompletions = String(
-            Number(root.dataset.batchCompletions || '0') + 1,
-          );
+          root.dataset.batchCompletions = String(Number(root.dataset.batchCompletions || '0') + 1);
           return {
             ok: true,
-            translations: root.dataset.batchMode === 'mismatch'
-              ? []
-              : texts.map((text) => `译文：${text}`),
+            translations:
+              root.dataset.batchMode === 'mismatch' ? [] : texts.map((text) => `译文：${text}`),
             stats: {},
           };
         }

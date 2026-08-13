@@ -3,7 +3,7 @@ export const MAX_TEXT_CHARS = 20_000;
 export const MAX_BATCH_CHARS = 100_000;
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' ? value as Record<string, unknown> : null;
+  return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 }
 
 export function readText(value: unknown): string {

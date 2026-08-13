@@ -94,7 +94,12 @@ export function getCachedSync(text: string, target: string, model: string): stri
 }
 
 // 同步写入（仅改内存 + 标记脏，回写交给防抖定时器合并为一次）
-export function setCachedSync(text: string, target: string, model: string, translation: string): void {
+export function setCachedSync(
+  text: string,
+  target: string,
+  model: string,
+  translation: string,
+): void {
   if (memory === null) return;
   memory[keyOf(text, target, model)] = { v: translation, t: Date.now() };
   dirty = true;
@@ -102,7 +107,11 @@ export function setCachedSync(text: string, target: string, model: string, trans
 }
 
 // 保留旧异步签名以兼容划词气泡等调用
-export async function getCached(text: string, target: string, model: string): Promise<string | null> {
+export async function getCached(
+  text: string,
+  target: string,
+  model: string,
+): Promise<string | null> {
   await ensureCacheLoaded();
   return getCachedSync(text, target, model);
 }

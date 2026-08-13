@@ -110,7 +110,7 @@ const BUILTIN: Record<string, Record<string, string>> = {
     'in stock': '有货',
     'out of stock': '缺货',
     'sold out': '售罄',
-    'sale': '促销',
+    sale: '促销',
     'view more': '查看更多',
     'learn more': '了解更多',
     'read more': '阅读更多',
@@ -189,9 +189,9 @@ const BUILTIN: Record<string, Record<string, string>> = {
     'good job': '干得漂亮',
     congratulations: '恭喜',
     'see you': '再见',
-    'goodbye': '再见',
+    goodbye: '再见',
     'excuse me': '抱歉',
-    'sorry': '对不起',
+    sorry: '对不起',
     // 动作 / 交互
     view: '查看',
     read: '阅读',
@@ -366,13 +366,10 @@ export function relevantTerms(
     if (out.length >= limit) break;
     if (seen.has(src)) continue;
     // 拉丁词用词边界，避免 "cat" 命中 "category"；含空格/非拉丁则用子串包含
-    let hit = false;
-    if (/^[a-z0-9 ]+$/.test(src) && !src.includes(' ')) {
-      const re = new RegExp(`\\b${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-      hit = re.test(haystack);
-    } else {
-      hit = haystack.includes(src.toLowerCase());
-    }
+    const hit =
+      /^[a-z0-9 ]+$/.test(src) && !src.includes(' ')
+        ? new RegExp(`\\b${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(haystack)
+        : haystack.includes(src.toLowerCase());
     if (hit) {
       seen.add(src);
       // 展示时源词首字母大写更自然（仅展示用，不影响匹配）

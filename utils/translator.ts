@@ -169,7 +169,11 @@ export async function translateOneDetailed(
   return { translation: response.text, stats };
 }
 
-export async function translateOne(cfg: AppConfig, text: string, signal?: AbortSignal): Promise<string> {
+export async function translateOne(
+  cfg: AppConfig,
+  text: string,
+  signal?: AbortSignal,
+): Promise<string> {
   return (await translateOneDetailed(cfg, text, signal)).translation;
 }
 
@@ -229,8 +233,7 @@ export async function translateBatchDetailed(
       pending.indexes.push(i);
       stats.duplicateHits++;
       countSaved(stats, t);
-    }
-    else pendingByText.set(t, { indexes: [i], text: t });
+    } else pendingByText.set(t, { indexes: [i], text: t });
   }
   const toTranslate = Array.from(pendingByText.values());
   if (toTranslate.length === 0) return { translations: result, stats };
@@ -239,7 +242,12 @@ export async function translateBatchDetailed(
   stats.sentCharacters = toTranslate.reduce((sum, item) => sum + item.text.length, 0);
 
   if (provider.type === 'mt') {
-    const batch = await translateMTBatch(provider.id, toTranslate.map((item) => item.text), cfg, signal);
+    const batch = await translateMTBatch(
+      provider.id,
+      toTranslate.map((item) => item.text),
+      cfg,
+      signal,
+    );
     stats.requests += batch.requests;
     toTranslate.forEach((item, itemIndex) => {
       const translation = batch.translations[itemIndex] || item.text;
@@ -273,7 +281,8 @@ export async function translateBatchDetailed(
       }
     };
     await Promise.all(Array.from({ length: Math.min(3, parts.length) }, () => worker()));
-    const compactTarget = cfg.targetLang === '中文' || cfg.targetLang === '日语' || cfg.targetLang === '韩语';
+    const compactTarget =
+      cfg.targetLang === '中文' || cfg.targetLang === '日语' || cfg.targetLang === '韩语';
     applyResult(item, translated.join(item.text.includes('\n') ? '\n' : compactTarget ? '' : ' '));
   };
 
@@ -308,7 +317,13 @@ export async function translateBatchDetailed(
   const translateGroup = async (items: typeof toTranslate, recovery = false): Promise<void> => {
     signal?.throwIfAborted();
     const block = useGlossary
-      ? buildGlossaryBlock(relevantTerms(items.map((item) => item.text), cfg.targetLang, glossary))
+      ? buildGlossaryBlock(
+          relevantTerms(
+            items.map((item) => item.text),
+            cfg.targetLang,
+            glossary,
+          ),
+        )
       : '';
     const input = JSON.stringify({ items: createBatchItems(items.map((item) => item.text)) });
     let response: ChatResult;
@@ -450,12 +465,16 @@ async function translateMTBatch(
     const url = `${cfg.baseUrl || 'https://api-free.deepl.com'}/v2/translate`;
     const body: Record<string, unknown> = { text: texts, target_lang: target.toUpperCase() };
     if (source !== 'auto') body.source_lang = source.toUpperCase();
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `DeepL-Auth-Key ${apiKey}` },
-      body: JSON.stringify(body),
-      signal,
-    }, 20_000);
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `DeepL-Auth-Key ${apiKey}` },
+        body: JSON.stringify(body),
+        signal,
+      },
+      20_000,
+    );
     if (!res.ok) throw new Error(`DeepL 翻译失败 (${res.status})：请检查 API Key`);
     const data = await res.json();
     const translations = Array.isArray(data?.translations)
@@ -467,15 +486,19 @@ async function translateMTBatch(
 
   if (providerId === 'microsoft') {
     const url = `${cfg.baseUrl || 'https://api.cognitive.microsofttranslator.com'}/translate?api-version=3.0&to=${target}${source !== 'auto' ? `&from=${source}` : ''}`;
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Ocp-Apim-Subscription-Key': apiKey,
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Ocp-Apim-Subscription-Key': apiKey,
+        },
+        body: JSON.stringify(texts.map((Text) => ({ Text }))),
+        signal,
       },
-      body: JSON.stringify(texts.map((Text) => ({ Text }))),
-      signal,
-    }, 20_000);
+      20_000,
+    );
     if (!res.ok) throw new Error(`Microsoft 翻译失败 (${res.status})：请检查 Key`);
     const data = await res.json();
     const translations = Array.isArray(data)

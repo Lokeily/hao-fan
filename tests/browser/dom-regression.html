@@ -5,11 +5,26 @@
     <title>DOM extraction regression</title>
     <script src="./browser-mock.js"></script>
     <style>
-      body { font: 16px/1.5 system-ui; margin: 0; }
-      header { display: flex; gap: 16px; padding: 12px; }
-      main { width: 720px; margin: 24px auto; }
-      h1 { text-align: center; }
-      form { border: 1px solid #999; padding: 20px; }
+      body {
+        font: 16px/1.5 system-ui;
+        margin: 0;
+      }
+      header {
+        display: flex;
+        gap: 16px;
+        padding: 12px;
+      }
+      main {
+        width: 720px;
+        margin: 24px auto;
+      }
+      h1 {
+        text-align: center;
+      }
+      form {
+        border: 1px solid #999;
+        padding: 20px;
+      }
     </style>
   </head>
   <body>
@@ -27,7 +42,9 @@
         <div>Authenticator apps generate one-time passwords used during sign-in.</div>
         <h3>Scan the QR code</h3>
         <div>Use an authenticator app or browser extension to scan.</div>
-        <div><label>Verify the code from the app <input value="XXXXXX" /></label></div>
+        <div>
+          <label>Verify the code from the app <input value="XXXXXX" /></label>
+        </div>
         <dialog open><p>Alternative recovery options are available.</p></dialog>
         <div role="menu" aria-label="Choose visibility">
           <button role="menuitemradio" aria-checked="true">

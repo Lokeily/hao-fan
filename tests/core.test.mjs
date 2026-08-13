@@ -17,9 +17,18 @@ import {
 } from '../utils/messages.ts';
 import { fetchWithTimeout, postJson, RequestTimeoutError } from '../utils/requester.ts';
 import { parseImageSegments, parseImageSegmentsResult } from '../utils/vision-parser.ts';
-import { batchInstruction, createBatchItems, parseBatchTranslations } from '../utils/batch-protocol.ts';
+import {
+  batchInstruction,
+  createBatchItems,
+  parseBatchTranslations,
+} from '../utils/batch-protocol.ts';
 import { localSkipReason } from '../utils/language-detection.ts';
-import { accumulateUsage, createStats, estimateTokens, EMPTY_USAGE_TOTALS } from '../utils/usage.ts';
+import {
+  accumulateUsage,
+  createStats,
+  estimateTokens,
+  EMPTY_USAGE_TOTALS,
+} from '../utils/usage.ts';
 import { planTextChunks, splitLongText, takeFirstTextChunk } from '../utils/chunking.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
@@ -90,10 +99,14 @@ test('normalizes and updates per-site translation pauses', () => {
 test('cancels active translation jobs and rejects requests that arrive late', async () => {
   const jobs = new TranslationJobRegistry(2);
   let release;
-  const active = jobs.run('page-job', (signal) => new Promise((resolve, reject) => {
-    release = resolve;
-    signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
-  }));
+  const active = jobs.run(
+    'page-job',
+    (signal) =>
+      new Promise((resolve, reject) => {
+        release = resolve;
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+      }),
+  );
 
   jobs.cancel('page-job');
   await assert.rejects(active, (error) => error?.name === 'AbortError');
@@ -126,15 +139,20 @@ test('migrates the retired Zhipu endpoint without changing custom endpoints', ()
 test('validates translation message boundaries', () => {
   assert.deepEqual(readBatch({ payload: { texts: ['hello', 'world'] } }), ['hello', 'world']);
   assert.equal(readSingle({ payload: { text: 'hello' } }), 'hello');
-  assert.equal(readJobId({ payload: { jobId: '123e4567-e89b-12d3-a456-426614174000' } }),
-    '123e4567-e89b-12d3-a456-426614174000');
+  assert.equal(
+    readJobId({ payload: { jobId: '123e4567-e89b-12d3-a456-426614174000' } }),
+    '123e4567-e89b-12d3-a456-426614174000',
+  );
 
   assert.throws(() => readBatch({ payload: { texts: [] } }), /不能为空/);
   assert.throws(
     () => readBatch({ payload: { texts: Array(MAX_BATCH_ITEMS + 1).fill('x') } }),
     /单批最多/,
   );
-  assert.throws(() => readSingle({ payload: { text: 'x'.repeat(MAX_TEXT_CHARS + 1) } }), /不能超过/);
+  assert.throws(
+    () => readSingle({ payload: { text: 'x'.repeat(MAX_TEXT_CHARS + 1) } }),
+    /不能超过/,
+  );
   assert.throws(() => readJobId({ payload: { jobId: '../invalid' } }), /ID 无效/);
 });
 
@@ -152,10 +170,17 @@ test('maps structured batch responses by stable IDs', () => {
     { id: 't0', text: 'one' },
     { id: 't1', text: 'two' },
   ]);
-  const response = '```json\n{"items":[{"id":"t1","translation":"二"},{"id":"t0","translation":"一"}]}\n```';
+  const response =
+    '```json\n{"items":[{"id":"t1","translation":"二"},{"id":"t0","translation":"一"}]}\n```';
   assert.deepEqual(parseBatchTranslations(response, 2), ['一', '二']);
   assert.equal(parseBatchTranslations('{"items":[{"id":"t0","translation":"一"}]}', 2), null);
-  assert.equal(parseBatchTranslations('{"items":[{"id":"t0","translation":"一"},{"id":"t0","translation":"二"}]}', 2), null);
+  assert.equal(
+    parseBatchTranslations(
+      '{"items":[{"id":"t0","translation":"一"},{"id":"t0","translation":"二"}]}',
+      2,
+    ),
+    null,
+  );
   assert.match(batchInstruction('中文'), /相同 id|id 必须原样返回/);
   assert.deepEqual(parseBatchTranslations('["一","二"]', 2), ['一', '二']);
   assert.deepEqual(parseBatchTranslations('{"translations":["一","二"]}', 2), ['一', '二']);
@@ -163,23 +188,32 @@ test('maps structured batch responses by stable IDs', () => {
 
 test('plans translation batches by both item and character limits', () => {
   const items = ['a'.repeat(4), 'b'.repeat(4), 'c'.repeat(7), 'd'];
-  assert.deepEqual(planTextChunks(items, (text) => text, {
-    maxItems: 3,
-    maxCharacters: 10,
-  }), [
-    [items[0], items[1]],
-    [items[2], items[3]],
-  ]);
-  assert.deepEqual(planTextChunks(['x'.repeat(20)], (text) => text, {
-    maxItems: 2,
-    maxCharacters: 5,
-  }), [['x'.repeat(20)]]);
+  assert.deepEqual(
+    planTextChunks(items, (text) => text, {
+      maxItems: 3,
+      maxCharacters: 10,
+    }),
+    [
+      [items[0], items[1]],
+      [items[2], items[3]],
+    ],
+  );
+  assert.deepEqual(
+    planTextChunks(['x'.repeat(20)], (text) => text, {
+      maxItems: 2,
+      maxCharacters: 5,
+    }),
+    [['x'.repeat(20)]],
+  );
 
   const visibleQueue = ['a'.repeat(6), 'b'.repeat(6), 'c'];
-  assert.deepEqual(takeFirstTextChunk(visibleQueue, (text) => text, {
-    maxItems: 3,
-    maxCharacters: 10,
-  }), ['a'.repeat(6)]);
+  assert.deepEqual(
+    takeFirstTextChunk(visibleQueue, (text) => text, {
+      maxItems: 3,
+      maxCharacters: 10,
+    }),
+    ['a'.repeat(6)],
+  );
   assert.deepEqual(visibleQueue, ['b'.repeat(6), 'c']);
 });
 
@@ -271,10 +305,9 @@ test('retries 429 responses and honors a zero Retry-After delay', async () => {
   };
 
   try {
-    assert.deepEqual(
-      await postJson('https://example.test', {}, '{}', { retries: 1 }),
-      { ok: true },
-    );
+    assert.deepEqual(await postJson('https://example.test', {}, '{}', { retries: 1 }), {
+      ok: true,
+    });
     assert.equal(attempts, 2);
   } finally {
     globalThis.fetch = originalFetch;
