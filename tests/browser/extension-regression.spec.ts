@@ -330,3 +330,28 @@ test('input translation: focusing a textarea shows translate button and result',
   await page.locator('#ot-input-btn').click();
   await expect(page.locator('#ot-input-result')).toContainText('译文', { timeout: 5000 });
 });
+
+test('multi-column layout: translations stay in their own columns', async ({ page }) => {
+  await page.goto('/tests/browser/layout-regression.html');
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+
+  // 三列 6 段：每段译文紧跟原文（多列内 appendChild），总数 = h1 + 6 + 4卡 + 4行 = 15
+  await expect(page.locator('.ot-translation')).toHaveCount(15);
+  // 每列段落内都有译文（而不是堆到列末尾）
+  const col = page.locator('.cols3 p');
+  for (let i = 0; i < 6; i++) {
+    await expect(col.nth(i).locator('.ot-translation')).toHaveCount(1);
+  }
+});
+
+test('grid cards: each card keeps translations inside itself', async ({ page }) => {
+  await page.goto('/tests/browser/layout-regression.html');
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.card').nth(0).locator('.ot-translation')).toHaveCount(2);
+  await expect(page.locator('.card').nth(1).locator('.ot-translation')).toHaveCount(1);
+  await expect(page.locator('.card').nth(2).locator('.ot-translation')).toHaveCount(1);
+});

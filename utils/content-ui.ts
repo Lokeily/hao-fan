@@ -435,7 +435,6 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   host.style.setProperty('z-index', '2147483647', 'important');
   host.style.setProperty('width', '300px', 'important');
   host.style.setProperty('border-radius', '14px', 'important');
-  host.style.setProperty('background', 'rgba(255,255,255,0.94)', 'important');
   host.style.setProperty('color', '#1d1d1f', 'important');
   host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.22)', 'important');
   host.style.setProperty('backdrop-filter', 'blur(24px) saturate(180%)', 'important');
@@ -446,7 +445,18 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
-    :host { color-scheme: light dark; }
+    /* 宿主背景由 :host 规则控制，保证深浅色随系统（内联样式无法被 media query 覆盖） */
+    :host {
+      color-scheme: light dark;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(60, 60, 67, 0.14);
+    }
+    @media (prefers-color-scheme: dark) {
+      :host {
+        background: rgba(28, 28, 30, 0.96);
+        border-color: rgba(84, 84, 88, 0.5);
+      }
+    }
     * { box-sizing: border-box; }
     .head {
       display: flex; align-items: center; gap: 8px;
@@ -606,12 +616,10 @@ export function createHoverBubble(
   host.style.setProperty('width', '280px', 'important');
   host.style.setProperty('max-width', 'min(320px, calc(100vw - 24px))', 'important');
   host.style.setProperty('border-radius', '12px', 'important');
-  host.style.setProperty('background', 'rgba(255,255,255,0.96)', 'important');
   host.style.setProperty('color', '#1d1d1f', 'important');
   host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.2)', 'important');
   host.style.setProperty('backdrop-filter', 'blur(20px) saturate(180%)', 'important');
   host.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(180%)', 'important');
-  host.style.setProperty('border', '1px solid rgba(60,60,67,0.14)', 'important');
   host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
   host.style.setProperty('overflow', 'hidden', 'important');
   host.style.setProperty('pointer-events', 'auto', 'important');
@@ -619,7 +627,18 @@ export function createHoverBubble(
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
-    :host { color-scheme: light dark; }
+    /* 宿主背景由 :host 规则控制，保证深浅色随系统 */
+    :host {
+      color-scheme: light dark;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(60, 60, 67, 0.14);
+    }
+    @media (prefers-color-scheme: dark) {
+      :host {
+        background: rgba(28, 28, 30, 0.96);
+        border-color: rgba(84, 84, 88, 0.5);
+      }
+    }
     * { box-sizing: border-box; }
     .src {
       padding: 8px 12px 4px;

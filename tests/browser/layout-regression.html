@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Layout regression: columns, grid, inline mix</title>
+<style>
+  body { margin: 24px; font: 15px/1.6 system-ui; }
+  .cols3 { column-count: 3; column-gap: 20px; }
+  .cols3 p { margin: 6px 0; break-inside: avoid; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .card { border: 1px solid #ddd; padding: 10px; }
+  .card p { margin: 4px 0; }
+  .inline-mix { border: 1px solid #ddd; padding: 10px; }
+  .inline-mix span { display: inline; }
+</style>
+<script src="./browser-mock.js"></script>
+</head>
+<body>
+  <h1>Layout regression page</h1>
+  <section class="cols3">
+    <p>Column one paragraph about renewable energy markets.</p>
+    <p>Column one second paragraph about storage capacity growth.</p>
+    <p>Column two paragraph about offshore wind investments.</p>
+    <p>Column two second paragraph about grid modernization.</p>
+    <p>Column three paragraph about solar panel exports.</p>
+    <p>Column three second paragraph about battery supply chains.</p>
+  </section>
+  <section class="cards">
+    <div class="card"><p>First card content about product launch.</p><p>First card second line about pricing.</p></div>
+    <div class="card"><p>Second card content about customer reviews.</p></div>
+    <div class="card"><p>Third card content about shipping updates.</p></div>
+  </section>
+  <div class="inline-mix">
+    <span>Inline span one talks about feature roadmap.</span>
+    <span>Inline span two talks about release schedule.</span>
+    <span>Inline span three talks about beta access.</span>
+    <span>Inline span four talks about community feedback.</span>
+  </div>
+  <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
+</body>
+</html>

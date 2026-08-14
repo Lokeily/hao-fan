@@ -179,7 +179,11 @@ export default defineContentScript({
       const existing = translationNodes.get(el);
       if (existing?.isConnected) {
         const text = existing.shadowRoot?.querySelector('.text');
-        if (text) text.textContent = translation;
+        if (text) {
+          text.textContent = translation;
+          // 移除流式占位脉冲动画（译文到达后不再闪烁）
+          text.classList.remove('is-pending');
+        }
         existing.dataset.translation = translation;
         existing.dataset.source = sourceText ?? existing.dataset.source ?? '';
         return;
@@ -460,7 +464,10 @@ export default defineContentScript({
             if (!msg || msg.id !== id) return;
             if (typeof msg.delta === 'string' && node?.isConnected) {
               const text = node.shadowRoot?.querySelector('.text');
-              if (text) text.textContent = msg.delta;
+              if (text) {
+                text.textContent = msg.delta;
+                text.classList.remove('is-pending');
+              }
             }
             if (msg.done) {
               clearTimeout(timer);
@@ -490,7 +497,10 @@ export default defineContentScript({
               const translation = typeof msg.translation === 'string' ? msg.translation : '';
               if (node?.isConnected) {
                 const text = node.shadowRoot?.querySelector('.text');
-                if (text) text.textContent = translation || '';
+                if (text) {
+                  text.textContent = translation || '';
+                  text.classList.remove('is-pending');
+                }
               }
               if (requestConfigRevision === translationConfigRevision) {
                 if (translation) {
@@ -1704,12 +1714,14 @@ export default defineContentScript({
       host.style.setProperty('width', '320px', 'important');
       host.style.setProperty('max-width', 'calc(100vw - 24px)', 'important');
       host.style.setProperty('border-radius', '12px', 'important');
-      host.style.setProperty('background', 'rgba(255,255,255,0.96)', 'important');
-      host.style.setProperty('color', '#1d1d1f', 'important');
+      // 深浅色随系统（内联样式无法被 media query 覆盖，直接按当前外观计算）
+      const resultDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+      host.style.setProperty('background', resultDark ? 'rgba(28,28,30,0.96)' : 'rgba(255,255,255,0.96)', 'important');
+      host.style.setProperty('color', resultDark ? '#f5f5f7' : '#1d1d1f', 'important');
       host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.2)', 'important');
       host.style.setProperty('backdrop-filter', 'blur(20px) saturate(180%)', 'important');
       host.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(180%)', 'important');
-      host.style.setProperty('border', '1px solid rgba(60,60,67,0.14)', 'important');
+      host.style.setProperty('border', `1px solid ${resultDark ? 'rgba(84,84,88,0.5)' : 'rgba(60,60,67,0.14)'}`, 'important');
       host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
       host.style.setProperty('padding', '10px 12px', 'important');
       host.style.setProperty('font-size', '13px', 'important');
