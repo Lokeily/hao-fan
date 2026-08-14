@@ -225,17 +225,22 @@ export function createNoticeHost(
       padding: 0 16px;
       border: 0;
       border-radius: 6px;
-      background: #1a73e8;
+      background: #007aff;
       color: #fff;
       font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       letter-spacing: 0;
       cursor: pointer;
+      transition: background 0.15s ease;
     }
-    button:hover { background: #1765cc; }
-    button:focus-visible { outline: 3px solid rgba(26, 115, 232, 0.35); outline-offset: 2px; }
+    button:hover { background: #0069d9; }
+    button:focus-visible { outline: 3px solid rgba(0, 122, 255, 0.35); outline-offset: 2px; }
     @media (prefers-color-scheme: dark) {
-      .dialog { border-color: #30363d; background: #161b22; color: #f0f6fc; }
-      p { color: #b1bac4; }
+      .dialog {
+        border-color: rgba(84, 84, 88, 0.4);
+        background: rgba(28, 28, 30, 0.92);
+        color: #f5f5f7;
+      }
+      p { color: #aeaeb2; }
     }
   `;
   const backdrop = document.createElement('div');
@@ -275,13 +280,15 @@ export function createSelectionUiStyle(): HTMLStyleElement {
     button { font: inherit; letter-spacing: 0; }
     .trigger {
       width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
-      display: grid; place-items: center; background: #1a73e8; color: #fff;
+      display: grid; place-items: center; background: #007aff; color: #fff;
       box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer;
       font: 650 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      transition: background 0.15s ease, transform 0.1s ease;
     }
-    .trigger:hover { background: #1765cc; }
+    .trigger:hover { background: #0069d9; }
+    .trigger:active { transform: scale(0.94); }
     .trigger:focus-visible, .action:focus-visible, .close:focus-visible {
-      outline: 3px solid rgba(26, 115, 232, .35); outline-offset: 2px;
+      outline: 3px solid rgba(0, 122, 255, .35); outline-offset: 2px;
     }
     .panel {
       width: min(360px, calc(100vw - 16px)); max-height: min(360px, calc(100vh - 16px));
