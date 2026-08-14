@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>好翻 · 开源免费的沉浸式 AI 网页翻译</title>
+    <meta
+      name="description"
+      content="好翻（Open Translator CN）是一款开源、免费、可自配 API 的沉浸式双语网页翻译扩展。直连 DeepSeek、智谱、腾讯混元等国内大模型，API Key 仅保存在本地，无遥测、无广告追踪。"
+    />
+    <meta property="og:title" content="好翻 · 开源免费的沉浸式 AI 网页翻译" />
+    <meta
+      property="og:description"
+      content="开源、免费、可自配 API 的沉浸式双语网页翻译扩展。API Key 本地保存，翻译请求直连所选服务商。"
+    />
+    <link rel="icon" type="image/png" href="assets/img/icon-48.png" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/img/icon-128.png" alt="好翻" />
+          <span>好翻</span>
+        </a>
+        <div class="nav-links">
+          <a href="#features">功能</a>
+          <a href="#providers">翻译服务</a>
+          <a href="#install">安装</a>
+          <a href="privacy.html">隐私政策</a>
+          <a
+            class="nav-cta"
+            href="https://github.com/Lokeily/hao-fan/releases/latest"
+            target="_blank"
+            rel="noopener"
+            >下载</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">开源 · 免费 · 自配 API</div>
+      <h1>沉浸式双语网页翻译，<br />把译文自然嵌进原文。</h1>
+      <p class="sub">
+        好翻在保留网页原文的同时，把译文显示在原文下方，逐段对照阅读。开源、免费、无额度限制，API
+        Key 只存在你本地。
+      </p>
+      <div class="hero-actions">
+        <a
+          class="btn btn-primary"
+          href="https://github.com/Lokeily/hao-fan/releases/latest"
+          target="_blank"
+          rel="noopener"
+          >下载扩展</a
+        >
+        <a class="btn btn-ghost" href="#install">查看安装方法</a>
+      </div>
+      <div class="hero-note">想先体验？在设置里选择「Google 翻译」即可免 Key 使用。</div>
+    </header>
+
+    <div class="trust">
+      <span><span class="dot">●</span> 开源 MIT 许可证</span>
+      <span><span class="dot">●</span> 无遥测 · 无广告追踪</span>
+      <span><span class="dot">●</span> API Key 仅存本地</span>
+      <span><span class="dot">●</span> 直连服务商，不经中转</span>
+    </div>
+
+    <section class="block" id="features">
+      <div class="container">
+        <div class="section-head">
+          <h2>为「读外文网页」而生</h2>
+          <p>从整页对照到划词翻译，所有能力都围绕一个目标：让你读得更顺。</p>
+        </div>
+        <div class="features">
+          <div class="card">
+            <div class="ico">📖</div>
+            <h3>沉浸式双语对照</h3>
+            <p>原文保留，译文自然显示在原文下方，随页面滚动一起跟随，不打断阅读节奏。</p>
+          </div>
+          <div class="card">
+            <div class="ico">👀</div>
+            <h3>可见区域优先</h3>
+            <p>先翻译当前屏幕里的内容，滚动时再继续翻译新出现的段落，首屏更快出结果。</p>
+          </div>
+          <div class="card">
+            <div class="ico">⚡</div>
+            <h3>动态内容翻译</h3>
+            <p>弹窗、下拉菜单、无限滚动等异步加载的内容会自动补译，单页应用也不漏。</p>
+          </div>
+          <div class="card">
+            <div class="ico">✂️</div>
+            <h3>划词翻译</h3>
+            <p>选中网页上的文字即译，独立浮窗展示，不改变原网页结构。</p>
+          </div>
+          <div class="card">
+            <div class="ico">🖼️</div>
+            <h3>图片翻译</h3>
+            <p>网页图片与本地图片支持 OCR 识别后翻译（需配置支持视觉能力的模型）。</p>
+          </div>
+          <div class="card">
+            <div class="ico">⏸️</div>
+            <h3>按网站暂停</h3>
+            <p>一键暂停当前网站的译文、清理页面，无需刷新即可恢复，互不干扰。</p>
+          </div>
+          <div class="card">
+            <div class="ico">💡</div>
+            <h3>节省 Token</h3>
+            <p>本地缓存、重复文本合并、术语库命中零请求、目标语言自动跳过，少花钱也更快。</p>
+          </div>
+          <div class="card">
+            <div class="ico">🎛️</div>
+            <h3>高度自定义</h3>
+            <p>服务商、模型、Base URL、提示词、术语表、翻译风格全部可配置，怎么顺手怎么来。</p>
+          </div>
+          <div class="card">
+            <div class="ico">🔒</div>
+            <h3>注入防护</h3>
+            <p>待译文本被明确标记为「数据而非指令」，降低恶意网页夹带提示词操纵译文的风险。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="providers" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div class="container">
+        <div class="section-head">
+          <h2>用你自己的翻译服务</h2>
+          <p>内置 12+ 家 AI 服务商与 3 家传统机器翻译预设，也支持任意 OpenAI 兼容接口与本地模型。</p>
+        </div>
+        <div class="prov-grid">
+          <div class="prov">DeepSeek</div>
+          <div class="prov">OpenAI</div>
+          <div class="prov">Google Gemini</div>
+          <div class="prov">OpenRouter</div>
+          <div class="prov">智谱 GLM</div>
+          <div class="prov">腾讯混元</div>
+          <div class="prov">通义千问</div>
+          <div class="prov">Kimi</div>
+          <div class="prov">百川智能</div>
+          <div class="prov">豆包</div>
+          <div class="prov">Ollama（本地）</div>
+          <div class="prov">任意 OpenAI 兼容</div>
+          <div class="prov muted">Google 翻译（免 Key）</div>
+          <div class="prov muted">DeepL</div>
+          <div class="prov muted">Microsoft 翻译</div>
+          <div class="prov muted">自定义端点</div>
+        </div>
+        <p class="prov-note">
+          Google 翻译（免 Key）走非官方免费端点，无服务等级保证，可能限流或临时不可用，建议仅用于体验；正式使用请配置支持
+          API Key 的服务。
+        </p>
+      </div>
+    </section>
+
+    <section class="block" id="install">
+      <div class="container">
+        <div class="section-head">
+          <h2>三步开始使用</h2>
+          <p>下载对应浏览器的安装包，解压后以「加载已解压的扩展程序」方式安装即可。</p>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="num">1</div>
+            <h3>下载安装包</h3>
+            <p>
+              前往
+              <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener"
+                >Releases</a
+              >
+              页面，下载对应浏览器的 ZIP 并解压。
+            </p>
+          </div>
+          <div class="step">
+            <div class="num">2</div>
+            <h3>加载扩展</h3>
+            <p>
+              Chrome / Edge 打开 <code>chrome://extensions</code>（Edge 为
+              <code>edge://extensions</code>），开启「开发者模式」后「加载已解压的扩展程序」。
+            </p>
+          </div>
+          <div class="step">
+            <div class="num">3</div>
+            <h3>配置并翻译</h3>
+            <p>
+              点击工具栏「好翻」图标 → 设置里选服务商、填 API Key、设目标语言，回到网页点右下角蓝色「译」按钮即可。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="container">
+        <div class="privacy-cta">
+          <h2>你的数据，只属于你</h2>
+          <p>
+            好翻不收集遥测、不投放广告、不追踪你的浏览行为。API Key 仅存于本地，翻译请求直连你选择的的服务商。想了解全部细节，请阅读我们的隐私政策。
+          </p>
+          <a class="btn btn-ghost" href="privacy.html">查看隐私政策</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="footer-inner">
+        <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
+        <div class="footer-links">
+          <a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub</a>
+          <a href="privacy.html">隐私政策</a>
+          <a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener"
+            >许可证</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

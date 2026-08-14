@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>隐私政策 · 好翻</title>
+    <meta name="description" content="好翻（Open Translator CN）隐私政策：说明扩展收集哪些数据、如何存储、与哪些第三方交互，以及你的权利。" />
+    <link rel="icon" type="image/png" href="assets/img/icon-48.png" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/img/icon-128.png" alt="好翻" />
+          <span>好翻</span>
+        </a>
+        <div class="nav-links">
+          <a href="index.html#features">功能</a>
+          <a href="index.html#providers">翻译服务</a>
+          <a href="index.html#install">安装</a>
+          <a
+            class="nav-cta"
+            href="https://github.com/Lokeily/hao-fan/releases/latest"
+            target="_blank"
+            rel="noopener"
+            >下载</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <main class="doc">
+      <a class="back-link" href="index.html">← 返回首页</a>
+      <h1>隐私政策</h1>
+      <p class="updated">最后更新：2026 年 8 月 15 日</p>
+
+      <p>
+        好翻（Open Translator CN，以下简称「本扩展」）是一款开源的浏览器翻译扩展。本政策说明本扩展在「你的浏览器本地」和「你主动配置的翻译服务」之间如何处理数据。我们的原则很简单：<strong>能不收集就不收集，必须用的数据只存在你本地。</strong>
+      </p>
+
+      <div class="callout">
+        一句话总结：本扩展<strong>不运营任何服务器</strong>，<strong>不收集遥测数据</strong>，<strong>不投放广告</strong>，也<strong>不追踪你的浏览行为</strong>。它只做一件事——把你选中的网页文本，发往<strong>你自行选择</strong>的翻译服务商。
+      </div>
+
+      <h2>我们收集哪些信息</h2>
+      <p>本扩展只在你的浏览器本地处理以下数据，<strong>不会</strong>上传到本扩展作者或任何由本扩展控制的服务器：</p>
+      <ul>
+        <li><strong>配置信息</strong>：你选择的翻译服务商、Base URL、模型名称、源语言、目标语言、翻译风格、自定义提示词、术语表。</li>
+        <li><strong>API 密钥</strong>：你填写的翻译服务 API Key，按服务商分别保存。</li>
+        <li><strong>使用统计</strong>：本地累计的翻译段数、Token 用量等计数，仅用于扩展内的用量展示。</li>
+        <li><strong>按网站暂停列表</strong>：你选择暂停翻译的网站地址列表。</li>
+        <li><strong>译文缓存</strong>：已翻译的文本，以哈希键存储，默认保留 30 天、最多 2000 条。</li>
+      </ul>
+
+      <h2>我们「不」收集的信息</h2>
+      <p>本扩展<strong>不会</strong>收集或访问以下数据：</p>
+      <ul>
+        <li>你的精确位置或地理位置；</li>
+        <li>你的浏览历史记录；</li>
+        <li>你的键盘输入、鼠标行为等用户活动；</li>
+        <li>通讯录、消息内容等个人通讯数据（除非你主动选中并翻译了某段文本，该文本才会被发往你选择的翻译服务）；</li>
+        <li>任何用于广告或跨站追踪的标识符、设备指纹。</li>
+      </ul>
+
+      <h2>数据存储在哪里</h2>
+      <p>
+        上述所有数据均保存在你浏览器的本地存储空间（<code>storage.local</code>）中，<strong>不会</strong>同步到云端，也<strong>不会</strong>被本扩展发送到第三方。你可以随时通过浏览器的扩展管理页面清除这些数据，或在扩展设置中关闭译文缓存。
+      </p>
+
+      <h2>与第三方服务的交互</h2>
+      <p>
+        要实现翻译，本扩展需要向你<strong>自行选择并配置</strong>的翻译服务商发起网络请求。在此过程中：
+      </p>
+      <ul>
+        <li>被翻译的<strong>网页文本</strong>和你的 <strong>API Key</strong> 会通过 HTTPS 加密传输给该服务商；</li>
+        <li>服务商如何处理这些数据，取决于<strong>该服务商自身的隐私政策</strong>，本扩展无法控制；</li>
+        <li>本扩展<strong>不会</strong>在请求中附加任何追踪标识符、遥测参数或用户标识；</li>
+        <li>你可以在设置中随时更换服务商或 API Key。</li>
+      </ul>
+      <p>
+        本扩展本身<strong>不提供</strong>翻译能力、也<strong>不中转</strong>任何请求——它只是把你配置的凭据和待译文本直连到你选择的服务商。
+      </p>
+
+      <h2>权限说明</h2>
+      <p>本扩展在浏览器中申请以下权限，且每项权限都仅用于实现翻译功能：</p>
+      <ul>
+        <li><strong>storage</strong>：在本地保存你的配置、API Key、译文缓存与暂停列表。</li>
+        <li><strong>activeTab</strong>：在你主动触发翻译（快捷键、悬浮按钮或右键菜单）时，读取当前标签页的网页文本用于翻译。</li>
+        <li><strong>contextMenus</strong>：在右键菜单中添加「翻译选中文字」选项。</li>
+        <li><strong>scripting</strong>：在需要时向页面注入脚本，将译文渲染到原文位置，并处理单页应用的动态内容。</li>
+        <li><strong>host_permissions（&lt;all_urls&gt;）</strong>：用于向你所选翻译服务的 API 端点发起跨域请求。本扩展仅在翻译时向<strong>你明确配置</strong>的域名发送数据。</li>
+      </ul>
+
+      <h2>安全与防护</h2>
+      <ul>
+        <li><strong>严格内容安全策略</strong>：扩展页面使用 <code>script-src 'self'</code>，禁止加载远程脚本或内联脚本，从根源上杜绝远程代码执行。</li>
+        <li><strong>不使用远程代码</strong>：本扩展的所有逻辑都打包在扩展本身，运行时不从外部服务器下载并执行任何 JavaScript。</li>
+        <li><strong>提示词注入防护</strong>：待译文本会被明确包裹并标记为「数据而非指令」，降低恶意网页在文本中夹带指令来操纵译文的风险。</li>
+        <li><strong>API Key 隔离</strong>：不同服务商的密钥分别存储，仅随对应服务的请求发送。</li>
+      </ul>
+
+      <h2>你的权利</h2>
+      <ul>
+        <li>你可以随时在扩展设置中修改或删除配置、API Key 与术语表；</li>
+        <li>你可以在浏览器扩展管理页面清除本扩展的全部本地数据；</li>
+        <li>你可以卸载本扩展，卸载后其本地数据随之一并被清除。</li>
+      </ul>
+
+      <h2>本政策的变更</h2>
+      <p>
+        若本扩展未来改变数据处理方式，我们会更新本页面并在扩展发布说明中提示。本政策仅适用于本扩展本身，不适用于你所选用的翻译服务商。
+      </p>
+
+      <h2>联系我们</h2>
+      <p>
+        如对本隐私政策有疑问，或发现安全漏洞，请通过
+        <a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub 仓库</a>
+        提交 Issue，或按仓库中的 <code>SECURITY.md</code> 私下联系作者。请勿在公开 Issue 中泄露你的 API Key。
+      </p>
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
+        <div class="footer-links">
+          <a href="index.html">首页</a>
+          <a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">许可证</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
