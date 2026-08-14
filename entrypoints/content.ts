@@ -29,6 +29,7 @@ import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
 import { randomId } from '../utils/id.ts';
 import { isSiteDisabled, withSiteDisabled } from '../utils/site-policy.ts';
 import { normalizeConfig } from '../utils/config.ts';
+import { buildConfigForm } from '../utils/ui.ts';
 import { LANGUAGES } from '../utils/languages.ts';
 import { PROVIDERS } from '../utils/providers.ts';
 import '../styles/content.css';
@@ -1503,9 +1504,9 @@ export default defineContentScript({
       host.style.setProperty('all', 'initial', 'important');
       host.style.setProperty('position', 'fixed', 'important');
       host.style.setProperty('z-index', '2147483647', 'important');
-      host.style.setProperty('width', 'min(560px, calc(100vw - 32px))', 'important');
-      host.style.setProperty('height', 'min(680px, calc(100vh - 32px))', 'important');
-      host.style.setProperty('left', 'max(16px, calc(100vw - 592px))', 'important');
+      host.style.setProperty('width', 'min(600px, calc(100vw - 32px))', 'important');
+      host.style.setProperty('height', 'min(720px, calc(100vh - 32px))', 'important');
+      host.style.setProperty('left', 'max(16px, calc(100vw - 632px))', 'important');
       host.style.setProperty('top', '16px', 'important');
       host.style.setProperty('border-radius', '16px', 'important');
       host.style.setProperty('background', theme.surface, 'important');
@@ -1538,9 +1539,11 @@ export default defineContentScript({
           font-size: 18px; line-height: 1; cursor: pointer;
         }
         .close:hover { background: rgba(128,128,128,0.18); }
-        iframe {
-          display: block; width: 100%; height: calc(100% - 43px);
-          border: 0; background: transparent;
+        .ot-full-settings-body {
+          height: calc(100% - 43px);
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          padding: 8px 16px 32px;
         }
       `;
       const head = document.createElement('div');
@@ -1555,24 +1558,44 @@ export default defineContentScript({
       close.setAttribute('aria-label', '关闭完整设置');
       close.addEventListener('click', closeFullSettings);
       head.append(title, close);
-      const frame = document.createElement('iframe');
-      frame.src = browser.runtime.getURL('/options.html');
-      frame.title = '好翻设置';
-      shadow.append(style, head, frame);
+
+      const body = document.createElement('div');
+      body.className = 'ot-full-settings-body';
+      const mount = document.createElement('div');
+      body.appendChild(mount);
+      shadow.append(style, head, body);
       document.documentElement.appendChild(host);
       fullSettingsHost = host;
-      // 拖动时暂停 iframe 的指针事件，避免拖动被 iframe 内容吞掉
-      head.addEventListener('pointerdown', () => {
-        frame.style.pointerEvents = 'none';
-      });
-      window.addEventListener(
-        'pointerup',
-        () => {
-          if (frame.isConnected) frame.style.pointerEvents = '';
-        },
-        true,
-      );
       makeDraggable(host, head, () => {});
+
+      // 内联渲染完整设置表单（不再使用 iframe——网页无法嵌入扩展页面，会被浏览器拦截）。
+      // 从扩展读取 options.html 解析其 CSS，注入 shadow 后构建表单；CSS 不可用时降级为无样式。
+      void (async () => {
+        try {
+          const htmlUrl = browser.runtime.getURL('/options.html');
+          const htmlText = await (await fetch(htmlUrl)).text();
+          const linkMatch = htmlText.match(/href="([^"]+\.css)"/);
+          if (linkMatch) {
+            let cssUrl = linkMatch[1];
+            if (!/^(chrome-extension|moz-extension|https?:)\/\//.test(cssUrl)) {
+              cssUrl = new URL(
+                cssUrl.replace(/^\//, ''),
+                browser.runtime.getURL('/options.html'),
+              ).href;
+            }
+            const cssText = await (await fetch(cssUrl)).text();
+            const sheet = document.createElement('style');
+            // 作用域适配：:root → :host；body → .ot-full-settings-body
+            sheet.textContent = cssText
+              .replace(/:root/g, ':host')
+              .replace(/\bbody\b/g, '.ot-full-settings-body');
+            shadow.prepend(sheet);
+          }
+        } catch {
+          /* CSS 不可用时表单仍可用，仅无样式 */
+        }
+        buildConfigForm(mount, false);
+      })();
     }
 
     async function openSettingsPanel(anchorX: number, anchorY: number) {

@@ -1,7 +1,14 @@
 import { defineConfig } from 'wxt';
+import { runPostbuild } from './scripts/postbuild';
 
 // 参考文档: https://wxt.dev
 export default defineConfig({
+  // 构建完成后统一处理页面资源（内联 CSS + 相对路径），wxt build 与 wxt zip 均会触发。
+  hooks: {
+    'build:done': async () => {
+      await runPostbuild();
+    },
+  },
   manifest: ({ browser }) => ({
     name: '好翻',
     description:

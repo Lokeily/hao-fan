@@ -381,15 +381,16 @@ test('quick settings panel: language and engine changes persist', async ({ page 
   expect(provider.provider).toBe('deepl');
 });
 
-test('full settings panel opens as an in-page panel with iframe', async ({ page }) => {
+test('full settings panel opens as an in-page panel with the settings form', async ({ page }) => {
   await page.goto('/tests/browser/selection-regression.html');
   await page.locator('#ot-settings-btn').click();
   await page.locator('#ot-settings-panel').getByRole('button', { name: '打开完整设置 ⚙' }).click();
   const full = page.locator('#ot-full-settings');
   await expect(full).toBeVisible();
-  const frame = full.locator('iframe');
-  await expect(frame).toHaveCount(1);
-  await expect(frame).toHaveAttribute('src', /options\.html/);
+  // 内联渲染完整设置表单（不再使用 iframe——网页无法嵌入扩展页面会被浏览器拦截）
+  await expect(full.locator('.ot-form')).toHaveCount(1);
+  await expect(full.locator('h2', { hasText: '模型服务' })).toBeVisible();
+  await expect(full.locator('h2', { hasText: '翻译偏好' })).toBeVisible();
   // 关闭
   await full.getByRole('button', { name: '关闭完整设置' }).click();
   await expect(full).toBeHidden();

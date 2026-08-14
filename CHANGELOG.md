@@ -1,5 +1,16 @@
 # 更新日志（Changelog）
 
+## v0.1.11 (2026-08-15)
+
+- 修复：完整设置面板在 Edge 显示「此页面已被 Edge 阻止」——网页无法 iframe 嵌入
+  扩展页面（浏览器安全策略）。改为内联渲染：从扩展读取设置页 CSS 注入面板
+  shadow 后直接构建完整设置表单，功能与右上角弹窗完全一致，不再依赖 iframe。
+- 修复：弹窗右侧大片空白——popup 窗口部分浏览器按 html 元素尺寸计算，
+  只约束 body 宽度会留下右侧空白；html 与 body 同时固定 360px。
+- 修复：CSS 内联化——构建产物页面样式直接内联 <style>，并移除 crossorigin
+  与绝对路径；postbuild 改挂 WXT build:done hook，wxt zip 打包产物同样生效
+  （此前 release 包未被处理，是弹窗裸渲染的根因）。
+
 ## v0.1.10 (2026-08-15)
 
 - 修复：悬停气泡/设置面板白底看不清——宿主带 all:initial !important 时
