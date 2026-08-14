@@ -14,7 +14,7 @@
   <a href="#安装"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
   <a href="#安装"><img src="https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
-  <a href="https://github.com/Lokeily/hao-fan/releases/latest"><img src="https://img.shields.io/badge/version-0.1.4-blue" alt="v0.1.4"></a>
+  <a href="https://github.com/Lokeily/hao-fan/releases/latest"><img src="https://img.shields.io/badge/version-0.1.5-blue" alt="v0.1.5"></a>
 </p>
 
 ## 简介
@@ -30,12 +30,17 @@
 | 功能 | 说明 |
 | --- | --- |
 | 沉浸式双语对照 | 原文保留，译文显示在原文下方，随页面滚动自然跟随 |
+| 流式输出 | 首段边生成边显示，首字延迟低至毫秒级（基线实测 ~90ms） |
+| 上下文感知翻译 | 结合页面标题与前段译文，长文代词指代与术语更连贯 |
+| 翻译质量自检 | 数字 / URL / 代码 token 保真校验，缺失自动校正并标记提示 |
 | 可见区域优先 | 先翻译当前屏幕内容，滚动时继续翻译新内容 |
 | 动态内容翻译 | 弹窗、菜单、无限滚动等异步加载的内容自动补译 |
 | 划词翻译 | 选中文字即译，独立浮窗展示，不改变原网页 |
+| 译文可编辑 · 术语自学习 | hover 译文即可修改，自动抽取术语沉淀进个人术语表 |
 | 图片翻译 | 网页图片与本地图片 OCR + 翻译（需支持视觉的模型） |
 | 按网站暂停 | 一键暂停当前网站、清理译文，无需刷新即可恢复 |
-| 节省 Token | 本地缓存、重复文本合并、术语库命中零请求、目标语言跳过 |
+| 多引擎路由 | 备用引擎故障转移（限流/报错自动切换）+ 长文强模型路由 |
+| 节省 Token | 句子级缓存、重复文本合并、术语库命中零请求、目标语言跳过 |
 | 自定义能力 | 服务商、模型、Base URL、提示词、术语表、翻译风格均可配置 |
 
 ## 支持的翻译服务
