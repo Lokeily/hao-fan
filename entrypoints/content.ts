@@ -59,6 +59,7 @@ export default defineContentScript({
 
     let busy = false;
     let translatedCount = 0; // 已插入译文计数（避免每次 querySelectorAll 全文档统计，省性能）
+    let pageTotalFound = 0; // 本次整页扫描发现的段落总数（进度显示用）
     let estimatedTokensSaved = 0;
     let dynamicActive = false;
     let dynamicObserver: MutationObserver | null = null;
@@ -217,7 +218,9 @@ export default defineContentScript({
       // 一律嵌入原文块内部，译文紧随原文且不改变页面布局。
       const ownFloat = getComputedStyle(el).float;
       let columnAncestor = false;
-      for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+      let depth = 0;
+      for (let p = el.parentElement; p && p !== document.documentElement && depth < 3; p = p.parentElement) {
+        depth++;
         const cs = getComputedStyle(p);
         if (cs.columnCount !== 'auto' || cs.columnWidth !== 'auto') {
           columnAncestor = true;
@@ -258,6 +261,10 @@ export default defineContentScript({
     // 状态提示（"翻译中…" / "已翻译 N 段"），紧贴悬浮按钮上方
     let statusEl: HTMLElement | null = null;
     let statusTimer: ReturnType<typeof setTimeout> | null = null;
+    function progressText(): string {
+      return pageTotalFound > 0 ? `${translatedCount}/${pageTotalFound}` : String(translatedCount);
+    }
+
     function showStatus(text: string, transient = false) {
       if (!statusEl) {
         statusEl = document.createElement('div');
@@ -331,6 +338,7 @@ export default defineContentScript({
       activeImageCleanup = null;
       document.querySelectorAll('.ot-img-panel, .ot-img-seg').forEach((el) => el.remove());
       translatedCount = 0;
+      pageTotalFound = 0;
       estimatedTokensSaved = 0;
       hideStatus();
     }
@@ -506,7 +514,7 @@ export default defineContentScript({
       }
       if (jobId && activePageJobId === jobId && inserted > 0) {
         translatedCount += inserted;
-        showStatus(`翻译中… 已译 ${translatedCount} 段`);
+        showStatus(`翻译中… 已译 ${progressText()} 段`);
       }
     }
 
@@ -607,7 +615,7 @@ export default defineContentScript({
         if (activePageJobId === jobId) {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
           const failureText = failures > 0 ? ` · ${failures} 批失败` : '';
-          showStatus(`已翻译 ${translatedCount} 段${savedText}${failureText} · 滚动时继续`, true);
+          showStatus(`已翻译 ${progressText()} 段${savedText}${failureText} · 滚动时继续`, true);
         }
       } finally {
         if (activePageJobId === jobId) {
@@ -677,7 +685,7 @@ export default defineContentScript({
       if (jobId && activePageJobId !== jobId) return;
       if (stale.length > 0) observeForLazyTranslation(stale);
       translatedCount += inserted;
-      if (inserted > 0) showStatus(`翻译中… 已译 ${translatedCount} 段`);
+      if (inserted > 0) showStatus(`翻译中… 已译 ${progressText()} 段`);
       if (failures > 0) {
         throw firstError instanceof Error ? firstError : new Error(`${failures} 段逐条翻译失败`);
       }
@@ -754,7 +762,7 @@ export default defineContentScript({
         translatedCount += inserted;
         if (inserted > 0) {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
-          showStatus(`翻译中… 已译 ${translatedCount} 段${savedText}`);
+          showStatus(`翻译中… 已译 ${progressText()} 段${savedText}`);
         }
       } catch (error) {
         if (jobId && activePageJobId !== jobId) return;
@@ -855,6 +863,7 @@ export default defineContentScript({
         }
         await scanPromise;
         if (activePageJobId !== jobId) return;
+        pageTotalFound = foundCount;
         if (foundCount === 0) {
           showStatus('未找到可翻译的文本内容', true);
           return;
@@ -872,7 +881,7 @@ export default defineContentScript({
         if (activePageJobId !== jobId) return;
 
         if (failures > 0) {
-          showStatus(`已翻译 ${translatedCount} 段，${failures} 个批次失败`, true);
+          showStatus(`已翻译 ${progressText()} 段，${failures} 个批次失败`, true);
         } else if (translatedCount === 0) {
           const savedText =
             estimatedTokensSaved > 0 ? `，本地约省 ${estimatedTokensSaved} Token` : '';
@@ -880,7 +889,7 @@ export default defineContentScript({
         } else {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
           const lazyText = deferredCount > 0 ? ' · 滚动时继续' : '';
-          showStatus(`已翻译 ${translatedCount} 段${savedText}${lazyText}`, true);
+          showStatus(`已翻译 ${progressText()} 段${savedText}${lazyText}`, true);
         }
       } catch (e: any) {
         showNotice(e?.message || '翻译失败', jobId || 'page-translation');
@@ -1618,6 +1627,14 @@ export default defineContentScript({
         gear.style.background = 'transparent';
         gear.style.color = '#6e6e73';
       });
+
+      // 深色模式适配：工具条底色与齿轮颜色跟随系统外观
+      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+      if (prefersDark) {
+        bar.style.setProperty('background', 'rgba(28,28,30,0.92)', 'important');
+        bar.style.setProperty('border-color', 'rgba(84,84,88,0.5)', 'important');
+        gear.style.color = '#aeaeb2';
+      }
 
       bar.append(btn, gear);
       try {

@@ -447,7 +447,8 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   if (!compact) {
     const hint = document.createElement('p');
     hint.className = 'ot-hint';
-    hint.textContent = 'API Key 仅保存在本地浏览器，并只发送给你选择的翻译服务商。';
+    hint.textContent =
+      'API Key 仅保存在本地浏览器，并只发送给你选择的翻译服务商。快捷键 Alt+T 可直接翻译当前网页。';
     mount.insertAdjacentElement('beforebegin', hint);
   }
 
