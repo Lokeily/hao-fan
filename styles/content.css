@@ -163,6 +163,24 @@
   animation: ot-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* 翻译进行中：按钮内旋转圆圈指示器 */
+.ot-toolbar-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  flex: 0 0 14px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ot-spin 0.8s linear infinite;
+}
+@keyframes ot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes ot-pop {
   from {
     opacity: 0;

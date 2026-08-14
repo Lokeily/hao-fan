@@ -76,6 +76,9 @@ test('a cancelled task cannot clear the loading state of its replacement', async
   await toolbar.click();
   await expect.poll(async () => Number(await root.getAttribute('data-batch-requests'))).toBe(1);
   await expect(toolbar).toHaveAttribute('aria-busy', 'true');
+  // 加载态：旋转圆圈指示器 + "取消翻译" 文案
+  await expect(page.locator('#ot-translate-btn .ot-toolbar-spinner')).toBeVisible();
+  await expect(page.locator('#ot-translate-btn')).toContainText('取消翻译');
 
   await toolbar.click();
   await toolbar.click();
@@ -251,8 +254,12 @@ test('plain container without semantic blocks: lines are translated separately',
   // 原文行翻译后被标记 ot-translated；其紧随的兄弟即译文节点
   const lines = page.locator('.note span.ot-translated');
   await expect(lines).toHaveCount(4);
-  await expect(lines.nth(0).locator('xpath=./following-sibling::*[1]')).toHaveClass(/ot-translation/);
-  await expect(lines.nth(2).locator('xpath=./following-sibling::*[1]')).toHaveClass(/ot-translation/);
+  await expect(lines.nth(0).locator('xpath=./following-sibling::*[1]')).toHaveClass(
+    /ot-translation/,
+  );
+  await expect(lines.nth(2).locator('xpath=./following-sibling::*[1]')).toHaveClass(
+    /ot-translation/,
+  );
 });
 
 test('toolbar is draggable and keeps its position', async ({ page }) => {

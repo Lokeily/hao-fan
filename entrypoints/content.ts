@@ -393,6 +393,7 @@ export default defineContentScript({
       const requestConfigRevision = translationConfigRevision;
       let inserted = 0;
       let idSeq = 0;
+      const streamCallId = `${Date.now().toString(36)}${randomId().slice(0, 4)}`;
       const done: Promise<void>[] = [];
       // 流式请求兜底：后台 SW 休眠/扩展重载会断开端口，若不处理，done 将永久挂起，
       // 导致整页翻译卡死（busy 永远为 true）。断开或超时后立即收尾，
@@ -415,7 +416,7 @@ export default defineContentScript({
         (item.el as HTMLElement).classList.add(PENDING_CLASS);
         insertTranslation(item.el, '', item.text);
         const node = translationNodes.get(item.el);
-        const id = `s${idSeq++}`;
+        const id = `${streamCallId}-s${idSeq++}`;
         const p = new Promise<void>((resolve) => {
           const entry = {
             settle: () => resolve(),
@@ -428,6 +429,10 @@ export default defineContentScript({
             if (idx >= 0) pending.splice(idx, 1);
             entry.settle();
             entry.el.classList.remove(PENDING_CLASS);
+            // 移除"…"占位节点，等待重试
+            const node = translationNodes.get(entry.el);
+            node?.remove();
+            translationNodes.delete(entry.el);
             if (entry.el.isConnected) {
               observeForLazyTranslation([{ el: entry.el, text: textOfBlock(entry.el) }]);
             }
@@ -452,8 +457,10 @@ export default defineContentScript({
                 return;
               }
               if (msg.error) {
-                // 流式请求失败：告知用户原因，段落回到懒翻译队列待重试
+                // 流式请求失败：告知用户原因，移除占位节点，段落回到懒翻译队列待重试
                 (item.el as HTMLElement).classList.remove(PENDING_CLASS);
+                node?.remove();
+                translationNodes.delete(item.el);
                 showNotice(String(msg.error), jobId || 'page-translation');
                 if (item.el.isConnected) {
                   observeForLazyTranslation([{ el: item.el, text: textOfBlock(item.el) }]);
@@ -1678,16 +1685,33 @@ export default defineContentScript({
       }
       if (!btn) return;
       if (loading) {
-        // 加载态同时作为取消按钮。
+        // 加载态：旋转圆圈指示器 + "取消翻译"（点击可取消），状态一目了然。
         btn.setAttribute('aria-busy', 'true');
         btn.setAttribute('aria-label', '取消当前翻译');
         btn.style.setProperty('width', 'auto', 'important');
-        btn.style.setProperty('padding', '0 14px', 'important');
+        btn.style.setProperty('padding', '0 12px', 'important');
         btn.style.setProperty('border-radius', '22px', 'important');
         btn.style.setProperty('font-size', '13px', 'important');
         btn.style.setProperty('background', '#8fb8ef', 'important');
         btn.style.cursor = 'progress';
-        btn.textContent = '取消翻译';
+        btn.textContent = '';
+        const spinner = document.createElement('span');
+        spinner.className = 'ot-toolbar-spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        // 基础样式内联（不依赖 content.css 注入时机）；旋转动画由 content.css 提供。
+        Object.assign(spinner.style, {
+          display: 'inline-block',
+          width: '14px',
+          height: '14px',
+          marginRight: '6px',
+          flex: '0 0 14px',
+          border: '2px solid rgba(255,255,255,0.45)',
+          borderTopColor: '#fff',
+          borderRadius: '50%',
+        });
+        const label = document.createElement('span');
+        label.textContent = '取消翻译';
+        btn.append(spinner, label);
         btn.title = '取消当前翻译';
       } else {
         btn.setAttribute('aria-busy', 'false');

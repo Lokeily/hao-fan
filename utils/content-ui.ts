@@ -66,6 +66,14 @@ export function createTranslationNode(
       white-space: normal;
       transition: opacity 0.18s ease;
     }
+    .text.is-pending {
+      opacity: 0.45;
+      animation: ot-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes ot-pulse {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 0.6; }
+    }
     .text:focus { outline: none; opacity: 1; }
     :host([data-quality="warn"]) .text {
       border-bottom: 1px dashed rgba(255, 159, 10, 0.75);
@@ -113,7 +121,9 @@ export function createTranslationNode(
   `;
   const text = document.createElement('span');
   text.className = 'text';
-  text.textContent = translation;
+  // 空译文（流式渲染中）显示"…"占位，让用户明确感知翻译进度。
+  text.textContent = translation || '…';
+  if (!translation) text.classList.add('is-pending');
   shadow.append(style, text);
 
   if (options?.onEdit) {
