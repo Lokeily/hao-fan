@@ -28,7 +28,8 @@ globalThis.browser = {
   },
 };
 
-const { translateBatchDetailed, translateOneDetailed } = await import('../utils/translator.ts');
+const { translateBatchDetailed, translateOneDetailed, translateOneStream } =
+  await import('../utils/translator.ts');
 const { cleanSecret } = await import('../utils/requester.ts');
 
 const openServers = [];
@@ -46,6 +47,15 @@ async function startMockServer() {
     if (typeof result === 'number') {
       res.writeHead(result, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { message: `mock status ${result}` } }));
+      return;
+    }
+    if (result && result.__sse) {
+      // SSE 流式响应：逐块发送 data: 行，最后以 [DONE] 结束。
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      for (const chunk of result.__sse) {
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      }
+      res.end('data: [DONE]\n\n');
       return;
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -239,6 +249,106 @@ test('429 后按 Retry-After 重试并成功', async () => {
   const result = await translateBatchDetailed(cfgFor(server.port), ['Rate limited?']);
   assert.equal(result.translations[0], '译文0'); // 第二次成功返回的批量译文
   assert.equal(calls, 2);
+  await server.close();
+});
+
+test('质量自检：数字与 URL 缺失时标记 issue', async () => {
+  const server = await startMockServer();
+  let calls = 0;
+  server.setHandler(() => {
+    calls++;
+    // 无论普通还是校正重试，都返回缺失关键信息的译文
+    return { choices: [{ message: { content: '版本说明见官网' } }], usage: {} };
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { qualityCheck: true }),
+    'Version 2.5 is at https://example.com/x',
+  );
+  assert.ok(Array.isArray(result.issue) && result.issue.length > 0, '应标记缺失信息');
+  assert.ok(
+    result.issue.some((t) => t.includes('2.5')),
+    '应包含缺失的数字',
+  );
+  assert.ok(calls >= 2, '应有一次校正重试');
+  await server.close();
+});
+
+test('句子级缓存：文本微变时只重译变化的句子', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => {
+    return { choices: [{ message: { content: '句子译文' } }], usage: {} };
+  });
+  const cfg = cfgFor(server.port, { sentenceCache: true });
+  const first = await translateOneDetailed(cfg, 'Alpha. Beta.');
+  assert.ok(first.translation.length > 0);
+  const afterFirst = server.requests.length;
+  assert.ok(afterFirst >= 2, '两句应分别请求');
+  const second = await translateOneDetailed(cfg, 'Alpha. Gamma.');
+  assert.equal(server.requests.length, afterFirst + 1, '微变后只重译变化句');
+  assert.equal(second.stats.cacheHits, 1);
+  await server.close();
+});
+
+test('上下文感知：system 提示注入页面标题与前段译文', async () => {
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    const system = req.body.messages[0].content;
+    assert.match(system, /【语境·页面标题】My Page/);
+    assert.match(system, /【语境·上一段译文】前文/);
+    return { choices: [{ message: { content: '上下文译文' } }], usage: {} };
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { contextAware: true }),
+    'Some text',
+    undefined,
+    { title: 'My Page', prev: '前文译文' },
+  );
+  assert.equal(result.translation, '上下文译文');
+  await server.close();
+});
+
+test('流式输出：增量逐段回调，最终译文与用量正确', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => ({
+    __sse: [
+      { choices: [{ delta: { content: '你好' } }] },
+      { choices: [{ delta: { content: '世界' } }] },
+      {
+        choices: [{ delta: {}, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 7, completion_tokens: 4 },
+      },
+    ],
+  }));
+  const deltas = [];
+  let doneResult = null;
+  const result = await translateOneStream(cfgFor(server.port), 'Hello world', {
+    onDelta: (partial) => deltas.push(partial),
+    onDone: (r) => {
+      doneResult = r;
+    },
+  });
+  assert.deepEqual(deltas, ['你好', '你好世界']);
+  assert.equal(result.translation, '你好世界');
+  assert.equal(result.stats.requests, 1);
+  assert.equal(result.stats.promptTokens, 7);
+  assert.equal(result.stats.completionTokens, 4);
+  assert.equal(doneResult.translation, '你好世界');
+  await server.close();
+});
+
+test('qualityCheck 关闭时不做校正重试', async () => {
+  const server = await startMockServer();
+  let calls = 0;
+  server.setHandler(() => {
+    calls++;
+    return { choices: [{ message: { content: '无数字译文' } }], usage: {} };
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { qualityCheck: false }),
+    'Read 100 articles',
+  );
+  assert.equal(result.translation, '无数字译文');
+  assert.equal(calls, 1, '不启用自检时只请求一次');
   await server.close();
 });
 
