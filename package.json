@@ -1,6 +1,6 @@
 {
   "name": "open-translator-cn",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "开源、免费、可自配置 API 的沉浸式 AI 翻译浏览器插件（国内模型优先）",
   "type": "module",
   "scripts": {
