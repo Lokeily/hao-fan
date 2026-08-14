@@ -395,3 +395,34 @@ test('full settings panel opens as an in-page panel with the settings form', asy
   await full.getByRole('button', { name: '关闭完整设置' }).click();
   await expect(full).toBeHidden();
 });
+
+test('auto-translate site: page loads and starts translating automatically', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 预置"自动翻译此站"偏好后刷新
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({
+      autoSites: [location.host],
+      config: undefined,
+    });
+  });
+  await page.reload();
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+  // 自动开译：mock 记录到批量请求且状态条出现
+  await expect
+    .poll(async () => Number(await page.locator('html').getAttribute('data-batch-requests')))
+    .toBeGreaterThan(0);
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.ot-translation').first()).toBeVisible();
+});
+
+test('settings panel follows dark color scheme with readable text', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+  const bg = await panel.evaluate((el) => getComputedStyle(el).backgroundColor);
+  // 深色系统：面板为不透明深色底（可读，不透明）
+  expect(bg).toMatch(/rgb\(2[0-9],\s*2[0-9],\s*3[0-9]\)|rgb\(28,\s*28,\s*30\)/);
+  await expect(panel.getByRole('combobox', { name: '目标语言' })).toBeVisible();
+});

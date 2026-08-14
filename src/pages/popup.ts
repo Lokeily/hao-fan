@@ -10,10 +10,12 @@ import '../../styles/options.css';
 
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   // 防御性基础样式：即使外部 CSS 加载失败，弹窗也保持可读（背景/字体/宽度）。
+  // 颜色跟随系统深浅色（不能写死浅色，否则深色系统下白字浅底看不清）。
+  const defensiveDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   document.body.style.setProperty('width', '360px');
   document.body.style.setProperty('margin', '0');
-  document.body.style.setProperty('background', '#f2f2f7');
-  document.body.style.setProperty('color', '#1d1d1f');
+  document.body.style.setProperty('background', defensiveDark ? '#000000' : '#f2f2f7');
+  document.body.style.setProperty('color', defensiveDark ? '#f5f5f7' : '#1d1d1f');
   document.body.style.setProperty(
     'font-family',
     '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',

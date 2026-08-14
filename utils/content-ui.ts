@@ -443,6 +443,8 @@ export interface SettingsPanelOptions {
   provider: string;
   sitePaused: boolean;
   siteHost: string;
+  autoTranslate: boolean;
+  onAutoToggle: (enabled: boolean) => void;
   onTargetLang: (value: string) => void;
   onProvider: (value: string) => void;
   onSiteToggle: (paused: boolean) => void;
@@ -576,6 +578,22 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   provSel.addEventListener('change', () => opts.onProvider(provSel.value));
   provRow.append(provLabel, provSel);
 
+  const autoRow = document.createElement('div');
+  autoRow.className = 'row';
+  const autoLabel = document.createElement('label');
+  autoLabel.textContent = '自动翻译此站（打开页面即译）';
+  const autoToggle = document.createElement('span');
+  autoToggle.className = 'switch';
+  const autoInput = document.createElement('input');
+  autoInput.type = 'checkbox';
+  autoInput.checked = opts.autoTranslate;
+  const autoTrack = document.createElement('span');
+  autoTrack.className = 'track';
+  autoTrack.appendChild(document.createElement('span'));
+  autoToggle.append(autoInput, autoTrack);
+  autoInput.addEventListener('change', () => opts.onAutoToggle(autoInput.checked));
+  autoRow.append(autoLabel, autoToggle);
+
   const siteRow = document.createElement('div');
   siteRow.className = 'row';
   const siteLabel = document.createElement('label');
@@ -599,7 +617,7 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   fullBtn.textContent = '打开完整设置 ⚙';
   fullBtn.addEventListener('click', opts.onOpenFullSettings);
 
-  body.append(langRow, provRow, siteRow, fullBtn);
+  body.append(langRow, provRow, autoRow, siteRow, fullBtn);
   // 注意：shadow root 已挂载在 host 上，不能 host.appendChild(shadow)（会清空 shadow）。
   shadow.append(style, head, body);
   document.documentElement.appendChild(host);

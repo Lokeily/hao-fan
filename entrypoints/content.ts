@@ -12,7 +12,13 @@ import {
   closestTextBlock,
 } from '../utils/dom.ts';
 import { planTextChunks, takeFirstTextChunk } from '../utils/chunking.ts';
-import { configItem, disabledSitesItem, toolbarPosItem, settingsPanelPosItem } from '../utils/storage.ts';
+import {
+  configItem,
+  disabledSitesItem,
+  autoSitesItem,
+  toolbarPosItem,
+  settingsPanelPosItem,
+} from '../utils/storage.ts';
 import {
   createTranslationNode,
   createNoticeHost,
@@ -82,6 +88,8 @@ export default defineContentScript({
     const sessionTranslations = new SessionTranslationCache();
     let translationConfigRevision = 0;
     let currentTranslationStyle = 'plain';
+    let hoverTranslateEnabled = true;
+    let inputTranslateEnabled = true;
     let noticeHost: HTMLElement | null = null;
     const noticeCycles = new NoticeCycleGate();
     let blockedPageJobId: string | null = null;
@@ -105,6 +113,31 @@ export default defineContentScript({
           setSiteDisabledState(isSiteDisabled(sites, location.href));
         }
       })
+      .then(async () => {
+        // 自动翻译此站：站点在自动翻译列表且未被暂停时，页面加载后自动开始翻译。
+        try {
+          const autoSites = await autoSitesItem.getValue();
+          if (isSiteDisabled(autoSites, location.href)) {
+            await new Promise<void>((resolve) => {
+              if (sitePolicyLoaded) {
+                resolve();
+                return;
+              }
+              const timer = setInterval(() => {
+                if (sitePolicyLoaded) {
+                  clearInterval(timer);
+                  resolve();
+                }
+              }, 60);
+            });
+            if (!siteDisabled && !document.querySelector('.ot-translation')) {
+              void translatePage(true);
+            }
+          }
+        } catch {
+          /* 存储不可用时跳过自动翻译 */
+        }
+      })
       .catch(() => {
         if (!sitePolicyLoaded) setSiteDisabledState(false);
       });
@@ -116,12 +149,16 @@ export default defineContentScript({
         translationConfigRevision++;
         sessionTranslations.clear();
         if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+        hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
+        inputTranslateEnabled = v ? v.inputTranslate !== false : true;
         document.querySelectorAll('.ot-translation').forEach((el) => {
           (el as HTMLElement).dataset.style = currentTranslationStyle;
         });
       });
       void configItem.getValue().then((v) => {
         if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+        hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
+        inputTranslateEnabled = v ? v.inputTranslate !== false : true;
       });
     } catch {
       /* 极少数页面中 storage 监听不可用时，仅保留当前页面会话缓存。 */
@@ -1602,7 +1639,12 @@ export default defineContentScript({
       closeSettingsPanel();
       try {
         const cfg = normalizeConfig(await configItem.getValue());
-        const paused = isSiteDisabled(await disabledSitesItem.getValue(), location.href);
+        const [disabledSites, autoSites] = await Promise.all([
+          disabledSitesItem.getValue(),
+          autoSitesItem.getValue(),
+        ]);
+        const paused = isSiteDisabled(disabledSites, location.href);
+        const autoOn = isSiteDisabled(autoSites, location.href);
         let panelX = anchorX;
         let panelY = anchorY;
         try {
@@ -1621,6 +1663,13 @@ export default defineContentScript({
           provider: cfg.provider,
           sitePaused: paused,
           siteHost: location.host,
+          autoTranslate: autoOn,
+          onAutoToggle: (enabled) => {
+            void (async () => {
+              const sites = await autoSitesItem.getValue();
+              await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+            })();
+          },
           onTargetLang: (value) => {
             void (async () => {
               const current = normalizeConfig(await configItem.getValue());
@@ -1688,6 +1737,10 @@ export default defineContentScript({
         clearTimeout(hoverTimer);
         hoverTimer = null;
       }
+      if (hoverHideTimer) {
+        clearTimeout(hoverHideTimer);
+        hoverHideTimer = null;
+      }
       hoverBubble?.host.remove();
       hoverBubble = null;
       hoverEl = null;
@@ -1733,6 +1786,7 @@ export default defineContentScript({
     document.addEventListener(
       'mouseover',
       (e) => {
+        if (!hoverTranslateEnabled) return;
         const target = e.target as Element | null;
         if (!target || !document.body.contains(target)) return;
         if (
@@ -1757,13 +1811,26 @@ export default defineContentScript({
       true,
     );
 
+    let hoverHideTimer: ReturnType<typeof setTimeout> | null = null;
     document.addEventListener(
       'mousemove',
       (e) => {
         if (!hoverEl || hoverPinned || !hoverBubble) return;
         const target = e.target as Element | null;
-        if (target && (target.closest('#ot-hover-bubble') || hoverEl.contains(target))) return;
-        hideHoverBubble();
+        if (target && (target.closest('#ot-hover-bubble') || hoverEl.contains(target))) {
+          if (hoverHideTimer) {
+            clearTimeout(hoverHideTimer);
+            hoverHideTimer = null;
+          }
+          return;
+        }
+        // 延迟隐藏：给鼠标移向气泡的时间，避免气泡一闪就消失
+        if (!hoverHideTimer) {
+          hoverHideTimer = setTimeout(() => {
+            hoverHideTimer = null;
+            hideHoverBubble();
+          }, 260);
+        }
       },
       true,
     );
@@ -1888,6 +1955,7 @@ export default defineContentScript({
     document.addEventListener(
       'focusin',
       (e) => {
+        if (!inputTranslateEnabled) return;
         const target = e.target as Element | null;
         if (!isTranslatableInput(target)) return;
         hideInputTranslate();
