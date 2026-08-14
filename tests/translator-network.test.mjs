@@ -352,6 +352,25 @@ test('qualityCheck 关闭时不做校正重试', async () => {
   await server.close();
 });
 
+test('401 认证失败给出明确中文指引', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => 401);
+  await assert.rejects(
+    translateOneDetailed(cfgFor(server.port), 'Verification probe'),
+    (e) => /API Key/.test(e.message) && /401/.test(e.message) && /测试连接/.test(e.message),
+  );
+  await server.close();
+});
+
+test('403 无权限给出账户指引', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => 403);
+  await assert.rejects(
+    translateOneDetailed(cfgFor(server.port), 'Verification probe'),
+    (e) => /403/.test(e.message) && /权限/.test(e.message),
+  );
+  await server.close();
+});
 test('cleanSecret 拒绝含非 ASCII 字符的 Key', () => {
   assert.throws(() => cleanSecret('sk-abc\u3000def'), /非 ASCII/);
   assert.equal(cleanSecret('  sk-abc123  '), 'sk-abc123');

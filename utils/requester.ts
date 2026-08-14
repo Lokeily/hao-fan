@@ -34,7 +34,24 @@ class HttpRequestError extends Error {
   readonly retryAfter: number | null;
 
   constructor(status: number, detail: string, retryAfter: number | null) {
-    super(`请求失败 (${status})${detail ? `：${detail.slice(0, 300)}` : ''}`);
+    const shown = detail ? detail.slice(0, 300) : '';
+    // 认证类错误直出服务商原文对普通用户不友好，转为明确中文指引（保留服务商返回供排查）。
+    let message: string;
+    if (status === 401) {
+      message =
+        '请求失败 (401)：API Key 无效或已过期。请到设置页确认所选服务商正确，' +
+        '从服务商后台完整重新复制 API Key 并点击「测试连接」验证。';
+    } else if (status === 403) {
+      message =
+        '请求失败 (403)：API Key 无权限或账户受限。请检查服务商账户状态、' +
+        'Key 权限与余额，或更换 API Key。';
+    } else {
+      message = `请求失败 (${status})${shown ? `：${shown}` : ''}`;
+    }
+    if (shown && (status === 401 || status === 403)) {
+      message += `（服务商返回：${shown}）`;
+    }
+    super(message);
     this.name = 'HttpRequestError';
     this.status = status;
     this.retryAfter = retryAfter;
