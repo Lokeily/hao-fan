@@ -254,3 +254,50 @@ test('plain container without semantic blocks: lines are translated separately',
   await expect(lines.nth(0).locator('xpath=./following-sibling::*[1]')).toHaveClass(/ot-translation/);
   await expect(lines.nth(2).locator('xpath=./following-sibling::*[1]')).toHaveClass(/ot-translation/);
 });
+
+test('toolbar is draggable and keeps its position', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+
+  const before = await toolbar.boundingBox();
+  if (!before) throw new Error('toolbar missing');
+  // 按住并拖拽（超过阈值视为拖拽而非点击）
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(before.x + 120, before.y + 80, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+
+  const after = await toolbar.boundingBox();
+  if (!after) throw new Error('toolbar missing after drag');
+  expect(Math.round(after.x)).not.toBe(Math.round(before.x));
+  expect(Math.round(after.y)).not.toBe(Math.round(before.y));
+
+  // 刷新后位置保持（持久化）
+  await page.reload();
+  await expect(toolbar).toBeVisible();
+  const restored = await toolbar.boundingBox();
+  if (!restored) throw new Error('toolbar missing after reload');
+  expect(Math.round(restored.x)).toBe(Math.round(after.x));
+  expect(Math.round(restored.y)).toBe(Math.round(after.y));
+});
+
+test('gear button opens quick settings panel with live controls', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('快速设置');
+
+  // 目标语言选择器存在且含中文选项（option 在未展开的 select 中不可见，改查数量）
+  const langSel = panel.getByRole('combobox', { name: '目标语言' });
+  await expect(langSel).toBeVisible();
+  await expect(langSel.locator('option[value="中文"]')).toHaveCount(1);
+
+  // 关闭按钮可收起
+  await panel.getByRole('button', { name: '关闭设置' }).click();
+  await expect(panel).toBeHidden();
+});

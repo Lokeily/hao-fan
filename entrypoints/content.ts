@@ -12,17 +12,22 @@ import {
   closestTextBlock,
 } from '../utils/dom.ts';
 import { planTextChunks, takeFirstTextChunk } from '../utils/chunking.ts';
-import { configItem, disabledSitesItem } from '../utils/storage.ts';
+import { configItem, disabledSitesItem, toolbarPosItem, settingsPanelPosItem } from '../utils/storage.ts';
 import {
   createTranslationNode,
   createNoticeHost,
   createSelectionUiStyle,
+  createSettingsPanel,
+  makeDraggable,
 } from '../utils/content-ui.ts';
 import { mountImageResultOverlay } from '../utils/image-overlay.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
 import { randomId } from '../utils/id.ts';
-import { isSiteDisabled } from '../utils/site-policy.ts';
+import { isSiteDisabled, withSiteDisabled } from '../utils/site-policy.ts';
+import { normalizeConfig } from '../utils/config.ts';
+import { LANGUAGES } from '../utils/languages.ts';
+import { PROVIDERS } from '../utils/providers.ts';
 import '../styles/content.css';
 
 let activeImageCleanup: (() => void) | null = null;
@@ -1139,6 +1144,7 @@ export default defineContentScript({
         setToolbarLoading(false);
         hideSelectionUi();
         closeNotice();
+        closeSettingsPanel();
         document.getElementById('ot-toolbar')?.remove();
       } else {
         mountToolbar();
@@ -1432,60 +1438,210 @@ export default defineContentScript({
     // ============================================================
     // ★ 悬浮工具按钮 — 彻底重构：确保在任何网页上都可见
     // ============================================================
+    // ===== 悬浮工具按钮组（可拖动）：译 + 设置入口 =====
+    let settingsPanel: ReturnType<typeof createSettingsPanel> | null = null;
+
+    function closeSettingsPanel() {
+      settingsPanel?.host.remove();
+      settingsPanel = null;
+    }
+
+    async function openSettingsPanel(anchorX: number, anchorY: number) {
+      closeSettingsPanel();
+      try {
+        const cfg = normalizeConfig(await configItem.getValue());
+        const paused = isSiteDisabled(await disabledSitesItem.getValue(), location.href);
+        let panelX = anchorX;
+        let panelY = anchorY;
+        try {
+          const saved = await settingsPanelPosItem.getValue();
+          if (saved) {
+            panelX = saved.x;
+            panelY = saved.y;
+          }
+        } catch {
+          /* 无持久化位置时跟随锚点 */
+        }
+        settingsPanel = createSettingsPanel({
+          languages: LANGUAGES.map((l) => l.name),
+          providers: PROVIDERS.map((p) => ({ id: p.id, name: p.name, needsKey: p.needsKey })),
+          targetLang: cfg.targetLang,
+          provider: cfg.provider,
+          sitePaused: paused,
+          siteHost: location.host,
+          onTargetLang: (value) => {
+            void (async () => {
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({ ...current, targetLang: value });
+              translationConfigRevision++;
+              sessionTranslations.clear();
+            })();
+          },
+          onProvider: (value) => {
+            void (async () => {
+              const provider = PROVIDERS.find((p) => p.id === value);
+              if (!provider) return;
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({
+                ...current,
+                provider: value,
+                baseUrl: provider.baseUrl,
+                model: provider.defaultModel,
+              });
+              translationConfigRevision++;
+              sessionTranslations.clear();
+            })();
+          },
+          onSiteToggle: (paused) => {
+            void (async () => {
+              const sites = await disabledSitesItem.getValue();
+              await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
+            })();
+          },
+          onOpenFullSettings: () => {
+            closeSettingsPanel();
+            browser.runtime.openOptionsPage?.().catch(() => {});
+          },
+          onClose: closeSettingsPanel,
+          onDrag: (x, y) => {
+            void settingsPanelPosItem.setValue({ x, y }).catch(() => {});
+          },
+        });
+        const maxX = window.innerWidth - 308;
+        const maxY = window.innerHeight - 320;
+        settingsPanel.host.style.setProperty(
+          'left',
+          `${Math.min(Math.max(8, panelX), Math.max(8, maxX))}px`,
+          'important',
+        );
+        settingsPanel.host.style.setProperty(
+          'top',
+          `${Math.min(Math.max(8, panelY), Math.max(8, maxY))}px`,
+          'important',
+        );
+      } catch {
+        /* 存储不可用时静默 */
+      }
+    }
+
     function mountToolbar() {
       if (!sitePolicyLoaded || siteDisabled) return;
       if (document.getElementById('ot-toolbar')) return;
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.id = 'ot-toolbar';
-      btn.textContent = '\u8BD1'; // "译"
-      btn.title = '好翻 \u00B7 \u7FFB\u8BD1\u672C\u9875'; // "好翻 · 翻译本页"
-      btn.setAttribute('aria-label', '翻译当前网页');
-
-      // 使用内联样式覆盖一切可能的站点 CSS 干扰
-      // 关键：position:fixed 必须在无 transform/filter/perspective 的祖先下才有效
-      // 挂载到 documentElement 而非 body，避免 body 的 transform 破坏固定定位
-      Object.assign(btn.style, {
+      const bar = document.createElement('div');
+      bar.id = 'ot-toolbar';
+      bar.dataset.haofanUi = 'true';
+      // 使用内联样式覆盖一切可能的站点 CSS 干扰；挂载到 documentElement，
+      // 避免 body 的 transform 破坏 fixed 定位。
+      Object.assign(bar.style, {
         position: 'fixed',
         right: '20px',
         bottom: '20px',
         zIndex: '2147483647',
-        width: '44px',
-        height: '44px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '5px',
+        borderRadius: '999px',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(18px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1)',
+        border: '1px solid rgba(60,60,67,0.12)',
+        cursor: 'grab',
+        userSelect: 'none',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
+        transition: 'box-shadow 0.2s ease',
+      });
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'ot-translate-btn';
+      btn.textContent = '\u8BD1'; // "译"
+      btn.title = '好翻 \u00B7 \u7FFB\u8BD1\u672C\u9875'; // "好翻 · 翻译本页"
+      btn.setAttribute('aria-label', '翻译当前网页');
+      Object.assign(btn.style, {
+        width: '40px',
+        height: '40px',
         borderRadius: '50%',
-        background: 'linear-gradient(180deg, #2b7de9 0%, #1a73e8 100%)',
+        border: 'none',
+        padding: '0',
+        background: 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)',
         color: '#fff',
         fontWeight: '600',
         fontSize: '16px',
+        lineHeight: '1',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
-        userSelect: 'none',
-        boxShadow: '0 6px 18px rgba(26,115,232,0.38), 0 2px 6px rgba(0,0,0,0.16)',
-        transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.2s ease, box-shadow 0.2s ease',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        border: 'none',
-        padding: '0',
-        lineHeight: '1',
+        boxShadow: '0 3px 10px rgba(0,122,255,0.35)',
+        transition: 'transform 0.15s ease, background 0.2s ease',
+        fontFamily: 'inherit',
       });
 
-      btn.addEventListener('mouseenter', () => {
-        btn.style.background = '#1765cc';
-        btn.style.transform = 'translateY(-2px)';
+      const gear = document.createElement('button');
+      gear.type = 'button';
+      gear.id = 'ot-settings-btn';
+      gear.textContent = '\u2699\uFE0E'; // ⚙（文本变体，避免 emoji 渲染）
+      gear.title = '快速设置';
+      gear.setAttribute('aria-label', '打开快速设置');
+      Object.assign(gear.style, {
+        width: '36px',
+        height: '36px',
+        borderRadius: '50%',
+        border: 'none',
+        padding: '0',
+        background: 'transparent',
+        color: '#6e6e73',
+        fontSize: '17px',
+        lineHeight: '1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'background 0.15s ease, color 0.15s ease',
+        fontFamily: 'inherit',
       });
-      btn.addEventListener('mouseleave', () => {
-        btn.style.background = '#1a73e8';
-        btn.style.transform = 'translateY(0)';
+      gear.addEventListener('mouseenter', () => {
+        gear.style.background = 'rgba(60,64,67,0.08)';
+        gear.style.color = '#1d1d1f';
       });
-      btn.addEventListener('mousedown', () => {
-        btn.style.transform = 'scale(0.94)';
+      gear.addEventListener('mouseleave', () => {
+        gear.style.background = 'transparent';
+        gear.style.color = '#6e6e73';
       });
-      btn.addEventListener('mouseup', () => {
-        btn.style.transform = 'translateY(-1px)';
+
+      bar.append(btn, gear);
+      try {
+        document.documentElement.appendChild(bar);
+      } catch {
+        (document.body || document.documentElement).appendChild(bar);
+      }
+
+      // 整条工具条可拖动；位移超过阈值视为拖拽，不触发按钮点击。
+      const draggable = makeDraggable(bar, bar, (x, y) => {
+        void toolbarPosItem.setValue({ x, y }).catch(() => {});
       });
-      btn.addEventListener('click', () => {
+      const wasDrag = () => draggable.suppressNextClick();
+
+      // 恢复上次拖拽位置
+      void toolbarPosItem
+        .getValue()
+        .then((pos) => {
+          if (!pos || !document.getElementById('ot-toolbar')) return;
+          bar.style.right = 'auto';
+          bar.style.bottom = 'auto';
+          bar.style.left = `${Math.min(Math.max(0, pos.x), Math.max(0, window.innerWidth - bar.offsetWidth))}px`;
+          bar.style.top = `${Math.min(Math.max(0, pos.y), Math.max(0, window.innerHeight - bar.offsetHeight))}px`;
+        })
+        .catch(() => {});
+
+      // 点击委托在整条工具条上：点击容器任意位置（齿轮除外）都触发翻译，
+      // 拖拽位移超过阈值时 suppressNextClick 忽略本次点击。
+      bar.addEventListener('click', (event) => {
+        if (wasDrag()) return;
+        if ((event.target as Element | null)?.closest?.('#ot-settings-btn')) return;
         if (busy) {
           clearTranslations();
           busy = false;
@@ -1500,18 +1656,26 @@ export default defineContentScript({
           translatePage(true);
         }
       });
-
-      // 挂载到 documentElement（html 节点），避免页面 body 有 transform 时破坏 fixed 定位
-      try {
-        document.documentElement.appendChild(btn);
-      } catch {
-        // 极少数情况下 documentElement 不可写，退回 body
-        (document.body || document.documentElement).appendChild(btn);
-      }
+      gear.addEventListener('click', (event) => {
+        if (wasDrag()) return;
+        event.stopPropagation();
+        const rect = gear.getBoundingClientRect();
+        void openSettingsPanel(rect.left, rect.bottom + 8);
+      });
     }
 
     function setToolbarLoading(loading: boolean) {
-      const btn = document.getElementById('ot-toolbar');
+      const bar = document.getElementById('ot-toolbar');
+      const btn = document.getElementById('ot-translate-btn');
+      if (bar) {
+        if (loading) {
+          bar.setAttribute('aria-busy', 'true');
+          bar.setAttribute('aria-label', '取消当前翻译');
+        } else {
+          bar.setAttribute('aria-busy', 'false');
+          bar.setAttribute('aria-label', '翻译当前网页');
+        }
+      }
       if (!btn) return;
       if (loading) {
         // 加载态同时作为取消按钮。
@@ -1528,11 +1692,13 @@ export default defineContentScript({
       } else {
         btn.setAttribute('aria-busy', 'false');
         btn.setAttribute('aria-label', '翻译当前网页');
-        btn.style.removeProperty('width');
-        btn.style.removeProperty('padding');
-        btn.style.removeProperty('border-radius');
-        btn.style.removeProperty('font-size');
-        btn.style.setProperty('background', '#1a73e8', 'important');
+        // 注意：不能 removeProperty——inline 样式里的原始 width 也会被一并删除，
+        // 导致按钮缩回内容宽度（约 25px），工具条整体变窄（历史隐藏 bug）。
+        btn.style.setProperty('width', '40px', 'important');
+        btn.style.setProperty('padding', '0', 'important');
+        btn.style.setProperty('border-radius', '50%', 'important');
+        btn.style.setProperty('font-size', '16px', 'important');
+        btn.style.setProperty('background', 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)', 'important');
         btn.style.cursor = 'pointer';
         btn.textContent = '译';
         btn.title = '好翻 · 翻译本页';

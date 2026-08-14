@@ -318,3 +318,255 @@ export function createSelectionUiStyle(): HTMLStyleElement {
   `;
   return style;
 }
+
+
+// ===== 通用拖拽：把 host 通过 handle 拖到任意位置（fixed 定位） =====
+// 位移小于 threshold 视为点击（不移动）；回调 onPos 在拖拽中更新位置。
+export function makeDraggable(
+  host: HTMLElement,
+  handle: HTMLElement,
+  onPos: (x: number, y: number) => void,
+  threshold = 6,
+): { suppressNextClick: () => boolean } {
+  let startX = 0;
+  let startY = 0;
+  let origLeft = 0;
+  let origTop = 0;
+  let dragging = false;
+  let moved = false;
+
+  handle.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    moved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = host.getBoundingClientRect();
+    origLeft = rect.left;
+    origTop = rect.top;
+    host.style.transition = 'none';
+    const onMove = (ev: PointerEvent) => {
+      if (!dragging) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) > threshold) {
+        moved = true;
+        // 首次真正移动时清除另一侧定位：left+right 同时存在会把 fixed 元素
+        // 强制拉伸（宽度被压缩），且仅点击不移动时保留原定位。
+        host.style.setProperty('right', 'auto', 'important');
+        host.style.setProperty('bottom', 'auto', 'important');
+      }
+      if (!moved) return;
+      ev.preventDefault();
+      const maxX = window.innerWidth - host.offsetWidth;
+      const maxY = window.innerHeight - host.offsetHeight;
+      const x = Math.min(Math.max(0, origLeft + dx), Math.max(0, maxX));
+      const y = Math.min(Math.max(0, origTop + dy), Math.max(0, maxY));
+      // 用 !important：host 可能带 all:initial !important 的防干扰样式，普通赋值会被覆盖。
+      host.style.setProperty('left', `${x}px`, 'important');
+      host.style.setProperty('top', `${y}px`, 'important');
+      onPos(x, y);
+    };
+    const onUp = () => {
+      dragging = false;
+      host.style.transition = '';
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+    };
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+  });
+  return {
+    suppressNextClick: () => {
+      const wasMoved = moved;
+      moved = false;
+      return wasMoved;
+    },
+  };
+}
+
+// ===== 页面内设置悬浮窗（轻量快速设置） =====
+export interface SettingsPanelOptions {
+  languages: string[];
+  providers: { id: string; name: string; needsKey: boolean }[];
+  targetLang: string;
+  provider: string;
+  sitePaused: boolean;
+  siteHost: string;
+  onTargetLang: (value: string) => void;
+  onProvider: (value: string) => void;
+  onSiteToggle: (paused: boolean) => void;
+  onOpenFullSettings: () => void;
+  onClose: () => void;
+  onDrag?: (x: number, y: number) => void;
+}
+
+export interface SettingsPanel {
+  host: HTMLElement;
+  update: (patch: Partial<Pick<SettingsPanelOptions, 'targetLang' | 'provider' | 'sitePaused'>>) => void;
+}
+
+export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
+  const host = document.createElement('div');
+  host.id = 'ot-settings-panel';
+  host.dataset.haofanUi = 'true';
+  host.style.setProperty('all', 'initial', 'important');
+  host.style.setProperty('position', 'fixed', 'important');
+  host.style.setProperty('z-index', '2147483647', 'important');
+  host.style.setProperty('width', '300px', 'important');
+  host.style.setProperty('border-radius', '14px', 'important');
+  host.style.setProperty('background', 'rgba(255,255,255,0.94)', 'important');
+  host.style.setProperty('color', '#1d1d1f', 'important');
+  host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.22)', 'important');
+  host.style.setProperty('backdrop-filter', 'blur(24px) saturate(180%)', 'important');
+  host.style.setProperty('-webkit-backdrop-filter', 'blur(24px) saturate(180%)', 'important');
+  host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
+  host.style.setProperty('overflow', 'hidden', 'important');
+
+  const shadow = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = `
+    :host { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    .head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px; cursor: grab;
+      border-bottom: 1px solid rgba(60,60,67,0.14);
+      user-select: none;
+    }
+    .head:active { cursor: grabbing; }
+    .title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 0; }
+    .close {
+      width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px;
+      background: transparent; color: #8e8e93; font-size: 16px; line-height: 1; cursor: pointer;
+    }
+    .close:hover { background: rgba(60,64,67,0.1); color: #1d1d1f; }
+    .body { padding: 4px 14px 12px; }
+    .row { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid rgba(60,60,67,0.12); }
+    .row:last-child { border-bottom: 0; }
+    .row label { flex: 1; font-size: 13px; color: #3c3c43; }
+    select {
+      width: 130px; min-height: 30px; padding: 4px 8px;
+      border: 1px solid rgba(60,60,67,0.2); border-radius: 8px;
+      background: #f2f2f7; color: #1d1d1f; font-size: 12px; font-family: inherit;
+    }
+    .switch { position: relative; width: 42px; height: 25px; flex: 0 0 42px; }
+    .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .track {
+      display: flex; width: 100%; height: 100%; padding: 2px;
+      border-radius: 13px; background: #e5e5ea; transition: background 0.2s ease;
+    }
+    .track span { width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.25); transition: transform 0.2s cubic-bezier(0.2,0.8,0.2,1); }
+    .switch input:checked + .track { background: #34c759; }
+    .switch input:checked + .track span { transform: translateX(17px); }
+    .full {
+      display: block; width: 100%; min-height: 34px; margin-top: 10px;
+      border: 0; border-radius: 9px; background: rgba(0,122,255,0.12);
+      color: #007aff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .full:hover { background: rgba(0,122,255,0.2); }
+    .host { color: #8e8e93; font-size: 11px; }
+    @media (prefers-color-scheme: dark) {
+      .head { border-bottom-color: rgba(84,84,88,0.4); }
+      .row { border-bottom-color: rgba(84,84,88,0.35); }
+      .row label { color: #d1d1d6; }
+      select { border-color: rgba(84,84,88,0.5); background: #2c2c2e; color: #f5f5f7; }
+      .close { color: #8e8e93; }
+      .close:hover { background: rgba(255,255,255,0.1); color: #f5f5f7; }
+      .track { background: #3a3a3c; }
+      .host { color: #8e8e93; }
+    }
+  `;
+
+  const head = document.createElement('div');
+  head.className = 'head';
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.textContent = '好翻 · 快速设置';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'close';
+  close.textContent = '×';
+  close.setAttribute('aria-label', '关闭设置');
+  close.addEventListener('click', opts.onClose);
+  head.append(title, close);
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  const langRow = document.createElement('div');
+  langRow.className = 'row';
+  const langLabel = document.createElement('label');
+  langLabel.textContent = '目标语言';
+  const langSel = document.createElement('select');
+  langSel.setAttribute('aria-label', '目标语言');
+  opts.languages.forEach((name) => {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name;
+    langSel.appendChild(o);
+  });
+  langSel.value = opts.targetLang;
+  langSel.addEventListener('change', () => opts.onTargetLang(langSel.value));
+  langRow.append(langLabel, langSel);
+
+  const provRow = document.createElement('div');
+  provRow.className = 'row';
+  const provLabel = document.createElement('label');
+  provLabel.textContent = '翻译引擎';
+  const provSel = document.createElement('select');
+  provSel.setAttribute('aria-label', '翻译引擎');
+  opts.providers.forEach((p) => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.needsKey ? p.name : `${p.name}（免 Key）`;
+    provSel.appendChild(o);
+  });
+  provSel.value = opts.provider;
+  provSel.addEventListener('change', () => opts.onProvider(provSel.value));
+  provRow.append(provLabel, provSel);
+
+  const siteRow = document.createElement('div');
+  siteRow.className = 'row';
+  const siteLabel = document.createElement('label');
+  siteLabel.textContent = `暂停本站翻译（${opts.siteHost}）`;
+  const siteToggle = document.createElement('span');
+  siteToggle.className = 'switch';
+  const siteInput = document.createElement('input');
+  siteInput.type = 'checkbox';
+  siteInput.checked = opts.sitePaused;
+  const track = document.createElement('span');
+  track.className = 'track';
+  const knob = document.createElement('span');
+  track.appendChild(knob);
+  siteToggle.append(siteInput, track);
+  siteInput.addEventListener('change', () => opts.onSiteToggle(siteInput.checked));
+  siteRow.append(siteLabel, siteToggle);
+
+  const fullBtn = document.createElement('button');
+  fullBtn.type = 'button';
+  fullBtn.className = 'full';
+  fullBtn.textContent = '打开完整设置 ⚙';
+  fullBtn.addEventListener('click', opts.onOpenFullSettings);
+
+  body.append(langRow, provRow, siteRow, fullBtn);
+  // 注意：shadow root 已挂载在 host 上，不能 host.appendChild(shadow)（会清空 shadow）。
+  shadow.append(style, head, body);
+  document.documentElement.appendChild(host);
+
+  makeDraggable(host, head, opts.onDrag ?? (() => {}));
+
+  const update: SettingsPanel['update'] = (patch) => {
+    if (patch.targetLang !== undefined && langSel.value !== patch.targetLang) {
+      langSel.value = patch.targetLang;
+    }
+    if (patch.provider !== undefined && provSel.value !== patch.provider) {
+      provSel.value = patch.provider;
+    }
+    if (patch.sitePaused !== undefined && siteInput.checked !== patch.sitePaused) {
+      siteInput.checked = patch.sitePaused;
+    }
+  };
+
+  return { host, update };
+}

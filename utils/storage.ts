@@ -15,3 +15,13 @@ export const usageItem = storage.defineItem<UsageTotals>('local:usageStats', {
 export const disabledSitesItem = storage.defineItem<string[]>('local:disabledSites', {
   defaultValue: [],
 });
+
+// 悬浮工具栏与设置面板的拖拽位置（仅存位置，跟随用户习惯）。
+export const toolbarPosItem = storage.defineItem<{ x: number; y: number } | null>(
+  'local:toolbarPos',
+  { defaultValue: null },
+);
+export const settingsPanelPosItem = storage.defineItem<{ x: number; y: number } | null>(
+  'local:settingsPanelPos',
+  { defaultValue: null },
+);
