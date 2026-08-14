@@ -16,6 +16,11 @@ export const disabledSitesItem = storage.defineItem<string[]>('local:disabledSit
   defaultValue: [],
 });
 
+// 自动翻译站点列表（每站记忆"总是自动翻译"偏好，与暂停列表独立）。
+export const autoSitesItem = storage.defineItem<string[]>('local:autoSites', {
+  defaultValue: [],
+});
+
 // 悬浮工具栏与设置面板的拖拽位置（仅存位置，跟随用户习惯）。
 export const toolbarPosItem = storage.defineItem<{ x: number; y: number } | null>(
   'local:toolbarPos',

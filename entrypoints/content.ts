@@ -18,6 +18,8 @@ import {
   createNoticeHost,
   createSelectionUiStyle,
   createSettingsPanel,
+  createHoverBubble,
+  createInputTranslateButton,
   makeDraggable,
 } from '../utils/content-ui.ts';
 import { mountImageResultOverlay } from '../utils/image-overlay.ts';
@@ -77,6 +79,7 @@ export default defineContentScript({
     let retryCounts = new WeakMap<Element, number>();
     const sessionTranslations = new SessionTranslationCache();
     let translationConfigRevision = 0;
+    let currentTranslationStyle = 'plain';
     let noticeHost: HTMLElement | null = null;
     const noticeCycles = new NoticeCycleGate();
     let blockedPageJobId: string | null = null;
@@ -107,9 +110,16 @@ export default defineContentScript({
     // 页面内的开关/弹层反复创建相同 DOM 时直接复用译文；配置变化后立即失效，
     // 避免把旧语言或旧模型的结果继续显示出来。
     try {
-      configItem.watch(() => {
+      configItem.watch((v) => {
         translationConfigRevision++;
         sessionTranslations.clear();
+        if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+        document.querySelectorAll('.ot-translation').forEach((el) => {
+          (el as HTMLElement).dataset.style = currentTranslationStyle;
+        });
+      });
+      void configItem.getValue().then((v) => {
+        if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
       });
     } catch {
       /* 极少数页面中 storage 监听不可用时，仅保留当前页面会话缓存。 */
@@ -177,6 +187,7 @@ export default defineContentScript({
       const node = createTranslationNode(translation, el, {
         sourceText,
         onEdit: (next) => handleTranslationEdit(el, next),
+        style: currentTranslationStyle,
       });
       translationNodes.set(el, node);
       const tag = el.tagName;
@@ -1539,6 +1550,242 @@ export default defineContentScript({
         /* 存储不可用时静默 */
       }
     }
+
+    // ===== 悬停翻译：鼠标悬停段落 500ms 显示译文气泡（可固定） =====
+    let hoverBubble: ReturnType<typeof createHoverBubble> | null = null;
+    let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+    let hoverPinned = false;
+    let hoverEl: Element | null = null;
+
+    function hideHoverBubble() {
+      if (hoverPinned) return;
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+      }
+      hoverBubble?.host.remove();
+      hoverBubble = null;
+      hoverEl = null;
+    }
+
+    function showHoverBubbleFor(el: Element) {
+      if (hoverPinned) return;
+      hideHoverBubble();
+      hoverEl = el;
+      const text = textOfBlock(el);
+      if (text.length < 2) return;
+      if (el.querySelector(':scope > .ot-translation')) return;
+      hoverBubble = createHoverBubble(text, (pinned) => {
+        hoverPinned = pinned;
+      });
+      document.documentElement.appendChild(hoverBubble.host);
+      const rect = el.getBoundingClientRect();
+      const bw = 280;
+      const left = Math.min(Math.max(8, rect.left + 8), window.innerWidth - bw - 8);
+      const top = Math.min(Math.max(8, rect.bottom + 8), window.innerHeight - 80);
+      hoverBubble.host.style.setProperty('left', `${left}px`, 'important');
+      hoverBubble.host.style.setProperty('top', `${top}px`, 'important');
+      const cached = sessionTranslations.get(text);
+      if (cached !== undefined) {
+        hoverBubble.setTranslation(cached);
+        return;
+      }
+      void sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } })
+        .then((r: any) => {
+          if (!hoverBubble || hoverEl !== el) return;
+          if (r?.ok && typeof r.translation === 'string' && r.translation) {
+            hoverBubble.setTranslation(r.translation);
+            sessionTranslations.remember(text, r.translation);
+          } else {
+            hoverBubble.setTranslation(r?.error || '翻译失败');
+          }
+        })
+        .catch(() => {
+          if (hoverBubble && hoverEl === el) hoverBubble.setTranslation('翻译失败');
+        });
+    }
+
+    document.addEventListener(
+      'mouseover',
+      (e) => {
+        const target = e.target as Element | null;
+        if (!target || !document.body.contains(target)) return;
+        if (
+          target.closest(
+            '#ot-hover-bubble, #ot-toolbar, .ot-translation, .ot-selbtn, #ot-error-modal, #ot-settings-panel, #ot-input-btn, #ot-input-result',
+          )
+        )
+          return;
+        if (target.closest('a, button, input, textarea, select, [contenteditable]')) return;
+        const el = closestTextBlock(target, true);
+        if (!el || !el.isConnected) return;
+        if (
+          el.classList.contains(TRANSLATED_CLASS) ||
+          el.classList.contains(PENDING_CLASS) ||
+          el.classList.contains(OBSERVED_CLASS)
+        )
+          return;
+        if (el === hoverEl) return;
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => showHoverBubbleFor(el), 500);
+      },
+      true,
+    );
+
+    document.addEventListener(
+      'mousemove',
+      (e) => {
+        if (!hoverEl || hoverPinned || !hoverBubble) return;
+        const target = e.target as Element | null;
+        if (target && (target.closest('#ot-hover-bubble') || hoverEl.contains(target))) return;
+        hideHoverBubble();
+      },
+      true,
+    );
+
+    document.addEventListener(
+      'click',
+      (e) => {
+        const target = e.target as Element | null;
+        if (target?.closest('#ot-hover-bubble')) return;
+        if (hoverPinned) {
+          hoverPinned = false;
+          hideHoverBubble();
+        }
+      },
+      true,
+    );
+
+    document.addEventListener('scroll', () => {
+      if (!hoverPinned) hideHoverBubble();
+    }, true);
+
+    // ===== 输入框翻译：聚焦网页输入框时显示「译」按钮 =====
+    let inputBtn: HTMLElement | null = null;
+    let inputTarget: HTMLTextAreaElement | HTMLInputElement | null = null;
+    let inputResultHost: HTMLElement | null = null;
+
+    function isTranslatableInput(el: Element | null): el is HTMLTextAreaElement | HTMLInputElement {
+      if (!el || !el.isConnected) return false;
+      if (el instanceof HTMLTextAreaElement) return true;
+      if (el instanceof HTMLInputElement) {
+        const type = (el.type || 'text').toLowerCase();
+        return ['text', 'search', 'url', 'email'].includes(type);
+      }
+      return false;
+    }
+
+    function positionInputBtn() {
+      if (!inputBtn || !inputTarget) return;
+      const r = inputTarget.getBoundingClientRect();
+      inputBtn.style.setProperty('left', `${Math.max(8, r.right - 40)}px`, 'important');
+      inputBtn.style.setProperty('top', `${Math.max(8, r.bottom - 40)}px`, 'important');
+    }
+
+    function hideInputTranslate() {
+      inputBtn?.remove();
+      inputBtn = null;
+      inputResultHost?.remove();
+      inputResultHost = null;
+      inputTarget = null;
+    }
+
+    async function translateInputContent() {
+      if (!inputTarget) return;
+      const text = inputTarget.value.trim();
+      if (!text) return;
+      inputResultHost?.remove();
+      const host = document.createElement('div');
+      host.id = 'ot-input-result';
+      host.dataset.haofanUi = 'true';
+      host.style.setProperty('all', 'initial', 'important');
+      host.style.setProperty('position', 'fixed', 'important');
+      host.style.setProperty('z-index', '2147483646', 'important');
+      host.style.setProperty('width', '320px', 'important');
+      host.style.setProperty('max-width', 'calc(100vw - 24px)', 'important');
+      host.style.setProperty('border-radius', '12px', 'important');
+      host.style.setProperty('background', 'rgba(255,255,255,0.96)', 'important');
+      host.style.setProperty('color', '#1d1d1f', 'important');
+      host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.2)', 'important');
+      host.style.setProperty('backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+      host.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+      host.style.setProperty('border', '1px solid rgba(60,60,67,0.14)', 'important');
+      host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
+      host.style.setProperty('padding', '10px 12px', 'important');
+      host.style.setProperty('font-size', '13px', 'important');
+      host.style.setProperty('line-height', '1.55', 'important');
+      host.textContent = '翻译中…';
+      document.documentElement.appendChild(host);
+      inputResultHost = host;
+      const r = inputTarget.getBoundingClientRect();
+      host.style.setProperty('left', `${Math.min(Math.max(8, r.left), window.innerWidth - 328)}px`, 'important');
+      host.style.setProperty('top', `${Math.max(8, r.bottom + 6)}px`, 'important');
+      try {
+        const res: any = await sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } });
+        if (!inputResultHost) return;
+        if (res?.ok && typeof res.translation === 'string' && res.translation) {
+          host.textContent = res.translation;
+          const copy = document.createElement('button');
+          copy.type = 'button';
+          copy.textContent = '复制译文';
+          Object.assign(copy.style, {
+            display: 'block',
+            marginTop: '8px',
+            padding: '4px 10px',
+            border: '0',
+            borderRadius: '8px',
+            background: 'rgba(0,122,255,0.12)',
+            color: '#007aff',
+            fontSize: '12px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          });
+          copy.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(res.translation);
+              copy.textContent = '已复制';
+            } catch {
+              copy.textContent = '复制失败';
+            }
+          });
+          host.appendChild(copy);
+        } else {
+          host.textContent = res?.error || '翻译失败';
+        }
+      } catch {
+        if (inputResultHost) host.textContent = '翻译失败';
+      }
+    }
+
+    document.addEventListener(
+      'focusin',
+      (e) => {
+        const target = e.target as Element | null;
+        if (!isTranslatableInput(target)) return;
+        hideInputTranslate();
+        inputTarget = target;
+        inputBtn = createInputTranslateButton(() => {
+          void translateInputContent();
+        });
+        document.documentElement.appendChild(inputBtn);
+        positionInputBtn();
+      },
+      true,
+    );
+
+    document.addEventListener(
+      'focusout',
+      (e) => {
+        const related = (e as FocusEvent).relatedTarget as Element | null;
+        if (related && related.closest('#ot-input-btn, #ot-input-result')) return;
+        hideInputTranslate();
+      },
+      true,
+    );
+
+    window.addEventListener('scroll', positionInputBtn, true);
+    window.addEventListener('resize', positionInputBtn);
 
     function mountToolbar() {
       if (!sitePolicyLoaded || siteDisabled) return;

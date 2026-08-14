@@ -10,6 +10,7 @@
 export interface TranslationNodeOptions {
   sourceText?: string;
   onEdit?: (newTranslation: string) => void;
+  style?: string;
 }
 
 export function createTranslationNode(
@@ -21,6 +22,7 @@ export function createTranslationNode(
   host.className = 'ot-translation';
   host.dataset.haofanTranslation = 'true';
   host.setAttribute('role', 'note');
+  if (options?.style) host.dataset.style = options.style;
   const sourceStyle = getComputedStyle(anchor);
   const sourceSize = Number.parseFloat(sourceStyle.fontSize) || 14;
   const translationSize = Math.min(18, Math.max(12, sourceSize));
@@ -69,6 +71,14 @@ export function createTranslationNode(
     .text.is-pending {
       opacity: 0.45;
       animation: ot-pulse 1.2s ease-in-out infinite;
+    }
+    /* 译文显示样式：plain / dashed / underline / highlight */
+    :host([data-style="dashed"]) .text { border-bottom: 1px dashed rgba(0, 122, 255, 0.45); }
+    :host([data-style="underline"]) .text { border-bottom: 1px solid rgba(0, 122, 255, 0.35); }
+    :host([data-style="highlight"]) .text {
+      background: rgba(0, 122, 255, 0.1);
+      border-radius: 4px;
+      padding: 1px 4px;
     }
     @keyframes ot-pulse {
       0%, 100% { opacity: 0.35; }
@@ -579,4 +589,147 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   };
 
   return { host, update };
+}
+
+
+// ===== 悬停翻译气泡：鼠标悬停段落时显示译文小浮层 =====
+export function createHoverBubble(
+  source: string,
+  onPinnedChange: (pinned: boolean) => void,
+): { host: HTMLElement; setTranslation: (t: string) => void; setSource: (s: string) => void } {
+  const host = document.createElement('div');
+  host.id = 'ot-hover-bubble';
+  host.dataset.haofanUi = 'true';
+  host.style.setProperty('all', 'initial', 'important');
+  host.style.setProperty('position', 'fixed', 'important');
+  host.style.setProperty('z-index', '2147483646', 'important');
+  host.style.setProperty('width', '280px', 'important');
+  host.style.setProperty('max-width', 'min(320px, calc(100vw - 24px))', 'important');
+  host.style.setProperty('border-radius', '12px', 'important');
+  host.style.setProperty('background', 'rgba(255,255,255,0.96)', 'important');
+  host.style.setProperty('color', '#1d1d1f', 'important');
+  host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.2)', 'important');
+  host.style.setProperty('backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+  host.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+  host.style.setProperty('border', '1px solid rgba(60,60,67,0.14)', 'important');
+  host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
+  host.style.setProperty('overflow', 'hidden', 'important');
+  host.style.setProperty('pointer-events', 'auto', 'important');
+
+  const shadow = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = `
+    :host { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    .src {
+      padding: 8px 12px 4px;
+      color: #8e8e93;
+      font-size: 11px;
+      line-height: 1.45;
+      max-height: 72px;
+      overflow: hidden;
+    }
+    .dst {
+      padding: 0 12px 10px;
+      color: #1d1d1f;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .loading {
+      padding: 10px 12px;
+      color: #8e8e93;
+      font-size: 12px;
+      animation: ot-fade 1s ease-in-out infinite alternate;
+    }
+    @keyframes ot-fade { from { opacity: 0.4; } to { opacity: 0.9; } }
+    .pin {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #aeaeb2;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .pin:hover { background: rgba(60,64,67,0.1); }
+    .pin[data-pinned="true"] { color: #007aff; }
+    @media (prefers-color-scheme: dark) {
+      .src { color: #8e8e93; }
+      .dst { color: #f5f5f7; }
+      .loading { color: #8e8e93; }
+      .pin { color: #8e8e93; }
+      .pin:hover { background: rgba(255,255,255,0.1); }
+    }
+  `;
+  const src = document.createElement('div');
+  src.className = 'src';
+  src.textContent = source;
+  const dst = document.createElement('div');
+  dst.className = 'dst';
+  dst.textContent = '翻译中…';
+  dst.classList.add('loading');
+  const pin = document.createElement('button');
+  pin.type = 'button';
+  pin.className = 'pin';
+  pin.textContent = '📌';
+  pin.title = '固定译文';
+  pin.setAttribute('aria-label', '固定译文');
+  let pinned = false;
+  pin.addEventListener('click', () => {
+    pinned = !pinned;
+    pin.dataset.pinned = String(pinned);
+    pin.title = pinned ? '取消固定' : '固定译文';
+    onPinnedChange(pinned);
+  });
+  shadow.append(style, src, dst, pin);
+
+  return {
+    host,
+    setTranslation: (t) => {
+      dst.textContent = t;
+      dst.classList.remove('loading');
+    },
+    setSource: (s2) => {
+      src.textContent = s2;
+    },
+  };
+}
+
+// ===== 输入框翻译按钮 =====
+export function createInputTranslateButton(
+  onClick: () => void,
+): HTMLElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'ot-input-btn';
+  btn.textContent = '\u8BD1'; // 译
+  btn.title = '翻译输入框内容';
+  btn.setAttribute('aria-label', '翻译输入框内容');
+  btn.style.setProperty('all', 'initial', 'important');
+  btn.style.setProperty('position', 'fixed', 'important');
+  btn.style.setProperty('z-index', '2147483646', 'important');
+  btn.style.setProperty('width', '30px', 'important');
+  btn.style.setProperty('height', '30px', 'important');
+  btn.style.setProperty('border-radius', '50%', 'important');
+  btn.style.setProperty('border', 'none', 'important');
+  btn.style.setProperty('background', 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)', 'important');
+  btn.style.setProperty('color', '#fff', 'important');
+  btn.style.setProperty('font-size', '14px', 'important');
+  btn.style.setProperty('font-weight', '600', 'important');
+  btn.style.setProperty('display', 'flex', 'important');
+  btn.style.setProperty('align-items', 'center', 'important');
+  btn.style.setProperty('justify-content', 'center', 'important');
+  btn.style.setProperty('cursor', 'pointer', 'important');
+  btn.style.setProperty('boxShadow', '0 3px 10px rgba(0,122,255,0.35)', 'important');
+  btn.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif', 'important');
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+  return btn;
 }

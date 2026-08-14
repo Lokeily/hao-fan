@@ -18,6 +18,9 @@ export interface AppConfig {
   autoLearnTerms: boolean; // 译文可编辑 → 术语自动学习
   sentenceCache: boolean; // 句子级缓存 + 归一化匹配（省 Token）
   glossaryTermLimit: number; // 术语注入条数上限（0 关闭，默认 12，越低越省 Token）
+  hoverTranslate: boolean; // 鼠标悬停翻译（hover 段落即译）
+  inputTranslate: boolean; // 网页输入框翻译（聚焦时提供翻译按钮）
+  translationStyle: string; // 译文显示样式：plain / dashed / underline / highlight
   fallbackProviders: string[]; // 多引擎故障转移：主引擎 429/5xx 时按顺序切换
   strongProvider: string; // 长文强模型路由：超过阈值改用此服务商
   strongModel: string; // 长文强模型路由：目标模型
@@ -51,6 +54,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   autoLearnTerms: true,
   sentenceCache: true,
   glossaryTermLimit: 12,
+  hoverTranslate: true,
+  inputTranslate: true,
+  translationStyle: 'plain',
   fallbackProviders: [],
   strongProvider: '',
   strongModel: '',

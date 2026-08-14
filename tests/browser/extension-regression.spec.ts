@@ -308,3 +308,25 @@ test('gear button opens quick settings panel with live controls', async ({ page 
   await panel.getByRole('button', { name: '关闭设置' }).click();
   await expect(panel).toBeHidden();
 });
+
+test('hover translation: hovering a paragraph shows a translation bubble', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('main p').first().hover();
+  // 500ms 悬停延迟后出现气泡，内容为 mock 译文
+  await expect(page.locator('#ot-hover-bubble')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#ot-hover-bubble')).toContainText('译文');
+});
+
+test('input translation: focusing a textarea shows translate button and result', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.evaluate(() => {
+    const t = document.createElement('textarea');
+    t.id = 'test-input';
+    t.value = 'Hello world';
+    document.body.appendChild(t);
+    t.focus();
+  });
+  await expect(page.locator('#ot-input-btn')).toBeVisible();
+  await page.locator('#ot-input-btn').click();
+  await expect(page.locator('#ot-input-result')).toContainText('译文', { timeout: 5000 });
+});

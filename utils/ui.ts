@@ -124,6 +124,25 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
             <input data-f="autoLearnTerms" type="checkbox" />
             <span><strong>译文可编辑 · 术语自学习</strong><small>修改译文自动沉淀进术语库</small></span>
           </label>
+          <label class="ot-check">
+            <input data-f="hoverTranslate" type="checkbox" />
+            <span><strong>悬停翻译</strong><small>鼠标悬停段落即显示译文气泡</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="inputTranslate" type="checkbox" />
+            <span><strong>输入框翻译</strong><small>网页输入框聚焦时提供翻译入口</small></span>
+          </label>
+        </div>
+        <div class="ot-field-grid">
+          <label class="ot-field ot-field-wide">译文显示样式
+            <span>译文在原文下方的呈现方式</span>
+            <select data-f="translationStyle">
+              <option value="plain">默认（清淡无装饰）</option>
+              <option value="dashed">蓝色虚线分隔</option>
+              <option value="underline">蓝色下划线</option>
+              <option value="highlight">浅蓝高亮块</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -164,6 +183,9 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   const autoLearnChk = mount.querySelector('[data-f=autoLearnTerms]') as HTMLInputElement;
   const sentenceChk = mount.querySelector('[data-f=sentenceCache]') as HTMLInputElement;
   const glossaryTermLimitSel = mount.querySelector('[data-f=glossaryTermLimit]') as HTMLSelectElement;
+  const hoverTranslateChk = mount.querySelector('[data-f=hoverTranslate]') as HTMLInputElement;
+  const inputTranslateChk = mount.querySelector('[data-f=inputTranslate]') as HTMLInputElement;
+  const translationStyleSel = mount.querySelector('[data-f=translationStyle]') as HTMLSelectElement;
   const fallbackInput = mount.querySelector('[data-f=fallbackProviders]') as HTMLInputElement;
   const strongProviderSel = mount.querySelector('[data-f=strongProvider]') as HTMLSelectElement;
   const strongModelInput = mount.querySelector('[data-f=strongModel]') as HTMLInputElement;
@@ -296,6 +318,9 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     autoLearnChk.checked = cfg.autoLearnTerms !== false;
     sentenceChk.checked = cfg.sentenceCache !== false;
     glossaryTermLimitSel.value = String(cfg.glossaryTermLimit ?? 12);
+    hoverTranslateChk.checked = cfg.hoverTranslate !== false;
+    inputTranslateChk.checked = cfg.inputTranslate !== false;
+    translationStyleSel.value = cfg.translationStyle || 'plain';
     fallbackInput.value = (cfg.fallbackProviders || []).join(', ');
     strongProviderSel.value = cfg.strongProvider || '';
     strongModelInput.value = cfg.strongModel || '';
@@ -327,6 +352,9 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.autoLearnTerms = autoLearnChk.checked;
     cfg.sentenceCache = sentenceChk.checked;
     cfg.glossaryTermLimit = Number(glossaryTermLimitSel.value) || 12;
+    cfg.hoverTranslate = hoverTranslateChk.checked;
+    cfg.inputTranslate = inputTranslateChk.checked;
+    cfg.translationStyle = translationStyleSel.value;
     cfg.fallbackProviders = fallbackInput.value
       .split(/[,，\s]+/)
       .map((s) => s.trim())
@@ -398,7 +426,16 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     strongModelInput,
     strongThresholdInput,
     glossaryTermLimitSel,
+    hoverTranslateChk,
+    inputTranslateChk,
+    translationStyleSel,
   ].forEach((el) => el.addEventListener('change', save));
+
+  // checkbox 勾选样式同步（:has 兼容替代）
+  [cacheChk, glossaryChk, customVisionChk, streamingChk, contextChk, qualityChk, autoLearnChk,
+    sentenceChk, hoverTranslateChk, inputTranslateChk].forEach((el) => {
+    el.addEventListener('change', syncCheckState);
+  });
 
   [
     modelText,
