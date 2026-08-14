@@ -260,6 +260,24 @@ a:hover {
   font-size: 13px;
   color: var(--text-faint);
 }
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 26px;
+}
+.hero-badges .badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
 
 /* ===== 子页面头部（与首页形成「分离感」）===== */
 .page-hero {
@@ -454,23 +472,35 @@ section.block {
 /* ===== Providers ===== */
 .prov-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
 }
 @media (max-width: 760px) {
   .prov-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
 }
+.prov-group h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.prov-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .prov {
+  display: inline-flex;
+  align-items: center;
   background: var(--bg-soft);
-  border-radius: var(--radius-md);
-  padding: 16px 14px;
-  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
-  border: 1px solid transparent;
 }
 .prov.muted {
   color: var(--text-faint);
@@ -480,6 +510,9 @@ section.block {
   font-size: 14px;
   color: var(--text-faint);
   text-align: center;
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ===== Steps ===== */
@@ -671,6 +704,37 @@ footer {
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 14px;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+}
+.perm-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 8px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.perm-table th,
+.perm-table td {
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.perm-table th {
+  background: var(--bg-soft);
+  font-weight: 600;
+  color: var(--text);
+}
+.perm-table tr:last-child td {
+  border-bottom: none;
+}
+.perm-table code {
+  background: var(--bg-soft);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 13px;
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
 }
 

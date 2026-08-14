@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>好翻 · 开源免费的沉浸式 AI 网页翻译</title>
+    <title>好翻 · Open Translator CN — 开源免费的沉浸式双语网页翻译</title>
     <meta
       name="description"
-      content="好翻（Open Translator CN）是一款开源、免费、可自配 API 的沉浸式双语网页翻译扩展。直连 DeepSeek、智谱、腾讯混元等国内大模型，API Key 仅保存在本地，无遥测、无广告追踪。"
+      content="好翻（Open Translator CN）是一款开源、免费、可自配 API 的沉浸式双语网页翻译扩展。保留网页原文，把译文显示在原文下方；直连 DeepSeek、智谱、腾讯混元等 12+ 家 AI 服务商，API Key 仅存本地，无遥测、无广告追踪。"
     />
-    <meta property="og:title" content="好翻 · 开源免费的沉浸式 AI 网页翻译" />
+    <meta property="og:title" content="好翻 · Open Translator CN" />
     <meta
       property="og:description"
       content="开源、免费、可自配 API 的沉浸式双语网页翻译扩展。API Key 本地保存，翻译请求直连所选服务商。"
@@ -29,11 +29,8 @@
             <span></span><span></span><span></span>
           </button>
           <div class="nav-links">
-            <a href="features.html">功能</a>
-            <a href="use-cases.html">适用场景</a>
-            <a href="providers.html">翻译服务</a>
-            <a href="install.html">安装</a>
-            <a href="faq.html">常见问题</a>
+            <a href="index.html" class="active">首页</a>
+            <a href="privacy.html">隐私政策</a>
             <a
               class="nav-github"
               href="https://github.com/Lokeily/hao-fan"
@@ -56,10 +53,10 @@
     </nav>
 
     <header class="hero">
-      <div class="eyebrow">开源 · 免费 · 自配 API</div>
+      <div class="eyebrow">开源 · 免费 · 可自配 API</div>
       <h1>沉浸式双语网页翻译，<br />把译文自然嵌进原文。</h1>
       <p class="sub">
-        好翻在保留网页原文的同时，把译文显示在原文下方，逐段对照阅读。开源、免费、无额度限制，API
+        好翻（Open Translator CN）保留网页原文，把译文显示在原文下方，逐段对照阅读。免费开源、无额度限制，API
         Key 只存在你本地。
       </p>
       <div class="hero-actions">
@@ -68,9 +65,16 @@
           href="https://github.com/Lokeily/hao-fan/releases/latest"
           target="_blank"
           rel="noopener"
-          >下载扩展</a
+          >下载扩展（v0.1.8）</a
         >
-        <a class="btn btn-ghost" href="install.html">查看安装方法</a>
+        <a class="btn btn-ghost" href="#install">查看安装方法</a>
+      </div>
+      <div class="hero-badges">
+        <span class="badge">Chrome · MV3</span>
+        <span class="badge">Edge 兼容</span>
+        <span class="badge">Firefox</span>
+        <span class="badge">MIT 开源</span>
+        <span class="badge">无遥测 · 无广告追踪</span>
       </div>
       <div class="hero-note">想先体验？在设置里选择「Google 翻译」即可免 Key 使用。</div>
     </header>
@@ -82,138 +86,181 @@
       <span><span class="dot">●</span> 直连服务商，不经中转</span>
     </div>
 
-    <section class="block">
+    <section class="block" id="intro">
       <div class="container">
         <div class="section-head reveal">
-          <h2>三件事，认识好翻</h2>
-          <p>它做的事很简单，但每一件都做到顺手。</p>
-        </div>
-        <div class="features reveal">
-          <a class="card link-card" href="features.html">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div>
-            <h3>沉浸式双语对照</h3>
-            <p>原文保留，译文显示在原文下方，随页面滚动一起跟随。划词即译、动态内容自动补译，阅读不被打断。</p>
-            <span class="card-more">查看全部功能 →</span>
-          </a>
-          <a class="card link-card" href="providers.html">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg></div>
-            <h3>用你自己的翻译服务</h3>
-            <p>内置 12+ 家 AI 服务商与 3 家传统机器翻译，也支持任意 OpenAI 兼容接口与本地模型。密钥只存本地。</p>
-            <span class="card-more">支持的服务商 →</span>
-          </a>
-          <a class="card link-card" href="install.html">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/></svg></div>
-            <h3>三步开始使用</h3>
-            <p>下载对应浏览器的安装包，开启开发者模式「加载已解压的扩展程序」，填好密钥即可翻译。</p>
-            <span class="card-more">查看安装步骤 →</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="block">
-      <div class="container">
-        <div class="section-head reveal">
-          <h2>它是怎么工作的</h2>
-          <p>三步，把外文网页变成中英对照——全程只在你这台设备上按需发生。</p>
-        </div>
-        <div class="steps reveal">
-          <div class="step">
-            <div class="num">1</div>
-            <h3>触发翻译</h3>
-            <p>点击右下角蓝色「译」按钮、使用快捷键，或在选中文字后通过右键菜单「翻译选中文字」发起。好翻只在当前标签页按需工作（activeTab 权限），不会后台扫描页面。</p>
-          </div>
-          <div class="step">
-            <div class="num">2</div>
-            <h3>抽取与对照</h3>
-            <p>内容脚本读取页面可见文本、按段落拆分，通过 Shadow DOM 把译文渲染到原文下方。原网页布局与脚本不被破坏，译文随滚动自然跟随。</p>
-          </div>
-          <div class="step">
-            <div class="num">3</div>
-            <h3>翻译与缓存</h3>
-            <p>文本发往你配置的翻译服务；本地缓存命中则直接返回译文，省时也省 Token。选择 Google 翻译（免 Key）模式时，连 API Key 都不需要。</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="block" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-      <div class="container">
-        <div class="section-head reveal">
-          <h2>为什么选好翻</h2>
-          <p>不是又一个翻译工具，而是把「读外文网页」这件事做得更轻、更省心。</p>
+          <h2>关于好翻</h2>
+          <p>一款浏览器翻译扩展：保留网页原文，把译文自然地显示在原文下方，逐段对照阅读。</p>
         </div>
         <div class="features reveal">
           <div class="card">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></div>
-            <h3>开源可审计</h3>
-            <p>完整代码公开在 GitHub、基于 MIT 许可证，任何人都能查看它到底做了什么、收了什么。</p>
+            <h3>免费开源</h3>
+            <p>无使用额度，无遥测、无广告追踪；完整代码公开于 GitHub，基于 MIT 许可证。</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg></div>
+            <h3>12+ 家 AI 与 3 家传统翻译</h3>
+            <p>内置 12+ 家 AI 服务商与 3 家传统机器翻译预设，也支持任意 OpenAI 兼容接口与本地模型。</p>
           </div>
           <div class="card">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
-            <h3>数据只归你</h3>
-            <p>不运营服务器、不收集遥测、不追踪行为。API Key 仅存本地、按服务商隔离，请求直连所选服务。</p>
-          </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg></div>
-            <h3>国内模型友好</h3>
-            <p>内置 DeepSeek、智谱 GLM、腾讯混元等，中文互译与术语处理更顺手，也支持任意 OpenAI 兼容与本地模型。</p>
-          </div>
-          <div class="card">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"/><path d="M9 6.5v5M1 8h3.6"/><path d="M14 13.5c.4.9 1.8 1.6 3.5 1.6 2 0 3.5-1 3.5-2.1"/><circle cx="17" cy="15" r="4.5"/><path d="M17 12.8v4.4M15.4 14.4h3.2"/></svg></div>
-            <h3>真能省钱</h3>
-            <p>本地缓存、重复合并、术语命中零请求、目标语言自动跳过——同样的阅读量，花更少的 Token。</p>
+            <h3>密钥只存本地</h3>
+            <p>API Key 只保存在本地；翻译请求直连所选服务商，不经任何中转服务器。</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="block" id="use-cases">
+    <section class="block" id="features" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
       <div class="container">
         <div class="section-head reveal">
-          <h2>无论你是谁，都能用上</h2>
-          <p>好翻的使用场景很简单：凡是「要在浏览器里读外文网页」，它都能帮上忙。</p>
+          <h2>功能特性</h2>
+          <p>以下均来自项目 README，全部为扩展已实现的能力。</p>
         </div>
-        <div class="use-cases">
-          <div class="usecase reveal">
-            <div class="emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div>
-            <h3>读外文资料</h3>
-            <p>论文、技术文档、博客，原文译文对照，查阅效率更高。</p>
+        <div class="features reveal">
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div><h3>沉浸式双语对照</h3><p>原文保留，译文显示在原文下方，随页面滚动自然跟随。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h7l-1 7 9-11h-7l1-7Z"/></svg></div><h3>流式输出</h3><p>首段边生成边显示，首字延迟低至毫秒级（基线实测约 90ms）。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>上下文感知翻译</h3><p>结合页面标题与前段译文，长文代词指代与术语更连贯。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>翻译质量自检</h3><p>数字 / URL / 代码 token 保真校验，缺失自动校正并标记提示。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h7l2-3 2 6 2-3h5"/></svg></div><h3>可见区域优先</h3><p>先翻译当前屏幕内容，滚动时继续翻译新出现的内容。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>动态内容翻译</h3><p>弹窗、菜单、无限滚动等异步加载的内容自动补译。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v11H7l-3 3V4Z"/></svg></div><h3>划词翻译</h3><p>选中文字即译，独立浮窗展示，不改变原网页。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 16l4-8 3 5 3-7 4 10"/></svg></div><h3>译文可编辑 · 术语自学习</h3><p>hover 译文即可修改，自动抽取术语沉淀进个人术语表。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 14l4-4 3 3 4-5 4 4"/></svg></div><h3>图片翻译</h3><p>网页图片与本地图片 OCR + 翻译（需支持视觉的模型）。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9h3v6M14 9h2v6"/></svg></div><h3>按网站暂停</h3><p>一键暂停当前网站、清理译文，无需刷新即可恢复。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div><h3>多引擎路由</h3><p>备用引擎故障转移（限流/报错自动切换）+ 长文强模型路由。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h3>节省 Token</h3><p>句子级缓存、重复文本合并、术语库命中零请求、目标语言跳过、术语注入上限可调。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14M5 9l-1-3h16l-1 3M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 13h6"/></svg></div><h3>可拖动工具栏</h3><p>「译 + 设置」悬浮按钮组可拖到任意位置，位置自动记忆。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></div><h3>页面内快速设置</h3><p>齿轮按钮弹出悬浮设置窗：语言 / 引擎 / 暂停本站即改即生效。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg></div><h3>翻译进度显示</h3><p>状态条实时显示已译 X/Y 段，加载态带旋转指示。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg></div><h3>键盘快捷键</h3><p>Alt+T 直接翻译当前网页（浏览器设置页可自定义）。</p></div>
+          <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-8 8H6v-6l8-8Z"/><path d="M9 9h2M12 6v2"/></svg></div><h3>自定义能力</h3><p>服务商、模型、Base URL、提示词、术语表、翻译风格均可配置。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="providers">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>支持的翻译服务</h2>
+          <p>用你自己的账号与额度，密钥只保存在本地。</p>
+        </div>
+        <div class="prov-grid reveal">
+          <div class="prov-group">
+            <h3>AI 服务</h3>
+            <div class="prov-chips">
+              <span class="prov">DeepSeek</span>
+              <span class="prov">OpenAI</span>
+              <span class="prov">Google Gemini</span>
+              <span class="prov">OpenRouter</span>
+              <span class="prov">智谱 GLM</span>
+              <span class="prov">腾讯混元</span>
+              <span class="prov">通义千问</span>
+              <span class="prov">Kimi</span>
+              <span class="prov">百川智能</span>
+              <span class="prov">豆包</span>
+              <span class="prov">Ollama 本地模型</span>
+              <span class="prov">任意 OpenAI 兼容接口</span>
+            </div>
           </div>
-          <div class="usecase reveal">
-            <div class="emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v10H9l-4 4V5Z"/></svg></div>
-            <h3>逛海外社区</h3>
-            <p>论坛、Reddit、GitHub 讨论区，划词即译，边看边懂。</p>
+          <div class="prov-group">
+            <h3>传统机器翻译</h3>
+            <div class="prov-chips">
+              <span class="prov">Google 翻译（免 Key）</span>
+              <span class="prov">DeepL</span>
+              <span class="prov">Microsoft 翻译</span>
+            </div>
           </div>
-          <div class="usecase reveal">
-            <div class="emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2l2.2 11h11l1.8-8H6"/></svg></div>
-            <h3>跨境购物</h3>
-            <p>商品详情、买家评价、帮助文档，母语阅读不再卡壳。</p>
+        </div>
+        <p class="prov-note reveal">
+          Google 翻译（免 Key）走的是非官方免费端点，无服务等级保证，偶尔会限流或临时不可用，建议仅用于体验；正式使用请配置支持 API Key 的服务。
+        </p>
+      </div>
+    </section>
+
+    <section class="block" id="install" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>安装</h2>
+          <p>从 Releases 下载对应浏览器的安装包，手动加载即可。</p>
+        </div>
+        <div class="steps reveal">
+          <div class="step">
+            <div class="num">1</div>
+            <h3>下载安装包</h3>
+            <p>打开 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">Releases</a>，下载对应浏览器的 ZIP 并解压。</p>
           </div>
-          <div class="usecase reveal">
-            <div class="emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-4 9 4-9 4-9-4Z"/><path d="M7 11v4c0 1.2 2.5 2.5 5 2.5s5-1.3 5-2.5v-4"/></svg></div>
-            <h3>学外语</h3>
-            <p>保留原文、对照阅读，是练阅读、积累地道表达的好方式。</p>
+          <div class="step">
+            <div class="num">2</div>
+            <h3>Chrome / Edge</h3>
+            <p>访问 <code>chrome://extensions</code>（Edge 为 <code>edge://extensions</code>）→ 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压后<strong>直接包含 <code>manifest.json</code></strong> 的目录。</p>
+          </div>
+          <div class="step">
+            <div class="num">3</div>
+            <h3>Firefox</h3>
+            <p>访问 <code>about:debugging#/runtime/this-firefox</code> →「临时载入附加组件」→ 选择解压目录中的 <code>manifest.json</code>。Firefox 未签名扩展在浏览器重启后会消失，属浏览器限制。</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="block">
+    <section class="block" id="quickstart">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>快速开始</h2>
+          <p>三步开始你的第一段对照翻译。</p>
+        </div>
+        <div class="steps reveal">
+          <div class="step">
+            <div class="num">1</div>
+            <h3>打开设置</h3>
+            <p>点击工具栏「好翻」图标 → 打开「设置」。</p>
+          </div>
+          <div class="step">
+            <div class="num">2</div>
+            <h3>配置服务商</h3>
+            <p>选择服务商，填写 API Key，设置目标语言，点击「测试连接」确认可用。</p>
+          </div>
+          <div class="step">
+            <div class="num">3</div>
+            <h3>开始翻译</h3>
+            <p>回到网页，点击右下角蓝色「译」按钮开始翻译；翻译中再次点击可取消。</p>
+          </div>
+        </div>
+        <p class="prov-note reveal">想先体验？在设置中选择「Google 翻译」即可免 Key 使用。</p>
+      </div>
+    </section>
+
+    <section class="block" id="privacy">
       <div class="container">
         <div class="privacy-cta reveal">
           <h2>你的数据，只属于你</h2>
           <p>
-            好翻不收集遥测、不投放广告、不追踪你的浏览行为。API Key 仅存于本地，翻译请求直连你选择的的服务商。想了解全部细节，请阅读我们的隐私政策。
+            API Key 仅保存在浏览器本地（<code>storage.local</code>），按服务商隔离存储，直发所选服务商；无遥测、无广告追踪、无用户行为统计；翻译请求带注入防护。完整说明见隐私政策。
           </p>
           <a class="btn btn-ghost" href="privacy.html">查看隐私政策</a>
         </div>
       </div>
     </section>
 
+    <section class="block" id="contribute" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>参与贡献</h2>
+        </div>
+        <p class="reveal prov-note" style="text-align:center; max-width:720px; margin:0 auto;">
+          欢迎提交 Bug 报告、功能建议与代码。请先阅读
+          <a href="https://github.com/Lokeily/hao-fan/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a>，
+          并遵守 <a href="https://github.com/Lokeily/hao-fan/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">CODE_OF_CONDUCT.md</a>。
+          安全漏洞请按 <a href="https://github.com/Lokeily/hao-fan/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a> 私下联系作者，不要公开到 Issue。
+        </p>
+      </div>
+    </section>
+
     <footer>
       <div class="footer-inner">
-        <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
+        <div>© 2026 好翻（Open Translator CN）· 基于 <a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT 许可证</a> 开源</div>
         <div class="footer-links">
           <a
             class="footer-github"
@@ -226,9 +273,7 @@
             GitHub
           </a>
           <a href="privacy.html">隐私政策</a>
-          <a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener"
-            >许可证</a
-          >
+          <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载</a>
         </div>
       </div>
     </footer>
