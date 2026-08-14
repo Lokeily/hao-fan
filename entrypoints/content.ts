@@ -434,6 +434,16 @@ export default defineContentScript({
                 resolve();
                 return;
               }
+              if (msg.error) {
+                // 流式请求失败：告知用户原因，段落回到懒翻译队列待重试
+                (item.el as HTMLElement).classList.remove(PENDING_CLASS);
+                showNotice(String(msg.error), jobId || 'page-translation');
+                if (item.el.isConnected) {
+                  observeForLazyTranslation([{ el: item.el, text: textOfBlock(item.el) }]);
+                }
+                resolve();
+                return;
+              }
               const translation = typeof msg.translation === 'string' ? msg.translation : '';
               if (node?.isConnected) {
                 const text = node.shadowRoot?.querySelector('.text');
@@ -683,6 +693,11 @@ export default defineContentScript({
         }
         const saved = Number(res.stats?.estimatedTokensSaved) || 0;
         estimatedTokensSaved += Math.max(0, saved);
+        // 更新上下文窗口：非流式批量完成后，以最后一段译文作为后续翻译的语境
+        const lastText = items[items.length - 1];
+        if (lastText && typeof translations[items.length - 1] === 'string' && translations[items.length - 1]) {
+          lastTranslation = translations[items.length - 1];
+        }
 
         // 译文直接嵌入原文下方（<span>+display:block，见 makeTranslationNode），形成双语对照
         let inserted = 0;

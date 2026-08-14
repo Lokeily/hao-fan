@@ -244,6 +244,14 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     if (advanced && providerId === 'custom') advanced.open = true;
   }
 
+  // checkbox 勾选样式：不用 :has()（旧浏览器不支持），由 JS 同步 class。
+  function syncCheckState() {
+    document.querySelectorAll('.ot-form .ot-check').forEach((label) => {
+      const input = label.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+      label.classList.toggle('is-checked', Boolean(input?.checked));
+    });
+  }
+
   function fill() {
     providerSel.value = cfg.provider;
     fillModels(cfg.provider);
@@ -279,6 +287,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     strongProviderSel.value = cfg.strongProvider || '';
     strongModelInput.value = cfg.strongModel || '';
     strongThresholdInput.value = String(cfg.strongThreshold || 1200);
+    syncCheckState();
   }
 
   function save(): Promise<boolean> {

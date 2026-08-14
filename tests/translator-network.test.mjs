@@ -371,6 +371,16 @@ test('403 无权限给出账户指引', async () => {
   );
   await server.close();
 });
+
+test('句子缓存：英文缩写（U.S. / Dr.）不被拆散', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => ({ choices: [{ message: { content: '译文' } }], usage: {} }));
+  const cfg = cfgFor(server.port, { sentenceCache: true });
+  await translateOneDetailed(cfg, 'U.S. Army moved. Dr. Smith agreed.');
+  // 缩写受保护时只有 2 句；若被拆散会变成 4+ 次请求
+  assert.equal(server.requests.length, 2, '缩写不应被拆成单字母句子');
+  await server.close();
+});
 test('cleanSecret 拒绝含非 ASCII 字符的 Key', () => {
   assert.throws(() => cleanSecret('sk-abc\u3000def'), /非 ASCII/);
   assert.equal(cleanSecret('  sk-abc123  '), 'sk-abc123');

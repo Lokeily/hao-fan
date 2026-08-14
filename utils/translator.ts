@@ -209,19 +209,30 @@ function normalizeSentence(s: string): string {
     .toLowerCase();
 }
 
+// 常见英文缩写与单字母缩写：切分句子前保护起来，避免 "U.S."、"Dr." 被拆成单字母。
+const ABBREV_RE =
+  /(?:\b[A-Za-z]\.(?=\s|$))|(?:\b(?:e\.g|i\.e|Dr|Mr|Ms|Prof|vs|etc|No|Fig|approx|Inc|Ltd|Co)\.)/g;
+
 function splitSentences(text: string): { content: string; delim: string }[] {
+  const abbrs: string[] = [];
+  const protectedText = text.replace(ABBREV_RE, (m) => {
+    abbrs.push(m);
+    return `\uE000${abbrs.length - 1}\uE001`;
+  });
+  const restore = (piece: string) =>
+    piece.replace(/\uE000(\d+)\uE001/g, (_, i) => abbrs[Number(i)] ?? '');
   const re = /([。！？；]+|(?:\r?\n)+|[.!?]+(?=\s|$))/g;
   const out: { content: string; delim: string }[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const content = text.slice(last, m.index).trim();
+  while ((m = re.exec(protectedText))) {
+    const content = restore(protectedText.slice(last, m.index)).trim();
     if (content) out.push({ content, delim: m[0] });
     last = m.index + m[0].length;
   }
-  const tail = text.slice(last).trim();
+  const tail = restore(protectedText.slice(last)).trim();
   if (tail) out.push({ content: tail, delim: '' });
-  return out.length ? out : [{ content: text, delim: '' }];
+  return out.length ? out : [{ content: restore(text), delim: '' }];
 }
 
 function isSentenceCacheable(text: string): boolean {
