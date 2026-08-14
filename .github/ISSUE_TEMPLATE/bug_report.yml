@@ -9,7 +9,7 @@ body:
     id: extension-version
     attributes:
       label: 好翻版本
-      placeholder: 例如 v0.2.0
+      placeholder: 例如 v0.1.4
     validations:
       required: true
   - type: dropdown

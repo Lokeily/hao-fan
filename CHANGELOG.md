@@ -1,6 +1,6 @@
 # 更新日志（Changelog）
 
-## v0.2.0 (2026-08-14)
+## v0.1.4 (2026-08-14)
 
 - 修复：CI 依赖审计 —— `brace-expansion` 升级至 5.0.9（规避新披露的高危漏洞 GHSA-rgw5-rvv9-x895），`nanoid` / `postcss` / `esbuild` 同步升至安全版本，`npm audit` 归零。
 - 修复：浏览器回归测试同步 IndexedDB 迁移 —— mock 增加最小 IndexedDB 实现，图片结果页测试改从真实数据路径验证。
