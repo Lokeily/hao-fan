@@ -106,6 +106,20 @@ a:hover {
 .brand:hover {
   text-decoration: none;
 }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.footer-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.footer-github svg {
+  width: 18px;
+  height: 18px;
+}
 .brand img {
   width: 28px;
   height: 28px;
@@ -285,11 +299,16 @@ section.block {
   height: 46px;
   border-radius: 12px;
   background: var(--accent-soft);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   margin-bottom: 16px;
+}
+.card .ico svg {
+  width: 24px;
+  height: 24px;
 }
 .card h3 {
   font-size: 19px;
@@ -485,4 +504,234 @@ footer {
   margin-bottom: 24px;
   font-size: 14px;
   font-weight: 500;
+}
+
+/* ===== Scroll progress bar ===== */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  z-index: 200;
+  background: linear-gradient(90deg, var(--accent), #5ac8fa);
+  box-shadow: 0 0 8px rgba(0, 113, 227, 0.4);
+  transition: width 0.1s linear;
+}
+
+/* ===== Animated nav ===== */
+.nav {
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transform: translateY(-100%);
+  animation: nav-drop 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes nav-drop {
+  to {
+    transform: translateY(0);
+  }
+}
+.nav.scrolled {
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  .nav.scrolled {
+    background: rgba(10, 10, 10, 0.82);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+  }
+}
+.nav-links a {
+  position: relative;
+  transition: color 0.2s ease;
+}
+.nav-links a.active {
+  color: var(--text);
+}
+.nav-links a.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* GitHub 图标按钮 */
+.nav-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  background: transparent;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.nav-github:hover {
+  color: var(--text);
+  background: var(--bg-soft);
+  border-color: var(--text-faint);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.nav-github svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+
+/* 移动端菜单按钮 */
+.nav-toggle {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 9px;
+  border-radius: 9px;
+}
+.nav-toggle span {
+  display: block;
+  height: 2px;
+  width: 20px;
+  margin: 4px auto;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.2s ease;
+}
+body.nav-open .nav-toggle span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+body.nav-open .nav-toggle span:nth-child(2) {
+  opacity: 0;
+}
+body.nav-open .nav-toggle span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* ===== Reveal on scroll ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .nav {
+    transform: none;
+    animation: none;
+  }
+}
+
+/* ===== 适用场景（对齐沉浸式翻译的「人群」栏目）===== */
+.use-cases {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+@media (max-width: 880px) {
+  .use-cases {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .use-cases {
+    grid-template-columns: 1fr;
+  }
+}
+.usecase {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.usecase:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent);
+}
+.usecase .emoji {
+  color: var(--accent);
+  font-size: 30px;
+  margin-bottom: 14px;
+}
+.usecase .emoji svg {
+  width: 30px;
+  height: 30px;
+}
+.usecase h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.usecase p {
+  font-size: 14px;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+/* ===== 移动端导航布局 ===== */
+@media (max-width: 720px) {
+  .nav-toggle {
+    display: block;
+  }
+  .nav-links {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 16px 14px;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    transform: translateY(-12px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  body.nav-open .nav-links {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (prefers-color-scheme: dark) {
+    .nav-links {
+      background: rgba(10, 10, 10, 0.96);
+      border-bottom-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+  .nav-links a {
+    padding: 12px 8px;
+    font-size: 16px;
+    border-radius: 10px;
+  }
+  .nav-links a.active::after {
+    display: none;
+  }
+  .nav-cta {
+    text-align: center;
+    margin-top: 6px;
+  }
 }
