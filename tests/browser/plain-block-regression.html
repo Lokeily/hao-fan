@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Plain block line splitting regression</title>
+<style>
+  body { margin: 24px; font: 15px/1.6 system-ui; }
+  .note { padding: 12px; border: 1px solid #ccc; }
+</style>
+<script src="./browser-mock.js"></script>
+</head>
+<body>
+  <h1>Plain container test</h1>
+  <!-- 无 <p>/<li> 语义块：一个 div 内多行 span，模拟手写 HTML / 邮件排版 -->
+  <div class="note">
+    <span>First line announces the quarterly results summary.</span>
+    <span>Second line explains the revenue breakdown by region.</span>
+    <span>Third line highlights the growth in mobile adoption.</span>
+    <span>Fourth line discusses the outlook for the next quarter.</span>
+  </div>
+  <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
+</body>
+</html>

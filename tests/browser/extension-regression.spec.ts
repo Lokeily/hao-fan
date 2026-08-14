@@ -223,3 +223,34 @@ test('image result page explains missing tasks instead of leaving a blank page',
   await page.goto('/tests/browser/image-regression.html');
   await expect(page.getByRole('heading', { name: '缺少图片翻译任务' })).toBeVisible();
 });
+
+test('two-column layout: each column keeps its own translations', async ({ page }) => {
+  await page.goto('/tests/browser/two-column-regression.html');
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+
+  // h1 标题 + 6 个段落 + 2 个浮动块段落 = 9 段原文，各得一个译文
+  await expect(page.locator('.ot-translation')).toHaveCount(9);
+  // 左栏 3 段 → 左栏内 3 个译文；右栏 3 段 → 右栏内 3 个译文（译文跟随各自栏）
+  await expect(page.locator('.col').nth(0).locator('.ot-translation')).toHaveCount(3);
+  await expect(page.locator('.col').nth(1).locator('.ot-translation')).toHaveCount(3);
+});
+
+test('plain container without semantic blocks: lines are translated separately', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/plain-block-regression.html');
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+
+  // h1 + 4 行 span 各自成块翻译（而不是整块合并成一段译文堆在容器末尾）
+  await expect(page.locator('.ot-translation')).toHaveCount(5);
+  // 每行译文紧跟对应原文行（行内 span 后插入的块级译文位于该行下方）
+  // 原文行翻译后被标记 ot-translated；其紧随的兄弟即译文节点
+  const lines = page.locator('.note span.ot-translated');
+  await expect(lines).toHaveCount(4);
+  await expect(lines.nth(0).locator('xpath=./following-sibling::*[1]')).toHaveClass(/ot-translation/);
+  await expect(lines.nth(2).locator('xpath=./following-sibling::*[1]')).toHaveClass(/ot-translation/);
+});

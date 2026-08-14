@@ -207,7 +207,19 @@ export default defineContentScript({
         parentDisplay === 'inline-flex' ||
         parentDisplay === 'grid' ||
         parentDisplay === 'inline-grid';
-      if (parentCreatesLayout) el.appendChild(node);
+      // float 元素与 CSS 多列（column-count/width）布局：afterend 插入的兄弟节点
+      // 会被 float 挤出容器，或作为新列项流入下一列——译文与原文视觉错位。
+      // 一律嵌入原文块内部，译文紧随原文且不改变页面布局。
+      const ownFloat = getComputedStyle(el).float;
+      let columnAncestor = false;
+      for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+        const cs = getComputedStyle(p);
+        if (cs.columnCount !== 'auto' || cs.columnWidth !== 'auto') {
+          columnAncestor = true;
+          break;
+        }
+      }
+      if (parentCreatesLayout || ownFloat !== 'none' || columnAncestor) el.appendChild(node);
       else el.insertAdjacentElement('afterend', node);
     }
 

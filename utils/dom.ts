@@ -219,6 +219,31 @@ export function closestTextBlock(element: Element, includeProcessed = false): El
   return null;
 }
 
+// 长纯文本块拆分：页面缺少语义块（如手写 HTML / 邮件排版：div 内多个 span 行，
+// 无 <p>/<li> 等）时，整块文本会被并成一段译文堆在容器末尾，无法对应原文。
+// 拆成「行级单元」独立翻译，译文与原文逐行对应。
+const PLAIN_BLOCK_SPLIT_CHARS = 120;
+
+function splitPlainBlockUnits(element: Element): Element[] | null {
+  // 直接子元素中存在语义块时，页面本身已有结构，交给现有语义块逻辑处理。
+  const hasSemanticChild = Array.from(element.children).some((child) => isCandidate(child));
+  if (hasSemanticChild) return null;
+  if (textOfBlock(element).length < PLAIN_BLOCK_SPLIT_CHARS) return null;
+  const units: Element[] = [];
+  for (const child of Array.from(element.childNodes)) {
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    const c = child as Element;
+    if (c.tagName === 'BR') continue; // br 是行分隔符，不作为锚点
+    const t = textOfBlock(c);
+    if (t.length >= 2) units.push(c);
+  }
+  if (units.length < 2) return null;
+  // 注意：不能给单元加任何已处理标记——收集逻辑的 isRejected 会把标记元素当
+  // 已处理跳过，导致拆出的行单元全部落空。拆分单元必然是非语义行内元素
+  // （否则 hasSemanticChild 为 true 不会拆分），TreeWalker 不会单独访问它们。
+  return units;
+}
+
 export function collectTextBlocks(
   root: Document | Element = document,
   limit = Infinity,
@@ -226,6 +251,15 @@ export function collectTextBlocks(
   const candidates: Element[] = [];
   const consider = (element: Element) => {
     if (isRejected(element) || !isCandidate(element) || !isVisible(element)) return;
+    const units = splitPlainBlockUnits(element);
+    if (units) {
+      for (const unit of units) {
+        if (isRejected(unit) || !isVisible(unit)) continue;
+        const t = textOfBlock(unit);
+        if (t.length >= 2) candidates.push(unit);
+      }
+      return;
+    }
     const text = textOfBlock(element);
     if (text.length >= 2) candidates.push(element);
   };
@@ -285,17 +319,31 @@ export async function scanTextBlocksIncrementally(
     batch = [];
   };
 
+  const pushUnit = (el: Element) => {
+    if (isRejected(el) || !isVisible(el)) return;
+    const text = textOfBlock(el);
+    if (text.length >= 2) batch.push({ el, text });
+  };
+
   if (root instanceof Element && !isRejected(root) && isCandidate(root) && isVisible(root)) {
-    const text = textOfBlock(root);
-    if (text.length >= 2) batch.push({ el: root, text });
+    const units = splitPlainBlockUnits(root);
+    if (units) {
+      units.forEach(pushUnit);
+    } else {
+      pushUnit(root);
+    }
   }
 
   let element: Element | null;
   while (shouldContinue() && (element = walker.nextNode() as Element | null)) {
     visited++;
     if (isCandidate(element) && isVisible(element)) {
-      const text = textOfBlock(element);
-      if (text.length >= 2) batch.push({ el: element, text });
+      const units = splitPlainBlockUnits(element);
+      if (units) {
+        units.forEach(pushUnit);
+      } else {
+        pushUnit(element);
+      }
     }
     if (batch.length >= batchSize || visited >= nodeBudget) {
       emit();
