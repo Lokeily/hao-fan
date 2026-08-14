@@ -145,11 +145,16 @@ export default defineContentScript({
       const node = translationNodes.get(el);
       const source = node?.dataset.source || textOfBlock(el);
       if (!source) return;
-      showStatus('已学习该术语', true);
       sendRuntimeMessage({
         type: 'LEARN_TERM',
         payload: { source, edited: newTranslation },
-      }).catch(() => {});
+      })
+        .then((r: any) => {
+          if (r?.ok && r.learned) showStatus('已学习该术语 ✓', true);
+          else if (r?.ok && !r.learned) showStatus(r?.reason || '未发现可学习的术语调整', true);
+          else showStatus(r?.error || '术语学习失败', true);
+        })
+        .catch(() => showStatus('术语学习失败', true));
     }
 
     // ===== 译文嵌入（网页嵌入对照方案）：直接在原文文字下方插入译文节点 =====

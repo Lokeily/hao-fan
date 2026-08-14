@@ -327,12 +327,26 @@ export default defineBackground(() => {
         if (!source || !edited) throw new Error('学习数据不完整');
         const cfg = await getCfg();
         assertProviderReady(cfg);
+        if (getProvider(cfg.provider)?.type === 'mt') {
+          // 传统 MT 引擎没有 LLM 端点，无法抽取术语
+          return { learned: false, reason: '当前引擎不支持术语学习，请切换到 AI 模型' };
+        }
         const { term, translation } = await learnTermFromEdit(cfg, source, edited);
         if (!term || !translation) return { learned: false };
         const current = await configItem.getValue();
         const line = `${term}=${translation}`;
-        const nextGlossary = current.customGlossary ? `${current.customGlossary.trim()}\n${line}` : line;
-        await configItem.setValue({ ...current, customGlossary: nextGlossary });
+        // 去重：已存在的术语行原地更新，避免多次编辑导致术语表无限累积重复行。
+        const lines = (current.customGlossary || '').split(/\r?\n/).filter((l) => l.trim());
+        const normalized = new Map(lines.map((l) => {
+          const m = l.match(/^(.+?)\s*(?:=>|->|＝|=|：|:|\t)\s*(.+)$/);
+          return m ? [m[1].trim().toLowerCase(), l] : [l.toLowerCase(), l];
+        }));
+        if (normalized.has(term.toLowerCase())) {
+          normalized.set(term.toLowerCase(), line);
+        } else {
+          normalized.set(term.toLowerCase(), line);
+        }
+        await configItem.setValue({ ...current, customGlossary: Array.from(normalized.values()).join('\n') });
         return { learned: true, term, translation };
       }, sendResponse);
     }
