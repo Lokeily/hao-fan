@@ -340,6 +340,36 @@ export function createSelectionUiStyle(): HTMLStyleElement {
 }
 
 
+// ===== 全局深浅色主题（不透明配色，保证任何网页上都可读） =====
+// 注意：浮层宿主元素带 all:initial !important 防站点样式，shadow 内的 :host
+// 规则会被内联样式覆盖——因此背景/文字色必须由 JS 直接内联设置。
+export interface ThemeColors {
+  surface: string;
+  text: string;
+  text2: string;
+  border: string;
+  muted: string;
+}
+
+export function themeColors(): ThemeColors {
+  const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  return dark
+    ? {
+        surface: '#1c1c1e',
+        text: '#f5f5f7',
+        text2: '#aeaeb2',
+        border: 'rgba(84,84,88,0.6)',
+        muted: '#8e8e93',
+      }
+    : {
+        surface: '#ffffff',
+        text: '#1d1d1f',
+        text2: '#6e6e73',
+        border: 'rgba(60,60,67,0.18)',
+        muted: '#8e8e93',
+      };
+}
+
 // ===== 通用拖拽：把 host 通过 handle 拖到任意位置（fixed 定位） =====
 // 位移小于 threshold 视为点击（不移动）；回调 onPos 在拖拽中更新位置。
 export function makeDraggable(
@@ -435,28 +465,18 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   host.style.setProperty('z-index', '2147483647', 'important');
   host.style.setProperty('width', '300px', 'important');
   host.style.setProperty('border-radius', '14px', 'important');
-  host.style.setProperty('color', '#1d1d1f', 'important');
-  host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.22)', 'important');
-  host.style.setProperty('backdrop-filter', 'blur(24px) saturate(180%)', 'important');
-  host.style.setProperty('-webkit-backdrop-filter', 'blur(24px) saturate(180%)', 'important');
+  const theme = themeColors();
+  host.style.setProperty('background', theme.surface, 'important');
+  host.style.setProperty('color', theme.text, 'important');
+  host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
+  host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.28)', 'important');
   host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
   host.style.setProperty('overflow', 'hidden', 'important');
 
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
-    /* 宿主背景由 :host 规则控制，保证深浅色随系统（内联样式无法被 media query 覆盖） */
-    :host {
-      color-scheme: light dark;
-      background: rgba(255, 255, 255, 0.96);
-      border: 1px solid rgba(60, 60, 67, 0.14);
-    }
-    @media (prefers-color-scheme: dark) {
-      :host {
-        background: rgba(28, 28, 30, 0.96);
-        border-color: rgba(84, 84, 88, 0.5);
-      }
-    }
+    :host { color-scheme: light dark; }
     * { box-sizing: border-box; }
     .head {
       display: flex; align-items: center; gap: 8px;
@@ -616,10 +636,11 @@ export function createHoverBubble(
   host.style.setProperty('width', '280px', 'important');
   host.style.setProperty('max-width', 'min(320px, calc(100vw - 24px))', 'important');
   host.style.setProperty('border-radius', '12px', 'important');
-  host.style.setProperty('color', '#1d1d1f', 'important');
-  host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.2)', 'important');
-  host.style.setProperty('backdrop-filter', 'blur(20px) saturate(180%)', 'important');
-  host.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+  const theme = themeColors();
+  host.style.setProperty('background', theme.surface, 'important');
+  host.style.setProperty('color', theme.text, 'important');
+  host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
+  host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.28)', 'important');
   host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
   host.style.setProperty('overflow', 'hidden', 'important');
   host.style.setProperty('pointer-events', 'auto', 'important');
@@ -627,22 +648,11 @@ export function createHoverBubble(
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
-    /* 宿主背景由 :host 规则控制，保证深浅色随系统 */
-    :host {
-      color-scheme: light dark;
-      background: rgba(255, 255, 255, 0.96);
-      border: 1px solid rgba(60, 60, 67, 0.14);
-    }
-    @media (prefers-color-scheme: dark) {
-      :host {
-        background: rgba(28, 28, 30, 0.96);
-        border-color: rgba(84, 84, 88, 0.5);
-      }
-    }
+    :host { color-scheme: light dark; }
     * { box-sizing: border-box; }
     .src {
       padding: 8px 12px 4px;
-      color: #8e8e93;
+      color: ${theme.muted};
       font-size: 11px;
       line-height: 1.45;
       max-height: 72px;
@@ -650,7 +660,7 @@ export function createHoverBubble(
     }
     .dst {
       padding: 0 12px 10px;
-      color: #1d1d1f;
+      color: ${theme.text};
       font-size: 13px;
       line-height: 1.55;
     }

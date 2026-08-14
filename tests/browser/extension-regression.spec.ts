@@ -317,7 +317,9 @@ test('hover translation: hovering a paragraph shows a translation bubble', async
   await expect(page.locator('#ot-hover-bubble')).toContainText('译文');
 });
 
-test('input translation: focusing a textarea shows translate button and result', async ({ page }) => {
+test('input translation: focusing a textarea shows translate button and result', async ({
+  page,
+}) => {
   await page.goto('/tests/browser/selection-regression.html');
   await page.evaluate(() => {
     const t = document.createElement('textarea');
@@ -354,4 +356,41 @@ test('grid cards: each card keeps translations inside itself', async ({ page }) 
   await expect(page.locator('.card').nth(0).locator('.ot-translation')).toHaveCount(2);
   await expect(page.locator('.card').nth(1).locator('.ot-translation')).toHaveCount(1);
   await expect(page.locator('.card').nth(2).locator('.ot-translation')).toHaveCount(1);
+});
+
+test('quick settings panel: language and engine changes persist', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+
+  // 切换目标语言 → 写入配置存储
+  await panel.getByRole('combobox', { name: '目标语言' }).selectOption('日本語');
+  await page.waitForTimeout(300);
+  const lang = await page.evaluate(
+    async () => (await (window as any).chrome.storage.local.get('config')).config,
+  );
+  expect(lang.targetLang).toBe('日本語');
+
+  // 切换引擎 → 写入配置存储
+  await panel.getByRole('combobox', { name: '翻译引擎' }).selectOption('deepl');
+  await page.waitForTimeout(300);
+  const provider = await page.evaluate(
+    async () => (await (window as any).chrome.storage.local.get('config')).config,
+  );
+  expect(provider.provider).toBe('deepl');
+});
+
+test('full settings panel opens as an in-page panel with iframe', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  await page.locator('#ot-settings-panel').getByRole('button', { name: '打开完整设置 ⚙' }).click();
+  const full = page.locator('#ot-full-settings');
+  await expect(full).toBeVisible();
+  const frame = full.locator('iframe');
+  await expect(frame).toHaveCount(1);
+  await expect(frame).toHaveAttribute('src', /options\.html/);
+  // 关闭
+  await full.getByRole('button', { name: '关闭完整设置' }).click();
+  await expect(full).toBeHidden();
 });

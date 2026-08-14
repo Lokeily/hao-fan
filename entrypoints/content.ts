@@ -21,6 +21,7 @@ import {
   createHoverBubble,
   createInputTranslateButton,
   makeDraggable,
+  themeColors,
 } from '../utils/content-ui.ts';
 import { mountImageResultOverlay } from '../utils/image-overlay.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
@@ -1182,6 +1183,7 @@ export default defineContentScript({
         hideSelectionUi();
         closeNotice();
         closeSettingsPanel();
+        closeFullSettings();
         document.getElementById('ot-toolbar')?.remove();
       } else {
         mountToolbar();
@@ -1483,6 +1485,96 @@ export default defineContentScript({
       settingsPanel = null;
     }
 
+    // ===== 页面内完整设置大面板：iframe 加载扩展设置页，右上角全部设置都在这里 =====
+    let fullSettingsHost: HTMLElement | null = null;
+
+    function closeFullSettings() {
+      fullSettingsHost?.remove();
+      fullSettingsHost = null;
+    }
+
+    function openFullSettingsPanel() {
+      closeSettingsPanel();
+      closeFullSettings();
+      const theme = themeColors();
+      const host = document.createElement('div');
+      host.id = 'ot-full-settings';
+      host.dataset.haofanUi = 'true';
+      host.style.setProperty('all', 'initial', 'important');
+      host.style.setProperty('position', 'fixed', 'important');
+      host.style.setProperty('z-index', '2147483647', 'important');
+      host.style.setProperty('width', 'min(560px, calc(100vw - 32px))', 'important');
+      host.style.setProperty('height', 'min(680px, calc(100vh - 32px))', 'important');
+      host.style.setProperty('left', 'max(16px, calc(100vw - 592px))', 'important');
+      host.style.setProperty('top', '16px', 'important');
+      host.style.setProperty('border-radius', '16px', 'important');
+      host.style.setProperty('background', theme.surface, 'important');
+      host.style.setProperty('color', theme.text, 'important');
+      host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
+      host.style.setProperty('box-shadow', '0 24px 64px rgba(0,0,0,0.32)', 'important');
+      host.style.setProperty('overflow', 'hidden', 'important');
+      host.style.setProperty(
+        'font-family',
+        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
+        'important',
+      );
+
+      const shadow = host.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = `
+        :host { color-scheme: light dark; }
+        * { box-sizing: border-box; }
+        .head {
+          display: flex; align-items: center; gap: 8px;
+          padding: 10px 14px;
+          border-bottom: 1px solid ${theme.border};
+          cursor: grab; user-select: none;
+        }
+        .title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 0; }
+        .close {
+          width: 28px; height: 28px; padding: 0;
+          border: 0; border-radius: 8px;
+          background: transparent; color: ${theme.text2};
+          font-size: 18px; line-height: 1; cursor: pointer;
+        }
+        .close:hover { background: rgba(128,128,128,0.18); }
+        iframe {
+          display: block; width: 100%; height: calc(100% - 43px);
+          border: 0; background: transparent;
+        }
+      `;
+      const head = document.createElement('div');
+      head.className = 'head';
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = '好翻 · 完整设置';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'close';
+      close.textContent = '×';
+      close.setAttribute('aria-label', '关闭完整设置');
+      close.addEventListener('click', closeFullSettings);
+      head.append(title, close);
+      const frame = document.createElement('iframe');
+      frame.src = browser.runtime.getURL('/options.html');
+      frame.title = '好翻设置';
+      shadow.append(style, head, frame);
+      document.documentElement.appendChild(host);
+      fullSettingsHost = host;
+      // 拖动时暂停 iframe 的指针事件，避免拖动被 iframe 内容吞掉
+      head.addEventListener('pointerdown', () => {
+        frame.style.pointerEvents = 'none';
+      });
+      window.addEventListener(
+        'pointerup',
+        () => {
+          if (frame.isConnected) frame.style.pointerEvents = '';
+        },
+        true,
+      );
+      makeDraggable(host, head, () => {});
+    }
+
     async function openSettingsPanel(anchorX: number, anchorY: number) {
       closeSettingsPanel();
       try {
@@ -1537,7 +1629,7 @@ export default defineContentScript({
           },
           onOpenFullSettings: () => {
             closeSettingsPanel();
-            browser.runtime.openOptionsPage?.().catch(() => {});
+            openFullSettingsPanel();
           },
           onClose: closeSettingsPanel,
           onDrag: (x, y) => {
