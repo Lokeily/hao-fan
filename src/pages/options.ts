@@ -1,4 +1,4 @@
-import { buildConfigForm } from '../../utils/ui';
+import { buildConfigForm } from '../../utils/ui.ts';
 import { browser } from 'wxt/browser';
 import '../../styles/options.css';
 

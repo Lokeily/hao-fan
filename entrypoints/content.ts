@@ -10,19 +10,19 @@ import {
   OBSERVED_CLASS,
   isVisible,
   closestTextBlock,
-} from '../utils/dom';
-import { planTextChunks, takeFirstTextChunk } from '../utils/chunking';
-import { configItem, disabledSitesItem } from '../utils/storage';
+} from '../utils/dom.ts';
+import { planTextChunks, takeFirstTextChunk } from '../utils/chunking.ts';
+import { configItem, disabledSitesItem } from '../utils/storage.ts';
 import {
   createTranslationNode,
   createNoticeHost,
   createSelectionUiStyle,
-} from '../utils/content-ui';
-import { mountImageResultOverlay } from '../utils/image-overlay';
-import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy';
-import { SessionTranslationCache } from '../utils/session-translation-cache';
-import { randomId } from '../utils/id';
-import { isSiteDisabled } from '../utils/site-policy';
+} from '../utils/content-ui.ts';
+import { mountImageResultOverlay } from '../utils/image-overlay.ts';
+import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
+import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
+import { randomId } from '../utils/id.ts';
+import { isSiteDisabled } from '../utils/site-policy.ts';
 import '../styles/content.css';
 
 let activeImageCleanup: (() => void) | null = null;

@@ -1,11 +1,11 @@
 import { browser } from 'wxt/browser';
-import { buildConfigForm } from '../../utils/ui';
-import { configItem, disabledSitesItem } from '../../utils/storage';
-import { getProvider } from '../../utils/providers';
-import { getProviderApiKey, normalizeConfig } from '../../utils/config';
-import { isSiteDisabled, siteKeyOf, withSiteDisabled } from '../../utils/site-policy';
-import { EMPTY_USAGE_TOTALS, type UsageTotals } from '../../utils/usage';
-import { MAX_TEXT_CHARS } from '../../utils/messages';
+import { buildConfigForm } from '../../utils/ui.ts';
+import { configItem, disabledSitesItem } from '../../utils/storage.ts';
+import { getProvider } from '../../utils/providers.ts';
+import { getProviderApiKey, normalizeConfig } from '../../utils/config.ts';
+import { isSiteDisabled, siteKeyOf, withSiteDisabled } from '../../utils/site-policy.ts';
+import { EMPTY_USAGE_TOTALS, type UsageTotals } from '../../utils/usage.ts';
+import { MAX_TEXT_CHARS } from '../../utils/messages.ts';
 import '../../styles/options.css';
 
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {

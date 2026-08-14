@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { takeImageJob } from '../../utils/image-job-store';
+import { takeImageJob } from '../../utils/image-job-store.ts';
 import '../../styles/image-translate.css';
 
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {

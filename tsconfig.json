@@ -1,8 +1,11 @@
 {
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
-    "types": ["wxt/browser"],
+    "types": [
+      "wxt/browser"
+    ],
     "strict": true,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "allowImportingTsExtensions": true
   }
 }

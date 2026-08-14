@@ -1,4 +1,4 @@
-import type { ImageResult } from './vision';
+import type { ImageResult } from './vision.ts';
 
 // 图片翻译任务存储。
 // 之前把包含整张 base64 原图的 ImageResult 写入 storage.local，

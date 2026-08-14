@@ -1,19 +1,19 @@
-import { getProviderApiKey, type AppConfig } from './config';
-import { getProvider } from './providers';
-import { langCode } from './languages';
-import { ensureCacheLoaded, getCachedSync, setCachedSync } from './cache';
-import { fetchWithTimeout, postJson, cleanSecret } from './requester';
-import { batchInstruction, createBatchItems, parseBatchTranslations } from './batch-protocol';
-import { localSkipReason } from './language-detection';
-import { createStats, estimateTokens, type TranslationStats } from './usage';
-import { splitLongText } from './chunking';
+import { getProviderApiKey, type AppConfig } from './config.ts';
+import { getProvider } from './providers.ts';
+import { langCode } from './languages.ts';
+import { ensureCacheLoaded, getCachedSync, setCachedSync } from './cache.ts';
+import { fetchWithTimeout, postJson, cleanSecret } from './requester.ts';
+import { batchInstruction, createBatchItems, parseBatchTranslations } from './batch-protocol.ts';
+import { localSkipReason } from './language-detection.ts';
+import { createStats, estimateTokens, type TranslationStats } from './usage.ts';
+import { splitLongText } from './chunking.ts';
 import {
   parseCustomGlossary,
   matchExact,
   relevantTerms,
   buildGlossaryBlock,
   type TermMap,
-} from './glossary';
+} from './glossary.ts';
 
 // 翻译风格 → 追加到系统提示词的一句风格指令，让译文贴合场景（质量目标）。
 const TONE_HINTS: Record<string, string> = {

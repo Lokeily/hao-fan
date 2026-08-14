@@ -9,7 +9,7 @@
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
     "test": "npm run test:unit",
-    "test:unit": "node --experimental-strip-types --test tests/core.test.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/core.test.mjs tests/translator-network.test.mjs",
     "test:browser": "playwright test",
     "check:version": "node scripts/check-version.mjs",
     "test:all": "npm run check:version && npm run lint && npm run test && npm run typecheck && npm run build && npm run test:browser",

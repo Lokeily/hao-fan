@@ -1,6 +1,6 @@
 // 图片翻译结果浮层（从 entrypoints/content.ts 拆分）。
 // 在页面图片旁叠加译文标记框与结果面板；返回清理函数，由调用方管理生命周期。
-import type { ImageSegment } from './vision-parser';
+import type { ImageSegment } from './vision-parser.ts';
 
 export interface ImageOverlayResult {
   segments: ImageSegment[];

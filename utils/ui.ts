@@ -1,8 +1,8 @@
-import { configItem } from './storage';
-import { PROVIDERS } from './providers';
-import { LANGUAGES } from './languages';
+import { configItem } from './storage.ts';
+import { PROVIDERS } from './providers.ts';
+import { LANGUAGES } from './languages.ts';
 import { browser } from 'wxt/browser';
-import { getProviderApiKey, normalizeConfig, withProviderApiKey, type AppConfig } from './config';
+import { getProviderApiKey, normalizeConfig, withProviderApiKey, type AppConfig } from './config.ts';
 
 // Options 页与 Popup 共用的配置表单。compact=true 时不显示提示文案（给 popup 用）。
 export function buildConfigForm(mount: HTMLElement, compact: boolean) {

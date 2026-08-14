@@ -1,7 +1,7 @@
-import { getProviderApiKey, type AppConfig } from './config';
-import { getProvider } from './providers';
-import { postJson, cleanSecret } from './requester';
-import { parseImageSegmentsResult, type ImageSegment } from './vision-parser';
+import { getProviderApiKey, type AppConfig } from './config.ts';
+import { getProvider } from './providers.ts';
+import { postJson, cleanSecret } from './requester.ts';
+import { parseImageSegmentsResult, type ImageSegment } from './vision-parser.ts';
 
 export interface ImageResult {
   image: string; // data URL
