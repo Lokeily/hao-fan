@@ -381,6 +381,36 @@ test('句子缓存：英文缩写（U.S. / Dr.）不被拆散', async () => {
   assert.equal(server.requests.length, 2, '缩写不应被拆成单字母句子');
   await server.close();
 });
+
+test('术语注入上限：glossaryTermLimit=0 时提示词不含术语对照表', async () => {
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    const system = req.body.messages[0].content;
+    assert.ok(!system.includes('【术语对照表】'), '关闭注入时不应包含术语块');
+    return { choices: [{ message: { content: '术语译文' } }], usage: {} };
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { glossaryTermLimit: 0 }),
+    'Open the settings page',
+  );
+  assert.equal(result.translation, '术语译文');
+  await server.close();
+});
+
+test('术语注入默认上限 12：长术语列表被截断以节省 Token', async () => {
+  const server = await startMockServer();
+  let injected = 0;
+  server.setHandler((req) => {
+    const match = req.body.messages[0].content.match(/【术语对照表】/g);
+    injected = match ? 1 : 0;
+    return { choices: [{ message: { content: '译文' } }], usage: {} };
+  });
+  const manyTerms = Array.from({ length: 30 }, (_, i) => `term${i}=术语${i}`).join('\n');
+  const text = Array.from({ length: 30 }, (_, i) => `term${i} appears here`).join('. ');
+  await translateOneDetailed(cfgFor(server.port, { customGlossary: manyTerms }), text);
+  assert.equal(injected, 1);
+  await server.close();
+});
 test('cleanSecret 拒绝含非 ASCII 字符的 Key', () => {
   assert.throws(() => cleanSecret('sk-abc\u3000def'), /非 ASCII/);
   assert.equal(cleanSecret('  sk-abc123  '), 'sk-abc123');

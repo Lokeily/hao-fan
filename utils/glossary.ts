@@ -349,7 +349,7 @@ export function relevantTerms(
   texts: string[],
   target: string,
   custom: TermMap,
-  limit = 24,
+  limit = 12,
 ): string[] {
   const map = mergedMap(target, custom);
   const customKeys = Object.keys(custom);
@@ -362,7 +362,11 @@ export function relevantTerms(
   const haystack = texts.join('\n').toLowerCase();
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const src of entries) {
+  // 短术语优先：同样命中时注入更少字符 = 更少 Token。
+  const ranked = entries
+    .map((src) => ({ src, len: src.length }))
+    .sort((a, b) => a.len - b.len);
+  for (const { src } of ranked) {
     if (out.length >= limit) break;
     if (seen.has(src)) continue;
     // 拉丁词用词边界，避免 "cat" 命中 "category"；含空格/非拉丁则用子串包含
@@ -375,6 +379,8 @@ export function relevantTerms(
       // 展示时源词首字母大写更自然（仅展示用，不影响匹配）
       const label = src.replace(/\b\w/g, (c) => c.toUpperCase());
       out.push(`${label} → ${map[src]}`);
+      // 总字符上限：避免长术语列表推高每批固定开销
+      if (out.reduce((sum, t) => sum + t.length, 0) > 500) break;
     }
   }
   return out;

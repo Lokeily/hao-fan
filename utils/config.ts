@@ -17,6 +17,7 @@ export interface AppConfig {
   qualityCheck: boolean; // 翻译质量自检（数字/URL/代码 token 保真）
   autoLearnTerms: boolean; // 译文可编辑 → 术语自动学习
   sentenceCache: boolean; // 句子级缓存 + 归一化匹配（省 Token）
+  glossaryTermLimit: number; // 术语注入条数上限（0 关闭，默认 12，越低越省 Token）
   fallbackProviders: string[]; // 多引擎故障转移：主引擎 429/5xx 时按顺序切换
   strongProvider: string; // 长文强模型路由：超过阈值改用此服务商
   strongModel: string; // 长文强模型路由：目标模型
@@ -49,6 +50,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   qualityCheck: true,
   autoLearnTerms: true,
   sentenceCache: true,
+  glossaryTermLimit: 12,
   fallbackProviders: [],
   strongProvider: '',
   strongModel: '',

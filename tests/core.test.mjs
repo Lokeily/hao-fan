@@ -181,7 +181,7 @@ test('maps structured batch responses by stable IDs', () => {
     ),
     null,
   );
-  assert.match(batchInstruction('中文'), /相同 id|id 必须原样返回/);
+  assert.match(batchInstruction('中文'), /相同 id|id 原样出现一次/);
   assert.deepEqual(parseBatchTranslations('["一","二"]', 2), ['一', '二']);
   assert.deepEqual(parseBatchTranslations('{"translations":["一","二"]}', 2), ['一', '二']);
 });
@@ -242,10 +242,12 @@ test('accumulates usage and estimates avoided tokens', () => {
 test('parses custom glossary entries and respects exact matching', () => {
   const custom = parseCustomGlossary('repository=代码仓库\n# comment\nissue -> 工单');
   assert.equal(matchExact('Repository!', '中文', custom), '代码仓库');
-  assert.deepEqual(relevantTerms(['Open repository settings'], '中文', custom).slice(0, 2), [
-    'Repository → 代码仓库',
-    'Settings → 设置',
-  ]);
+  const terms = relevantTerms(['Open repository settings'], '中文', custom);
+  // 按长度升序注入（省 Token），内容仍完整、默认不超过 12 条
+  assert.ok(terms.includes('Repository → 代码仓库'));
+  assert.ok(terms.includes('Settings → 设置'));
+  assert.ok(terms.length <= 12);
+  assert.equal(terms[0], 'Open → 打开'); // 短术语优先（open 4 字符 < settings 8 字符）
 });
 
 test('sanitizes malformed image-model output and clamps overlays', () => {

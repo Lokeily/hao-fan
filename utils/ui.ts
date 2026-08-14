@@ -87,6 +87,21 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
             <input data-f="glossaryEnabled" type="checkbox" />
             <span><strong>术语库</strong><small>本地命中术语，不调用模型</small></span>
           </label>
+          <label class="ot-check">
+            <input data-f="sentenceCache" type="checkbox" />
+            <span><strong>句子级缓存</strong><small>按句缓存，SPA 微变只重译变化句</small></span>
+          </label>
+        </div>
+        <div class="ot-field-grid">
+          <label class="ot-field ot-field-wide">术语注入上限
+            <span>每批提示词注入的术语条数，越低越省 Token</span>
+            <select data-f="glossaryTermLimit">
+              <option value="0">关闭（不注入术语，最省）</option>
+              <option value="6">6 条（更省）</option>
+              <option value="12">12 条（推荐）</option>
+              <option value="24">24 条（译名更一致）</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -108,10 +123,6 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
           <label class="ot-check">
             <input data-f="autoLearnTerms" type="checkbox" />
             <span><strong>译文可编辑 · 术语自学习</strong><small>修改译文自动沉淀进术语库</small></span>
-          </label>
-          <label class="ot-check">
-            <input data-f="sentenceCache" type="checkbox" />
-            <span><strong>句子级缓存</strong><small>按句缓存，SPA 微变只重译变化句</small></span>
           </label>
         </div>
       </section>
@@ -152,6 +163,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   const qualityChk = mount.querySelector('[data-f=qualityCheck]') as HTMLInputElement;
   const autoLearnChk = mount.querySelector('[data-f=autoLearnTerms]') as HTMLInputElement;
   const sentenceChk = mount.querySelector('[data-f=sentenceCache]') as HTMLInputElement;
+  const glossaryTermLimitSel = mount.querySelector('[data-f=glossaryTermLimit]') as HTMLSelectElement;
   const fallbackInput = mount.querySelector('[data-f=fallbackProviders]') as HTMLInputElement;
   const strongProviderSel = mount.querySelector('[data-f=strongProvider]') as HTMLSelectElement;
   const strongModelInput = mount.querySelector('[data-f=strongModel]') as HTMLInputElement;
@@ -283,6 +295,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     qualityChk.checked = cfg.qualityCheck !== false;
     autoLearnChk.checked = cfg.autoLearnTerms !== false;
     sentenceChk.checked = cfg.sentenceCache !== false;
+    glossaryTermLimitSel.value = String(cfg.glossaryTermLimit ?? 12);
     fallbackInput.value = (cfg.fallbackProviders || []).join(', ');
     strongProviderSel.value = cfg.strongProvider || '';
     strongModelInput.value = cfg.strongModel || '';
@@ -313,6 +326,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.qualityCheck = qualityChk.checked;
     cfg.autoLearnTerms = autoLearnChk.checked;
     cfg.sentenceCache = sentenceChk.checked;
+    cfg.glossaryTermLimit = Number(glossaryTermLimitSel.value) || 12;
     cfg.fallbackProviders = fallbackInput.value
       .split(/[,，\s]+/)
       .map((s) => s.trim())
@@ -383,6 +397,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     strongProviderSel,
     strongModelInput,
     strongThresholdInput,
+    glossaryTermLimitSel,
   ].forEach((el) => el.addEventListener('change', save));
 
   [
