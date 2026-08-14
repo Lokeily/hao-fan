@@ -372,6 +372,21 @@ export default defineContentScript({
       let inserted = 0;
       let idSeq = 0;
       const done: Promise<void>[] = [];
+      // 流式请求兜底：后台 SW 休眠/扩展重载会断开端口，若不处理，done 将永久挂起，
+      // 导致整页翻译卡死（busy 永远为 true）。断开或超时后立即收尾，
+      // 未完成段落重新进入视口观察队列，由懒翻译/动态扫描补译。
+      const pending: { settle: () => void; el: Element }[] = [];
+      const settleAll = () => {
+        for (const p of pending) {
+          p.settle();
+          p.el.classList.remove(PENDING_CLASS);
+          if (p.el.isConnected) {
+            observeForLazyTranslation([{ el: p.el, text: textOfBlock(p.el) }]);
+          }
+        }
+        pending.length = 0;
+      };
+      port.onDisconnect.addListener(settleAll);
       for (const item of items) {
         if (jobId && activePageJobId !== jobId) break;
         if (!item.el.isConnected) continue;
@@ -380,6 +395,21 @@ export default defineContentScript({
         const node = translationNodes.get(item.el);
         const id = `s${idSeq++}`;
         const p = new Promise<void>((resolve) => {
+          const entry = {
+            settle: () => resolve(),
+            el: item.el,
+          };
+          pending.push(entry);
+          // 超时兜底：与后台单次请求超时（20s）对齐，多给 5s 余量。
+          const timer = setTimeout(() => {
+            const idx = pending.indexOf(entry);
+            if (idx >= 0) pending.splice(idx, 1);
+            entry.settle();
+            entry.el.classList.remove(PENDING_CLASS);
+            if (entry.el.isConnected) {
+              observeForLazyTranslation([{ el: entry.el, text: textOfBlock(entry.el) }]);
+            }
+          }, 25_000);
           const onMsg = (msg: any) => {
             if (!msg || msg.id !== id) return;
             if (typeof msg.delta === 'string' && node?.isConnected) {
@@ -387,6 +417,9 @@ export default defineContentScript({
               if (text) text.textContent = msg.delta;
             }
             if (msg.done) {
+              clearTimeout(timer);
+              const idx = pending.indexOf(entry);
+              if (idx >= 0) pending.splice(idx, 1);
               try {
                 port.onMessage.removeListener(onMsg);
               } catch {
@@ -427,6 +460,11 @@ export default defineContentScript({
         done.push(p);
       }
       await Promise.all(done);
+      try {
+        port.onDisconnect.removeListener(settleAll);
+      } catch {
+        /* 端口已断开 */
+      }
       if (jobId && activePageJobId === jobId && inserted > 0) {
         translatedCount += inserted;
         showStatus(`翻译中… 已译 ${translatedCount} 段`);

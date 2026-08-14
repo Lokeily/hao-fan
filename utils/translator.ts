@@ -274,7 +274,10 @@ async function coreTranslate(
 
   let translation = result.text;
   let issue: string[] | null = null;
-  if (cfg.qualityCheck) {
+  // 传统 MT 引擎（DeepL/Google/Microsoft）无 chat/completions 端点，校正重试必然失败，
+  // 且其翻译质量稳定，缺失关键符号的概率极低——直接标记，不做校正重试。
+  const isMt = getProvider(cfg.provider)?.type === 'mt';
+  if (cfg.qualityCheck && !isMt) {
     const missing = auditTranslation(text, translation);
     if (missing.length > 0) {
       // 一次校正重试：显式要求保留缺失的关键符号。
