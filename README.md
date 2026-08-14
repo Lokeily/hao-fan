@@ -61,6 +61,8 @@
 
 ## 隐私与安全
 
+完整说明见 [PRIVACY.md](./PRIVACY.md)。
+
 - API Key 仅保存在浏览器本地（`storage.local`），按服务商隔离存储，直发所选服务商
 - 无遥测、无广告追踪、无用户行为统计；网站暂停列表仅保存在本地
 - 翻译请求带注入防护：待译文本被标记为「数据而非指令」，降低恶意网页操纵译文的风险
@@ -85,6 +87,10 @@ npm run build        # 构建
 npm run test:browser # 浏览器回归测试
 npm run zip          # 打包 Chrome 安装包
 ```
+
+## 商店上架
+
+上架工作推进中：Chrome Web Store / Edge / Firefox AMO 的提交清单见 [docs/STORE_SUBMISSION.md](./docs/STORE_SUBMISSION.md)。上架后即可获得自动更新，无需手动覆盖安装。
 
 ## 参与贡献
 
