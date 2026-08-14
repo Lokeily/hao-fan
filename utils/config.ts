@@ -11,6 +11,16 @@ export interface AppConfig {
   glossaryEnabled: boolean;
   customGlossary: string;
   customVision: boolean;
+  // ===== 0.1.5 新增能力开关与路由 =====
+  streaming: boolean; // SSE 流式输出（首块首字 <1s）
+  contextAware: boolean; // 上下文感知翻译（标题 + 前段译文滑动窗口）
+  qualityCheck: boolean; // 翻译质量自检（数字/URL/代码 token 保真）
+  autoLearnTerms: boolean; // 译文可编辑 → 术语自动学习
+  sentenceCache: boolean; // 句子级缓存 + 归一化匹配（省 Token）
+  fallbackProviders: string[]; // 多引擎故障转移：主引擎 429/5xx 时按顺序切换
+  strongProvider: string; // 长文强模型路由：超过阈值改用此服务商
+  strongModel: string; // 长文强模型路由：目标模型
+  strongThreshold: number; // 长文路由字符阈值
 }
 
 export type StoredAppConfig = Partial<AppConfig> & { apiKey?: string; dualMode?: boolean };
@@ -34,6 +44,15 @@ export const DEFAULT_CONFIG: AppConfig = {
   glossaryEnabled: true,
   customGlossary: '',
   customVision: false,
+  streaming: true,
+  contextAware: true,
+  qualityCheck: true,
+  autoLearnTerms: true,
+  sentenceCache: true,
+  fallbackProviders: [],
+  strongProvider: '',
+  strongModel: '',
+  strongThreshold: 1200,
 };
 
 export function normalizeConfig(stored?: StoredAppConfig | null): AppConfig {

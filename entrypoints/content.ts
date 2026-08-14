@@ -140,16 +140,33 @@ export default defineContentScript({
       noticeHost = createNoticeHost(title, message, closeNotice);
       document.documentElement.appendChild(noticeHost);
     }
+    // 译文可编辑 → 术语自动学习：把原文与用户修改后的译文发给后台抽取术语并沉淀。
+    function handleTranslationEdit(el: Element, newTranslation: string) {
+      const node = translationNodes.get(el);
+      const source = node?.dataset.source || textOfBlock(el);
+      if (!source) return;
+      showStatus('已学习该术语', true);
+      sendRuntimeMessage({
+        type: 'LEARN_TERM',
+        payload: { source, edited: newTranslation },
+      }).catch(() => {});
+    }
+
     // ===== 译文嵌入（网页嵌入对照方案）：直接在原文文字下方插入译文节点 =====
     // 节点构建见 utils/content-ui.ts 的 createTranslationNode。
-    function insertTranslation(el: Element, translation: string) {
+    function insertTranslation(el: Element, translation: string, sourceText?: string) {
       const existing = translationNodes.get(el);
       if (existing?.isConnected) {
         const text = existing.shadowRoot?.querySelector('.text');
         if (text) text.textContent = translation;
+        existing.dataset.translation = translation;
+        existing.dataset.source = sourceText ?? existing.dataset.source ?? '';
         return;
       }
-      const node = createTranslationNode(translation, el);
+      const node = createTranslationNode(translation, el, {
+        sourceText,
+        onEdit: (next) => handleTranslationEdit(el, next),
+      });
       translationNodes.set(el, node);
       const tag = el.tagName;
       const role = el.getAttribute('role');
@@ -199,7 +216,7 @@ export default defineContentScript({
         markTranslated(el);
         return 'skipped';
       }
-      insertTranslation(el, translation);
+      insertTranslation(el, translation, original);
       markTranslated(el);
       return 'inserted';
     }
@@ -319,6 +336,103 @@ export default defineContentScript({
       return failures;
     }
 
+    // ===== SSE 流式首块：逐段预创建节点，边收边渲染，首字延迟降到首个 token =====
+    let streamPort: ReturnType<typeof runtime.connect> | null = null;
+    function getStreamPort(): ReturnType<typeof runtime.connect> | null {
+      if (streamPort && (streamPort as any).onDisconnect) return streamPort;
+      try {
+        streamPort = runtime.connect({ name: 'haofan-stream' });
+        streamPort.onDisconnect.addListener(() => {
+          streamPort = null;
+        });
+      } catch {
+        streamPort = null;
+      }
+      return streamPort;
+    }
+
+    // 滑动窗口上下文：页面标题 + 上一段译文，供后台做上下文感知翻译。
+    let lastTranslation = '';
+    function pageContext(): { title?: string; prev?: string } {
+      return { title: document.title || undefined, prev: lastTranslation || undefined };
+    }
+
+    async function translateChunkStreaming(
+      items: TranslationItem[],
+      jobId: string | undefined,
+      context: { title?: string; prev?: string } | undefined,
+    ): Promise<void> {
+      const port = getStreamPort();
+      if (!port) {
+        await translateChunk(items, jobId, context);
+        return;
+      }
+      if (jobId && activePageJobId !== jobId) return;
+      const requestConfigRevision = translationConfigRevision;
+      let inserted = 0;
+      let idSeq = 0;
+      const done: Promise<void>[] = [];
+      for (const item of items) {
+        if (jobId && activePageJobId !== jobId) break;
+        if (!item.el.isConnected) continue;
+        (item.el as HTMLElement).classList.add(PENDING_CLASS);
+        insertTranslation(item.el, '', item.text);
+        const node = translationNodes.get(item.el);
+        const id = `s${idSeq++}`;
+        const p = new Promise<void>((resolve) => {
+          const onMsg = (msg: any) => {
+            if (!msg || msg.id !== id) return;
+            if (typeof msg.delta === 'string' && node?.isConnected) {
+              const text = node.shadowRoot?.querySelector('.text');
+              if (text) text.textContent = msg.delta;
+            }
+            if (msg.done) {
+              try {
+                port.onMessage.removeListener(onMsg);
+              } catch {
+                /* 端口已断开 */
+              }
+              if (jobId && activePageJobId !== jobId) {
+                resolve();
+                return;
+              }
+              const translation = typeof msg.translation === 'string' ? msg.translation : '';
+              if (node?.isConnected) {
+                const text = node.shadowRoot?.querySelector('.text');
+                if (text) text.textContent = translation || '';
+              }
+              if (requestConfigRevision === translationConfigRevision) {
+                if (translation) {
+                  lastTranslation = translation;
+                  sessionTranslations.remember(item.text, translation);
+                  const outcome = applyTranslation(item.el, item.text, translation);
+                  if (outcome === 'inserted') inserted++;
+                  else if (outcome === 'stale') {
+                    const cur = textOfBlock(item.el);
+                    if (cur.length >= 2) observeForLazyTranslation([{ el: item.el, text: cur }]);
+                  }
+                  if (msg.issue && Array.isArray(msg.issue) && msg.issue.length) {
+                    node?.setAttribute('data-quality', 'warn');
+                  }
+                } else {
+                  (item.el as HTMLElement).classList.remove(PENDING_CLASS);
+                }
+              }
+              resolve();
+            }
+          };
+          port.onMessage.addListener(onMsg);
+          port.postMessage({ type: 'translate-one', id, text: item.text, jobId, context });
+        });
+        done.push(p);
+      }
+      await Promise.all(done);
+      if (jobId && activePageJobId === jobId && inserted > 0) {
+        translatedCount += inserted;
+        showStatus(`翻译中… 已译 ${translatedCount} 段`);
+      }
+    }
+
     function isInViewport(element: Element): boolean {
       const rect = element.getBoundingClientRect();
       return rect.bottom >= 0 && rect.top <= window.innerHeight;
@@ -411,7 +525,7 @@ export default defineContentScript({
           maxCharacters: DYNAMIC_CHUNK_CHARACTERS,
         });
         const failures = await runChunkQueue(chunks, LAZY_CONCURRENCY, (chunk) =>
-          translateChunk(chunk, jobId),
+          translateChunk(chunk, jobId, pageContext()),
         );
         if (activePageJobId === jobId) {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
@@ -441,6 +555,7 @@ export default defineContentScript({
     async function fallbackTranslateIndividually(
       items: { el: Element; text: string }[],
       jobId: string | undefined,
+      context?: { title?: string; prev?: string },
     ): Promise<void> {
       const snapshotRevision = translationConfigRevision;
       let inserted = 0;
@@ -454,7 +569,7 @@ export default defineContentScript({
           try {
             const r: any = await sendRuntimeMessage({
               type: 'TRANSLATE_ONE',
-              payload: { text: item.text, jobId },
+              payload: { text: item.text, jobId, context },
             });
             if (!r?.ok) throw new Error(r?.error || '逐条翻译失败');
             const t = typeof r.translation === 'string' ? r.translation : '';
@@ -468,6 +583,11 @@ export default defineContentScript({
             else if (outcome === 'stale') {
               const currentText = textOfBlock(item.el);
               if (currentText.length >= 2) stale.push({ el: item.el, text: currentText });
+            }
+            if (r.issue && Array.isArray(r.issue) && r.issue.length > 0) {
+              const node = translationNodes.get(item.el);
+              node?.setAttribute('data-quality', 'warn');
+              node?.setAttribute('title', '质量自检：原文中的数字 / 链接 / 代码可能未完整保留，请核对');
             }
             estimatedTokensSaved += Math.max(0, Number(r.stats?.estimatedTokensSaved) || 0);
             retryCounts.delete(item.el);
@@ -486,7 +606,11 @@ export default defineContentScript({
       }
     }
 
-    async function translateChunk(items: { el: Element; text: string }[], jobId?: string) {
+    async function translateChunk(
+      items: { el: Element; text: string }[],
+      jobId?: string,
+      context?: { title?: string; prev?: string },
+    ) {
       if (jobId && (activePageJobId !== jobId || blockedPageJobId === jobId)) {
         items.forEach((item) => (item.el as HTMLElement).classList.remove(PENDING_CLASS));
         return;
@@ -496,11 +620,12 @@ export default defineContentScript({
         const texts = items.map((x) => x.text);
         const res = (await sendRuntimeMessage({
           type: 'TRANSLATE_BATCH',
-          payload: { texts, jobId },
+          payload: { texts, jobId, context },
         })) as
           | {
               ok?: boolean;
               translations?: unknown;
+              issues?: (string[] | null)[] | null;
               stats?: { estimatedTokensSaved?: number };
               error?: string;
             }
@@ -510,7 +635,7 @@ export default defineContentScript({
         const translations = res.translations;
         if (!Array.isArray(translations) || translations.length !== items.length) {
           // 批量响应条目数异常：逐条回退翻译，避免整页翻译被单批错误中断。
-          await fallbackTranslateIndividually(items, jobId);
+          await fallbackTranslateIndividually(items, jobId, context);
           return;
         }
         const saved = Number(res.stats?.estimatedTokensSaved) || 0;
@@ -531,6 +656,13 @@ export default defineContentScript({
             const currentText = textOfBlock(x.el);
             (x.el as HTMLElement).classList.remove(PENDING_CLASS);
             if (currentText.length >= 2) stale.push({ el: x.el, text: currentText });
+          }
+          // 质量自检发现原文符号缺失：标记该译文，提示用户核对。
+          const issue = res.issues?.[k];
+          if (issue && Array.isArray(issue) && issue.length > 0) {
+            const node = translationNodes.get(x.el);
+            node?.setAttribute('data-quality', 'warn');
+            node?.setAttribute('title', '质量自检：原文中的数字 / 链接 / 代码可能未完整保留，请核对');
           }
           retryCounts.delete(x.el);
         });
@@ -634,7 +766,7 @@ export default defineContentScript({
         let failures = 0;
         if (firstChunk.length > 0) {
           try {
-            await translateChunk(firstChunk, jobId);
+            await translateChunkStreaming(firstChunk, jobId, pageContext());
           } catch {
             failures++;
           }
@@ -653,7 +785,7 @@ export default defineContentScript({
           maxCharacters: PAGE_CHUNK_CHARACTERS,
         });
         failures += await runChunkQueue(chunks, LAZY_CONCURRENCY, (chunk) =>
-          translateChunk(chunk, jobId!),
+          translateChunk(chunk, jobId!, pageContext()),
         );
         if (activePageJobId !== jobId) return;
 
@@ -699,6 +831,12 @@ export default defineContentScript({
         viewportObserver?.unobserve(element);
         lazyPending.delete(element);
         const translation = translationNodes.get(element);
+        // 用户编辑并学习过的译文予以保留，避免 SPA 更新时被重新翻译覆盖。
+        if (translation?.dataset.edited === 'true') {
+          const classes = (element as HTMLElement).classList;
+          classes?.remove(PENDING_CLASS, OBSERVED_CLASS);
+          return;
+        }
         if (translation?.isConnected) translatedCount = Math.max(0, translatedCount - 1);
         translation?.remove();
         translationNodes.delete(element);
@@ -1246,7 +1384,7 @@ export default defineContentScript({
         width: '44px',
         height: '44px',
         borderRadius: '50%',
-        background: '#1a73e8',
+        background: 'linear-gradient(180deg, #2b7de9 0%, #1a73e8 100%)',
         color: '#fff',
         fontWeight: '600',
         fontSize: '16px',
@@ -1255,8 +1393,8 @@ export default defineContentScript({
         justifyContent: 'center',
         cursor: 'pointer',
         userSelect: 'none',
-        boxShadow: '0 2px 8px rgba(0,113,227,0.35), 0 8px 24px rgba(0,0,0,0.18)',
-        transition: 'transform 0.15s ease, background 0.2s ease',
+        boxShadow: '0 6px 18px rgba(26,115,232,0.38), 0 2px 6px rgba(0,0,0,0.16)',
+        transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.2s ease, box-shadow 0.2s ease',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         border: 'none',
         padding: '0',

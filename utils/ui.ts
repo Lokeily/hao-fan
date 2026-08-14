@@ -23,6 +23,18 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
       <label class="ot-field ot-field-wide">我的术语表 <span>每行：源词=译文</span>
         <textarea data-f="customGlossary" rows="3" placeholder="GitHub=GitHub\nrepository=代码仓库\nissue=工单"></textarea>
       </label>
+      <label class="ot-field ot-field-wide">备用引擎（故障转移） <span>主引擎限流/报错时按顺序切换，逗号分隔</span>
+        <input data-f="fallbackProviders" type="text" placeholder="deepl, openai" />
+      </label>
+      <label class="ot-field">长文强模型·引擎
+        <select data-f="strongProvider"><option value="">不启用</option></select>
+      </label>
+      <label class="ot-field">长文强模型·模型
+        <input data-f="strongModel" type="text" placeholder="如 gpt-4o" />
+      </label>
+      <label class="ot-field">长文路由阈值（字符）
+        <input data-f="strongThreshold" type="number" min="200" step="100" />
+      </label>
     </div>
   `;
 
@@ -78,6 +90,32 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
         </div>
       </section>
 
+      <section class="ot-form-section">
+        <h2>智能增强</h2>
+        <div class="ot-switches">
+          <label class="ot-check">
+            <input data-f="streaming" type="checkbox" />
+            <span><strong>流式输出</strong><small>首段边生成边显示，首字延迟更低</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="contextAware" type="checkbox" />
+            <span><strong>上下文感知</strong><small>结合页面标题与前段译文，长文更连贯</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="qualityCheck" type="checkbox" />
+            <span><strong>质量自检</strong><small>校验数字 / 链接 / 代码不被遗漏</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="autoLearnTerms" type="checkbox" />
+            <span><strong>译文可编辑 · 术语自学习</strong><small>修改译文自动沉淀进术语库</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="sentenceCache" type="checkbox" />
+            <span><strong>句子级缓存</strong><small>按句缓存，SPA 微变只重译变化句</small></span>
+          </label>
+        </div>
+      </section>
+
       ${
         compact
           ? `<details class="ot-advanced"><summary>高级设置</summary>${advancedFields}</details>`
@@ -109,6 +147,15 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   const glossaryInput = mount.querySelector('[data-f=customGlossary]') as HTMLTextAreaElement;
   const customVisionChk = mount.querySelector('[data-f=customVision]') as HTMLInputElement;
   const customVisionRow = mount.querySelector('[data-custom-vision]') as HTMLElement;
+  const streamingChk = mount.querySelector('[data-f=streaming]') as HTMLInputElement;
+  const contextChk = mount.querySelector('[data-f=contextAware]') as HTMLInputElement;
+  const qualityChk = mount.querySelector('[data-f=qualityCheck]') as HTMLInputElement;
+  const autoLearnChk = mount.querySelector('[data-f=autoLearnTerms]') as HTMLInputElement;
+  const sentenceChk = mount.querySelector('[data-f=sentenceCache]') as HTMLInputElement;
+  const fallbackInput = mount.querySelector('[data-f=fallbackProviders]') as HTMLInputElement;
+  const strongProviderSel = mount.querySelector('[data-f=strongProvider]') as HTMLSelectElement;
+  const strongModelInput = mount.querySelector('[data-f=strongModel]') as HTMLInputElement;
+  const strongThresholdInput = mount.querySelector('[data-f=strongThreshold]') as HTMLInputElement;
   const testBtn = mount.querySelector('[data-f=test]') as HTMLButtonElement;
   const status = mount.querySelector('.ot-status') as HTMLElement;
   const advanced = mount.querySelector('.ot-advanced') as HTMLDetailsElement | null;
@@ -150,6 +197,12 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     o.value = p.id;
     o.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
     providerSel.appendChild(o);
+    if (p.id !== 'google') {
+      const so = document.createElement('option');
+      so.value = p.id;
+      so.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
+      strongProviderSel.appendChild(so);
+    }
   });
 
   LANGUAGES.forEach((l) => {
@@ -217,6 +270,15 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     glossaryChk.checked = cfg.glossaryEnabled !== false;
     glossaryInput.value = cfg.customGlossary || '';
     customVisionChk.checked = cfg.customVision === true;
+    streamingChk.checked = cfg.streaming !== false;
+    contextChk.checked = cfg.contextAware !== false;
+    qualityChk.checked = cfg.qualityCheck !== false;
+    autoLearnChk.checked = cfg.autoLearnTerms !== false;
+    sentenceChk.checked = cfg.sentenceCache !== false;
+    fallbackInput.value = (cfg.fallbackProviders || []).join(', ');
+    strongProviderSel.value = cfg.strongProvider || '';
+    strongModelInput.value = cfg.strongModel || '';
+    strongThresholdInput.value = String(cfg.strongThreshold || 1200);
   }
 
   function save(): Promise<boolean> {
@@ -237,6 +299,18 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.glossaryEnabled = glossaryChk.checked;
     cfg.customGlossary = glossaryInput.value;
     cfg.customVision = customVisionChk.checked;
+    cfg.streaming = streamingChk.checked;
+    cfg.contextAware = contextChk.checked;
+    cfg.qualityCheck = qualityChk.checked;
+    cfg.autoLearnTerms = autoLearnChk.checked;
+    cfg.sentenceCache = sentenceChk.checked;
+    cfg.fallbackProviders = fallbackInput.value
+      .split(/[,，\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    cfg.strongProvider = strongProviderSel.value;
+    cfg.strongModel = strongModelInput.value.trim();
+    cfg.strongThreshold = Number(strongThresholdInput.value) || 1200;
     const snapshot: AppConfig = { ...cfg, apiKeys: { ...cfg.apiKeys } };
     const write = saveQueue.catch(() => {}).then(() => configItem.setValue(snapshot));
     saveQueue = write.then(
@@ -291,9 +365,26 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     glossaryChk,
     glossaryInput,
     customVisionChk,
+    streamingChk,
+    contextChk,
+    qualityChk,
+    autoLearnChk,
+    sentenceChk,
+    fallbackInput,
+    strongProviderSel,
+    strongModelInput,
+    strongThresholdInput,
   ].forEach((el) => el.addEventListener('change', save));
 
-  [modelText, baseInput, keyInput, promptInput, glossaryInput].forEach((el) => {
+  [
+    modelText,
+    baseInput,
+    keyInput,
+    promptInput,
+    glossaryInput,
+    fallbackInput,
+    strongModelInput,
+  ].forEach((el) => {
     el.addEventListener('input', () => scheduleSave());
   });
   window.addEventListener(
