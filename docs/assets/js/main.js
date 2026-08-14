@@ -44,29 +44,17 @@
     revealEls.forEach(function (el) { io.observe(el); });
   }
 
-  // ---- 栏目滚动高亮（scroll-spy）----
-  var links = Array.prototype.slice.call(document.querySelectorAll('.nav-links a[data-spy]'));
-  if (links.length && 'IntersectionObserver' in window) {
-    var map = {};
-    links.forEach(function (a) {
-      var id = a.getAttribute('href');
-      if (id && id.indexOf('#') === 0) {
-        var sec = document.querySelector(id);
-        if (sec) map[id] = a;
+  // ---- 当前页导航高亮（按文件名匹配）----
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-links a'));
+  if (navLinks.length) {
+    var path = location.pathname.split('/').pop() || 'index.html';
+    navLinks.forEach(function (a) {
+      var href = a.getAttribute('href') || '';
+      var name = href.split('/').pop();
+      // 首页无需高亮；其余页面与文件名一致时高亮
+      if (name && name === path && path !== 'index.html') {
+        a.classList.add('active');
       }
-    });
-    var spy = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          links.forEach(function (a) { a.classList.remove('active'); });
-          var active = map['#' + entry.target.id];
-          if (active) active.classList.add('active');
-        }
-      });
-    }, { rootMargin: '-45% 0px -50% 0px' });
-    Object.keys(map).forEach(function (id) {
-      var sec = document.querySelector(id);
-      if (sec) spy.observe(sec);
     });
   }
 
