@@ -557,6 +557,38 @@ test('full settings modal: centered overlay with blur and sync with quick panel'
   expect(scrollAfter).toBeGreaterThan(scrollBefore);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 
+  // 大屏开关视觉状态：默认开启 → is-checked 勾选样式存在（修复 shadow 查询盲区）
+  const switchState = () =>
+    full.evaluate((host) => {
+      const shadow = host.shadowRoot;
+      const labels = shadow?.querySelectorAll('label.ot-check');
+      const state: Record<string, boolean> = {};
+      labels?.forEach((l) => {
+        const input = l.querySelector('input');
+        const key = input?.getAttribute('data-f') || input?.getAttribute('data-site-ctx') || '';
+        state[key] = l.classList.contains('is-checked');
+      });
+      return state;
+    });
+  const initial = await switchState();
+  expect(initial.cacheEnabled).toBe(true); // 默认开启且视觉勾选
+  await full.locator('input[data-f="cacheEnabled"]').click({ force: true });
+  await page.waitForTimeout(300);
+  const afterClick = await switchState();
+  expect(afterClick.cacheEnabled).toBe(false); // 点击后视觉关闭
+
+  // 跨上下文同步：外部（模拟 popup）修改配置 → 大屏开关状态实时更新
+  await page.evaluate(async () => {
+    const cfg = await (window as any).chrome.storage.local.get('config');
+    await (window as any).chrome.storage.local.set({
+      config: { ...cfg.config, cacheEnabled: true, qualityCheck: false },
+    });
+  });
+  await page.waitForTimeout(600);
+  const synced = await switchState();
+  expect(synced.cacheEnabled).toBe(true); // 外部开 → 大屏同步开
+  expect(synced.qualityCheck).toBe(false); // 外部关 → 大屏同步关
+
   await page.keyboard.press('Escape');
   await expect(full).toBeHidden();
   await page.locator('#ot-settings-btn').click();

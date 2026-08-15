@@ -14,7 +14,7 @@
   <a href="#安装"><img src="https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox"></a>
   <a href="#安装"><img src="https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white" alt="Edge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
-  <a href="https://github.com/Lokeily/hao-fan/releases/latest"><img src="https://img.shields.io/badge/version-0.1.20-blue" alt="v0.1.20"></a>
+  <a href="https://github.com/Lokeily/hao-fan/releases/latest"><img src="https://img.shields.io/badge/version-0.1.21-blue" alt="v0.1.21"></a>
 </p>
 
 ## 简介

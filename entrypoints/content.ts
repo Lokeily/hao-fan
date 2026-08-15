@@ -186,7 +186,7 @@ export default defineContentScript({
         if (!v) return;
         hoverTranslateEnabled = v.hoverTranslate !== false;
         inputTranslateEnabled = v.inputTranslate !== false;
-        fullSettingsFormApi?.update();
+        fullSettingsFormApi?.update(v);
         settingsPanel?.update({
           targetLang: v.targetLang,
           provider: v.provider,
@@ -1749,23 +1749,29 @@ export default defineContentScript({
           disabledSitesItem.getValue(),
           autoSitesItem.getValue(),
         ]);
-        fullSettingsFormApi = buildConfigForm(mount, false, {
-          host: location.host,
-          autoTranslate: isSiteDisabled(autoSites, location.href),
-          paused: isSiteDisabled(disabledSites, location.href),
-          onAuto: (enabled) => {
-            enqueueSettingsWrite(async () => {
-              const sites = await autoSitesItem.getValue();
-              await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
-            });
-          },
-          onPause: (paused) => {
-            enqueueSettingsWrite(async () => {
-              const sites = await disabledSitesItem.getValue();
-              await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
-            });
-          },
-        });
+        try {
+          fullSettingsFormApi = buildConfigForm(mount, false, {
+            host: location.host,
+            autoTranslate: isSiteDisabled(autoSites, location.href),
+            paused: isSiteDisabled(disabledSites, location.href),
+            onAuto: (enabled) => {
+              enqueueSettingsWrite(async () => {
+                const sites = await autoSitesItem.getValue();
+                await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+              });
+            },
+            onPause: (paused) => {
+              enqueueSettingsWrite(async () => {
+                const sites = await disabledSitesItem.getValue();
+                await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
+              });
+            },
+          });
+        } catch {
+          // 表单构建失败：面板保留头部与关闭按钮，不崩溃内容脚本
+          mount.textContent = '设置加载失败，请重新打开';
+          mount.style.cssText = 'padding:12px;font-size:13px;color:#ff3b30;';
+        }
       })();
     }
 

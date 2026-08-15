@@ -16,8 +16,11 @@ export interface SettingsSiteCtx {
 }
 
 export interface ConfigFormApi {
-  /** 从存储重新填充表单（值相同则不动控件，避免打断输入） */
-  update: () => void;
+  /**
+   * 用最新配置重填表单（值相同则不动控件，避免打断输入）。
+   * next 传入最新配置快照（如 storage watch 回调），否则用当前内存值。
+   */
+  update: (next?: AppConfig) => void;
   /** 外部同步站点开关状态（可只传其一） */
   updateSiteState: (auto?: boolean, paused?: boolean) => void;
 }
@@ -327,15 +330,20 @@ export function buildConfigForm(
 
   // checkbox 勾选样式：不用 :has()（旧浏览器不支持），由 JS 同步 class。
   function syncCheckState() {
-    document.querySelectorAll('.ot-form .ot-check').forEach((label) => {
+    // 在表单容器内查询：页面内完整设置面板渲染在 Shadow DOM 里，
+    // document.querySelectorAll 查不到 shadow 内的开关（此前导致大屏开关全白）。
+    mount.querySelectorAll('.ot-form .ot-check').forEach((label) => {
       const input = label.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
       label.classList.toggle('is-checked', Boolean(input?.checked));
     });
   }
 
   function fill() {
-    providerSel.value = cfg.provider;
-    fillModels(cfg.provider);
+    // 仅引擎变化时重建模型下拉；开关切换等外部同步不应反复重建（性能/闪烁）
+    if (providerSel.value !== cfg.provider) {
+      providerSel.value = cfg.provider;
+      fillModels(cfg.provider);
+    }
     const hasModels = !modelSel.hidden;
     const inSelect = hasModels && Array.from(modelSel.options).some((o) => o.value === cfg.model);
     if (inSelect) {
@@ -569,7 +577,10 @@ export function buildConfigForm(
     .finally(() => setFormLoading(false));
 
   return {
-    update: fill,
+    update: (next?: AppConfig) => {
+      if (next) cfg = normalizeConfig(next);
+      fill();
+    },
     updateSiteState: (auto, paused) => {
       if (auto !== undefined && autoSiteInput) autoSiteInput.checked = auto;
       if (paused !== undefined && pauseSiteInput) pauseSiteInput.checked = paused;
