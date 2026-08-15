@@ -504,6 +504,44 @@ test('full settings modal: centered overlay with blur and sync with quick panel'
   // 合成点击（避免 Playwright 等待可能的导航信号；change 事件照常触发）
   await autoFull.evaluate((el) => (el as HTMLInputElement).click());
   await page.waitForTimeout(300);
+
+  // 面板布局：居中凸起（modal 容器存在、圆角、遮罩模糊）
+  const modalInfo = await full.evaluate((host) => {
+    const modal = host.shadowRoot?.querySelector('.modal');
+    const mr = modal?.getBoundingClientRect();
+    return {
+      exists: Boolean(modal),
+      centeredX: mr ? Math.abs(mr.x + mr.width / 2 - window.innerWidth / 2) < 8 : false,
+      radius: modal ? getComputedStyle(modal).borderRadius : '',
+      blur: getComputedStyle(host).backdropFilter,
+    };
+  });
+  expect(modalInfo.exists).toBe(true);
+  expect(modalInfo.centeredX).toBe(true);
+  expect(modalInfo.radius).not.toBe('0px');
+  expect(modalInfo.blur).toContain('blur');
+
+  // 输入可用：术语表输入保存
+  await full.locator('textarea[data-f="customGlossary"]').fill('TestTerm=测试词');
+  await page.waitForTimeout(500);
+  const cfgIn = await page.evaluate(
+    async () => (await (window as any).chrome.storage.local.get('config')).config,
+  );
+  expect(cfgIn.customGlossary).toContain('TestTerm=测试词');
+
+  // 面板内滚动可用：鼠标移入面板滚轮 → 面板内容滚动、页面不动
+  await page.mouse.move(500, 300);
+  const scrollBefore = await full.evaluate(
+    (host) => host.shadowRoot?.querySelector('.ot-full-settings-body')?.scrollTop ?? 0,
+  );
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(300);
+  const scrollAfter = await full.evaluate(
+    (host) => host.shadowRoot?.querySelector('.ot-full-settings-body')?.scrollTop ?? 0,
+  );
+  expect(scrollAfter).toBeGreaterThan(scrollBefore);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
   await page.keyboard.press('Escape');
   await expect(full).toBeHidden();
   await page.locator('#ot-settings-btn').click();

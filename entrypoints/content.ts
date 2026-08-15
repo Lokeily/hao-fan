@@ -1611,9 +1611,9 @@ export default defineContentScript({
       host.style.setProperty('position', 'fixed', 'important');
       host.style.setProperty('inset', '0', 'important');
       host.style.setProperty('z-index', '2147483646', 'important');
-      host.style.setProperty('background', dark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.4)', 'important');
-      host.style.setProperty('backdrop-filter', 'blur(6px) saturate(120%)', 'important');
-      host.style.setProperty('-webkit-backdrop-filter', 'blur(6px) saturate(120%)', 'important');
+      host.style.setProperty('background', dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.45)', 'important');
+      host.style.setProperty('backdrop-filter', 'blur(12px) saturate(110%)', 'important');
+      host.style.setProperty('-webkit-backdrop-filter', 'blur(12px) saturate(110%)', 'important');
       host.style.setProperty('display', 'flex', 'important');
       host.style.setProperty('align-items', 'center', 'important');
       host.style.setProperty('justify-content', 'center', 'important');
@@ -1631,13 +1631,14 @@ export default defineContentScript({
         }
         .modal {
           display: flex; flex-direction: column;
-          width: min(640px, calc(100vw - 40px));
-          height: min(76vh, 720px);
-          border-radius: 18px;
+          width: min(640px, calc(100vw - 48px));
+          height: min(74vh, 700px);
+          max-height: calc(100vh - 48px);
+          border-radius: 20px;
           background: ${theme.surface};
           color: ${theme.text};
           border: 1px solid ${theme.border};
-          box-shadow: 0 32px 80px rgba(0,0,0,0.35);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 48px 120px rgba(0,0,0,0.45);
           overflow: hidden;
           animation: ot-modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
@@ -1691,7 +1692,12 @@ export default defineContentScript({
       hint.className = 'foot-hint';
       hint.textContent = '设置自动保存 · 快捷键 Alt+T 翻译当前网页';
       foot.appendChild(hint);
-      shadow.append(style, head, body, foot);
+      // 关键：head/body/foot 必须包在 .modal 容器内——遮罩 host 是 flex 居中，
+      // 直接平铺会把三者拉成水平一排（此前"排版一团糟"的根因）。
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.append(head, body, foot);
+      shadow.append(style, modal);
       document.documentElement.appendChild(host);
       fullSettingsHost = host;
 
@@ -1704,9 +1710,20 @@ export default defineContentScript({
       };
       fullSettingsEsc = escHandler;
       document.addEventListener('keydown', escHandler, true);
-      // 弹窗打开期间锁定页面滚动（滚轮/触摸均不穿透遮罩）
-      fullSettingsWheelLock = (e: WheelEvent) => e.preventDefault();
-      fullSettingsTouchLock = (e: TouchEvent) => e.preventDefault();
+      // 弹窗打开期间锁定页面滚动：滚轮/触摸落在面板外（遮罩上）时阻止，
+      // 面板内部滚动不受影响（此前全局拦截导致面板内容也滚不动）。
+      const inModal = (target: EventTarget | null) => {
+        const el = target instanceof Element ? target : null;
+        if (!el) return false;
+        // 事件目标在面板 shadow 树内（含面板内部元素）→ 不拦截，面板可正常滚动
+        return Boolean(shadow.contains(el));
+      };
+      fullSettingsWheelLock = (e: WheelEvent) => {
+        if (!inModal(e.target)) e.preventDefault();
+      };
+      fullSettingsTouchLock = (e: TouchEvent) => {
+        if (!inModal(e.target)) e.preventDefault();
+      };
       window.addEventListener('wheel', fullSettingsWheelLock, true);
       window.addEventListener('touchmove', fullSettingsTouchLock, true);
       window.addEventListener(
