@@ -521,13 +521,28 @@ test('full settings modal: centered overlay with blur and sync with quick panel'
   expect(modalInfo.radius).not.toBe('0px');
   expect(modalInfo.blur).toContain('blur');
 
-  // 输入可用：术语表输入保存
-  await full.locator('textarea[data-f="customGlossary"]').fill('TestTerm=测试词');
+  // 输入可用：真实点击输入框（不关闭面板）→ 输入 → 保存
+  const glossary = full.locator('textarea[data-f="customGlossary"]');
+  await glossary.click();
+  await expect(full).toBeVisible(); // 点击面板内控件不会关闭
+  await page.keyboard.type('TestTerm=测试词');
   await page.waitForTimeout(500);
   const cfgIn = await page.evaluate(
     async () => (await (window as any).chrome.storage.local.get('config')).config,
   );
   expect(cfgIn.customGlossary).toContain('TestTerm=测试词');
+
+  // 下拉可用：真实点击目标语言下拉并选择，面板保持打开
+  const langSel = full.getByRole('combobox', { name: '目标语言' });
+  await langSel.click();
+  await expect(full).toBeVisible();
+  await langSel.selectOption('日本語');
+  await page.waitForTimeout(300);
+  await expect(full).toBeVisible();
+  const cfgLang = await page.evaluate(
+    async () => (await (window as any).chrome.storage.local.get('config')).config,
+  );
+  expect(cfgLang.targetLang).toBe('日本語');
 
   // 面板内滚动可用：鼠标移入面板滚轮 → 面板内容滚动、页面不动
   await page.mouse.move(500, 300);

@@ -1701,9 +1701,13 @@ export default defineContentScript({
       document.documentElement.appendChild(host);
       fullSettingsHost = host;
 
-      // 点击遮罩空白处关闭；Esc 关闭
+      // 点击遮罩空白处关闭；Esc 关闭。
+      // 注意：不能用 e.target === host——Shadow DOM 事件重定向会把面板内部的
+      // 点击目标重定向为 host，导致"点击输入框/下拉就关闭面板"。
+      // composedPath() 返回真实目标（不重定向），用它判断点击是否落在面板外。
       host.addEventListener('pointerdown', (e) => {
-        if (e.target === host) closeFullSettings();
+        const path = e.composedPath();
+        if (path[0] === host) closeFullSettings();
       });
       const escHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape') closeFullSettings();
