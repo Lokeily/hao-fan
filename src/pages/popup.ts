@@ -87,7 +87,17 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
     </div>
   `;
 
-  buildConfigForm(document.getElementById('ot-form-mount') as HTMLElement, true);
+  // 表单渲染保护：异常时不至于整页空白，提示可恢复操作
+  try {
+    buildConfigForm(document.getElementById('ot-form-mount') as HTMLElement, true);
+  } catch {
+    const mount = document.getElementById('ot-form-mount');
+    if (mount) {
+      mount.textContent = '设置加载失败，请重新打开弹窗或检查扩展状态';
+      mount.style.cssText =
+        'padding:12px;font-size:13px;color:#ff3b30;border-radius:10px;background:rgba(255,59,48,0.08);';
+    }
+  }
 
   // 标签页切换
   const tabs = Array.from(document.querySelectorAll('.ot-tab')) as HTMLButtonElement[];

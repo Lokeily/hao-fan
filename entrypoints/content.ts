@@ -165,25 +165,38 @@ export default defineContentScript({
         inputTranslateEnabled = v ? v.inputTranslate !== false : true;
       });
       // 双向同步：设置变化时刷新已打开的大面板与快速设置面板，保证两边状态一致。
-      void configItem.watch?.((v) => {
-        if (v) {
-          hoverTranslateEnabled = v.hoverTranslate !== false;
-          inputTranslateEnabled = v.inputTranslate !== false;
-          fullSettingsFormApi?.update();
-          settingsPanel?.update({
-            targetLang: v.targetLang,
-            provider: v.provider,
-            hoverTranslate: v.hoverTranslate !== false,
-            inputTranslate: v.inputTranslate !== false,
+      // 回调内任何异常都不允许影响内容脚本主流程。
+      const safeWatch = (item: { watch?: (cb: (v: any) => void) => void }, cb: (v: any) => void) => {
+        try {
+          item.watch?.((v) => {
+            try {
+              cb(v);
+            } catch {
+              /* 面板刷新失败不影响翻译主流程 */
+            }
           });
+        } catch {
+          /* storage 监听不可用时静默降级 */
         }
+      };
+      safeWatch(configItem, (v) => {
+        if (!v) return;
+        hoverTranslateEnabled = v.hoverTranslate !== false;
+        inputTranslateEnabled = v.inputTranslate !== false;
+        fullSettingsFormApi?.update();
+        settingsPanel?.update({
+          targetLang: v.targetLang,
+          provider: v.provider,
+          hoverTranslate: v.hoverTranslate !== false,
+          inputTranslate: v.inputTranslate !== false,
+        });
       });
-      void disabledSitesItem.watch?.((sites) => {
+      safeWatch(disabledSitesItem, (sites) => {
         const paused = isSiteDisabled(sites, location.href);
         settingsPanel?.update({ sitePaused: paused });
         fullSettingsFormApi?.updateSiteState(undefined, paused);
       });
-      void autoSitesItem.watch?.((sites) => {
+      safeWatch(autoSitesItem, (sites) => {
         const autoOn = sites === null || isSiteDisabled(sites, location.href);
         settingsPanel?.update({ autoTranslate: autoOn });
         fullSettingsFormApi?.updateSiteState(autoOn, undefined);
@@ -1545,6 +1558,12 @@ export default defineContentScript({
     // ============================================================
     // ===== 悬浮工具按钮组（可拖动）：译 + 设置入口 =====
     let settingsPanel: ReturnType<typeof createSettingsPanel> | null = null;
+    // 设置写入串行队列：多入口（快速面板/大面板/自动翻译）并发写入时防止
+    // "读旧值-写新值"互相覆盖（竞态）。
+    let settingsWriteQueue: Promise<void> = Promise.resolve();
+    const enqueueSettingsWrite = (task: () => Promise<void>): void => {
+      settingsWriteQueue = settingsWriteQueue.then(task).catch(() => {});
+    };
 
     function closeSettingsPanel() {
       settingsPanel?.host.remove();
@@ -1554,8 +1573,13 @@ export default defineContentScript({
     // ===== 页面内完整设置大面板（网页中央弹窗） =====
     let fullSettingsHost: HTMLElement | null = null;
     let fullSettingsFormApi: ReturnType<typeof buildConfigForm> | null = null;
+    let fullSettingsEsc: ((e: KeyboardEvent) => void) | null = null;
 
     function closeFullSettings() {
+      if (fullSettingsEsc) {
+        document.removeEventListener('keydown', fullSettingsEsc, true);
+        fullSettingsEsc = null;
+      }
       fullSettingsHost?.remove();
       fullSettingsHost = null;
       fullSettingsFormApi = null;
@@ -1665,10 +1689,8 @@ export default defineContentScript({
       const escHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape') closeFullSettings();
       };
+      fullSettingsEsc = escHandler;
       document.addEventListener('keydown', escHandler, true);
-      host.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeFullSettings();
-      });
       window.addEventListener(
         'pointerup',
         () => {},
@@ -1693,16 +1715,16 @@ export default defineContentScript({
           autoTranslate: isSiteDisabled(autoSites, location.href),
           paused: isSiteDisabled(disabledSites, location.href),
           onAuto: (enabled) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const sites = await autoSitesItem.getValue();
               await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
-            })();
+            });
           },
           onPause: (paused) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const sites = await disabledSitesItem.getValue();
               await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
-            })();
+            });
           },
         });
       })();
@@ -1742,33 +1764,33 @@ export default defineContentScript({
           hoverTranslate: hoverOn,
           inputTranslate: inputOn,
           onAutoToggle: (enabled) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const sites = await autoSitesItem.getValue();
               await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
-            })();
+            });
           },
           onHoverToggle: (enabled) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const current = normalizeConfig(await configItem.getValue());
               await configItem.setValue({ ...current, hoverTranslate: enabled });
-            })();
+            });
           },
           onInputToggle: (enabled) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const current = normalizeConfig(await configItem.getValue());
               await configItem.setValue({ ...current, inputTranslate: enabled });
-            })();
+            });
           },
           onTargetLang: (value) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const current = normalizeConfig(await configItem.getValue());
               await configItem.setValue({ ...current, targetLang: value });
               translationConfigRevision++;
               sessionTranslations.clear();
-            })();
+            });
           },
           onProvider: (value) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const provider = PROVIDERS.find((p) => p.id === value);
               if (!provider) return;
               const current = normalizeConfig(await configItem.getValue());
@@ -1780,13 +1802,13 @@ export default defineContentScript({
               });
               translationConfigRevision++;
               sessionTranslations.clear();
-            })();
+            });
           },
           onSiteToggle: (paused) => {
-            void (async () => {
+            enqueueSettingsWrite(async () => {
               const sites = await disabledSitesItem.getValue();
               await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
-            })();
+            });
           },
           onOpenFullSettings: () => {
             closeSettingsPanel();
