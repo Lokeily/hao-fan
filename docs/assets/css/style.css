@@ -1407,29 +1407,10 @@ body.nav-open .nav-toggle span:nth-child(3) {
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
 }
-.marquee-track {
-  display: flex;
-  gap: 14px;
-  width: max-content;
-  animation: marquee 32s linear infinite;
-}
 .marquee:hover .marquee-track { animation-play-state: paused; }
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
-}
-.marquee .prov {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
 }
 
 /* ---- 磁吸 / 微交互 ---- */
@@ -1490,6 +1471,66 @@ body.nav-open .nav-toggle span:nth-child(3) {
    第二轮 Apple 风增强（子页通用）
    英雄错落入场 / 卡片光标聚光 / 图文分栏 / FAQ 筛选 / 文档目录 / 数据流向 / 渐变标题
    =================================================================== */
+
+/* ===================================================================
+   动画文字稳定性：中文在 transform/filter 合成下容易重影/错乱，
+   这里给动画容器与文字层固定独立光栅层 + 抗锯齿，杜绝跳动时文字糊掉。
+   =================================================================== */
+.reveal,
+.reveal--blur,
+.reveal--scale,
+.reveal--left,
+.reveal--right,
+.page-hero > *,
+.hero-visual,
+.hero-visual-inner,
+.win,
+.float-visual,
+.float-visual .fv-inner {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  backface-visibility: hidden;
+}
+/* 文字层固定独立合成层：祖先做视差/浮动位移时，文字不再逐帧重排而糊掉 */
+.win,
+.win-body {
+  transform: translateZ(0);
+}
+.win-body {
+  white-space: normal;
+  word-break: break-word;
+}
+/* 打字机文字：保留空格、长串不溢出、预留一行高度，避免打字时跳动/错行 */
+.tgt[data-typetext] {
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 1.9em;
+}
+
+/* 服务商跑马灯：间距内置到每项，两段完全等距，translateX(-50%) 无缝循环 */
+.marquee-track {
+  display: flex;
+  gap: 0;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.marquee .prov {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  margin-right: 14px;
+}
 
 /* ---- 子页面英雄错落入场（与首页 hero-rise 同语言）---- */
 @keyframes page-rise {

@@ -160,9 +160,23 @@
   }
 
   // 3) 打字机演示（双语对照流式输出）
+  // 若所在区块仍带 .reveal（尚未 .in），先等其渐显完成再开始，避免文字在模糊态下被“打出来”显得乱
   function typeWriter(el) {
     var text = el.getAttribute('data-typetext') || '';
     if (reduceMotion) { el.textContent = text; return; }
+    var host = el.closest ? el.closest('.reveal') : null;
+    if (host && !host.classList.contains('in')) {
+      var wait = setInterval(function () {
+        if (host.classList.contains('in')) {
+          clearInterval(wait);
+          doType(el, text);
+        }
+      }, 120);
+      return;
+    }
+    doType(el, text);
+  }
+  function doType(el, text) {
     el.classList.add('typing');
     el.textContent = '';
     var i = 0;
@@ -195,7 +209,7 @@
     document.querySelectorAll('.stat .num[data-count]').forEach(function (el) {
       el.textContent = (parseFloat(el.getAttribute('data-count')) || 0) + (el.getAttribute('data-suffix') || '');
     });
-    document.querySelectorAll('.demo .tgt[data-typetext]').forEach(function (el) {
+    document.querySelectorAll('.tgt[data-typetext]').forEach(function (el) {
       el.textContent = el.getAttribute('data-typetext') || '';
     });
   }
