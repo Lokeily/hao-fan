@@ -787,13 +787,15 @@ export function createHoverBubble(
       position: absolute;
       top: 4px;
       right: 6px;
-      width: 24px;
-      height: 24px;
+      min-width: 34px;
+      height: 22px;
+      padding: 0 6px;
       border: 0;
       border-radius: 7px;
       background: transparent;
       color: #aeaeb2;
-      font-size: 13px;
+      font-size: 11px;
+      font-weight: 600;
       cursor: pointer;
     }
     .pin:hover { background: rgba(60,64,67,0.1); }
@@ -816,7 +818,7 @@ export function createHoverBubble(
   const pin = document.createElement('button');
   pin.type = 'button';
   pin.className = 'pin';
-  pin.textContent = '📌';
+  pin.textContent = '固定';
   pin.title = '固定译文';
   pin.setAttribute('aria-label', '固定译文');
   let pinned = false;

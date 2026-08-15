@@ -128,6 +128,8 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   });
 
   const input = document.getElementById('ot-input') as HTMLTextAreaElement;
+  // 打开弹窗自动聚焦输入框，直接输入即可翻译（多数用户场景）
+  input?.focus({ preventScroll: true });
   const inputCount = document.getElementById('ot-input-count') as HTMLElement;
   const out = document.getElementById('ot-out') as HTMLElement;
   const fileInput = document.getElementById('ot-file') as HTMLInputElement;

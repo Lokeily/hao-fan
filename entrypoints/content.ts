@@ -1577,11 +1577,21 @@ export default defineContentScript({
     let fullSettingsHost: HTMLElement | null = null;
     let fullSettingsFormApi: ReturnType<typeof buildConfigForm> | null = null;
     let fullSettingsEsc: ((e: KeyboardEvent) => void) | null = null;
+    let fullSettingsWheelLock: ((e: WheelEvent) => void) | null = null;
+    let fullSettingsTouchLock: ((e: TouchEvent) => void) | null = null;
 
     function closeFullSettings() {
       if (fullSettingsEsc) {
         document.removeEventListener('keydown', fullSettingsEsc, true);
         fullSettingsEsc = null;
+      }
+      if (fullSettingsWheelLock) {
+        window.removeEventListener('wheel', fullSettingsWheelLock, true);
+        fullSettingsWheelLock = null;
+      }
+      if (fullSettingsTouchLock) {
+        window.removeEventListener('touchmove', fullSettingsTouchLock, true);
+        fullSettingsTouchLock = null;
       }
       fullSettingsHost?.remove();
       fullSettingsHost = null;
@@ -1694,6 +1704,11 @@ export default defineContentScript({
       };
       fullSettingsEsc = escHandler;
       document.addEventListener('keydown', escHandler, true);
+      // 弹窗打开期间锁定页面滚动（滚轮/触摸均不穿透遮罩）
+      fullSettingsWheelLock = (e: WheelEvent) => e.preventDefault();
+      fullSettingsTouchLock = (e: TouchEvent) => e.preventDefault();
+      window.addEventListener('wheel', fullSettingsWheelLock, true);
+      window.addEventListener('touchmove', fullSettingsTouchLock, true);
       window.addEventListener(
         'pointerup',
         () => {},
@@ -1991,8 +2006,11 @@ export default defineContentScript({
     function positionInputBtn() {
       if (!inputBtn || !inputTarget) return;
       const r = inputTarget.getBoundingClientRect();
-      inputBtn.style.setProperty('left', `${Math.max(8, r.right - 40)}px`, 'important');
-      inputBtn.style.setProperty('top', `${Math.max(8, r.bottom - 40)}px`, 'important');
+      const left = Math.max(8, r.right - 40);
+      // 输入框高度足够（>44px）时按钮在框内右下角，否则移到框外下方避免遮挡
+      const inside = r.height > 44 ? r.bottom - 40 : r.bottom + 4;
+      inputBtn.style.setProperty('left', `${left}px`, 'important');
+      inputBtn.style.setProperty('top', `${Math.max(8, Math.min(inside, window.innerHeight - 36))}px`, 'important');
     }
 
     function hideInputTranslate() {

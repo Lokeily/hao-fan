@@ -11,6 +11,12 @@
       const response = await fetch('../../.output/chrome-mv3/options.html');
       const html = await response.text();
       const parsed = new DOMParser().parseFromString(html, 'text/html');
+      // 构建产物已内联样式（postbuild）：复制 <style> 块；兼容旧构建的 link 方式。
+      for (const style of parsed.querySelectorAll('style')) {
+        const clone = document.createElement('style');
+        clone.textContent = style.textContent;
+        document.head.appendChild(clone);
+      }
       for (const link of parsed.querySelectorAll('link[rel="stylesheet"]')) {
         const clone = document.createElement('link');
         clone.rel = 'stylesheet';
