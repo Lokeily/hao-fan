@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>隐私政策 · 好翻</title>
-    <meta name="description" content="好翻（Open Translator CN）隐私政策：说明扩展收集哪些数据、如何存储、与哪些第三方交互，以及你的权利。" />
+    <meta name="description" content="好翻（Open Translator CN）隐私政策：运营方不在服务器收集任何个人数据；翻译内容仅发往你主动选择的第三方服务商，受其条款约束。含 GDPR/CCPA 权利、国际传输与免责说明。" />
     <link rel="icon" type="image/png" href="assets/img/icon-48.png" />
     <link rel="stylesheet" href="assets/css/style.css" />
   </head>
@@ -22,6 +22,10 @@
           </button>
           <div class="nav-links">
             <a href="index.html">首页</a>
+            <a href="features.html">功能特性</a>
+            <a href="providers.html">翻译服务</a>
+            <a href="install.html">安装指南</a>
+            <a href="faq.html">常见问题</a>
             <a href="privacy.html" class="active">隐私政策</a>
             <a
               class="nav-github"
@@ -44,50 +48,157 @@
       </div>
     </nav>
 
-    <main class="doc">
+    <div class="doc-layout">
+      <aside class="doc-toc" aria-label="隐私政策目录">
+        <div class="toc-title">本页目录</div>
+        <a href="#scope">适用范围</a>
+        <a href="#collect">我们收集哪些数据</a>
+        <a href="#handling">数据如何处理</a>
+        <a href="#thirdparty">第三方服务</a>
+        <a href="#legal">法律依据</a>
+        <a href="#retention">数据存储与保留</a>
+        <a href="#rights">你的权利</a>
+        <a href="#transfer">国际数据传输</a>
+        <a href="#children">儿童隐私</a>
+        <a href="#security">安全</a>
+        <a href="#changes">本政策的变更</a>
+        <a href="#disclaimer">免责声明</a>
+        <a href="#contact">联系我们</a>
+        <a href="#permissions">权限说明</a>
+        <a href="#english">English Summary</a>
+      </aside>
+      <main class="doc">
       <h1>隐私政策</h1>
-      <p class="updated">最后更新：2026-08-14</p>
+      <p class="updated">最后更新：2026-08-15</p>
 
       <p>
-        「好翻」（Open Translator CN）是一款开源浏览器翻译扩展。本政策说明扩展收集、使用与存储哪些数据。
+        「好翻」（Open Translator CN）是一款开源、免费、可自配 API 的浏览器翻译扩展。本政策以清晰、诚实的方式说明：扩展及其运营方如何对待你的数据、与你选定的第三方服务相关的数据流向，以及你所拥有的权利。我们力求措辞准确——不夸大，也不回避。
       </p>
 
-      <div class="callout">
-        我们<strong>不收集任何数据</strong>：项目没有遥测、广告追踪或用户行为统计；没有服务器端日志，翻译请求不经过任何中转服务器；扩展不注册账号，不要求登录。
+      <div class="callout reveal">
+        核心结论：<strong>好翻的运营方不在任何服务器上收集、存储或处理你的个人数据。</strong>扩展运行在你的浏览器本地；翻译内容只会发往<strong>你主动选择</strong>的翻译服务商，并由该服务商按其自身条款处理。
       </div>
 
-      <h2>我们收集什么</h2>
-      <p><strong>我们不收集任何数据。</strong></p>
+      <div class="flow reveal">
+        <div class="flow-node"><strong>你的浏览器</strong><small>扩展本地运行</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node"><strong>本地处理</strong><small>缓存 · 术语 · Key 隔离</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node"><strong>你选的服务商</strong><small>直连 · 不经中转</small></div>
+      </div>
+
+      <h2 id="scope" class="reveal">一、适用范围</h2>
+      <p>本政策适用于：</p>
       <ul>
-        <li>项目没有遥测、广告追踪或用户行为统计；</li>
-        <li>没有服务器端日志，翻译请求不经过任何中转服务器；</li>
-        <li>扩展不注册账号，不要求登录。</li>
+        <li><strong>好翻浏览器扩展</strong>：包括其在你设备上的全部功能（整页翻译、划词翻译、图片翻译、术语表、设置等）；</li>
+        <li><strong>本官方网站</strong>（含文档与下载指引）：本网站为静态页面，不使用 Cookie、不部署统计或广告追踪脚本，也不会向你索取个人信息。</li>
+      </ul>
+      <p>本政策不涵盖你自行选用的第三方翻译服务商，其数据处理由其各自的服务条款与隐私政策约束，请另行查阅。</p>
+
+      <h2 id="collect" class="reveal">二、我们收集哪些数据</h2>
+      <p><strong>在服务器层面：我们不收集任何数据。</strong></p>
+      <ul>
+        <li>没有遥测、没有广告追踪、没有用户行为统计；</li>
+        <li>没有账号体系，不要求注册或登录；</li>
+        <li>没有自有后端服务器，也没有服务器端日志。</li>
+      </ul>
+      <p>你在使用扩展时产生的所有数据，均只存在于<strong>你的设备本地</strong>或<strong>你选择的翻译服务商处</strong>（详见下节）。</p>
+
+      <h2 id="handling" class="reveal">三、数据如何处理</h2>
+
+      <h3>翻译内容（网页文本 / 图片）</h3>
+      <ul>
+        <li>当你发起翻译时，待翻译的网页文本或图片会直接发送到你<strong>在设置中主动选择</strong>的翻译服务商（如 DeepSeek、OpenAI、智谱、腾讯混元、Google 翻译等）；</li>
+        <li>数据经由你配置的 API 端点传输；<strong>本项目不参与、不中转、不留存</strong>任何翻译内容；</li>
+        <li>译文与原文仅缓存在你自己的浏览器本地（默认 30 天有效期，可在设置中关闭或清空）。</li>
       </ul>
 
-      <h2>数据处理方式</h2>
-
-      <h3>待翻译的网页内容</h3>
+      <h3>API 密钥</h3>
       <ul>
-        <li>整页翻译、划词翻译、图片翻译时，你正在阅读的网页文本（或图片）会直接发送给你在设置页<strong>主动选择</strong>的翻译服务商（如 DeepSeek、OpenAI、智谱等）；</li>
-        <li>数据经由你配置的 API 端点传输，本项目不参与、不中转、不存储；</li>
-        <li>翻译结果与原文仅保存在你自己的浏览器本地缓存中（默认 30 天有效期，可在设置中关闭）。</li>
-      </ul>
-
-      <h3>API Key</h3>
-      <ul>
-        <li>各服务商 API Key 仅保存在浏览器本地 <code>storage.local</code>，按服务商隔离；</li>
-        <li>Key 只随你选择的翻译请求发送给对应服务商，扩展不会将其发送给任何其他方；</li>
-        <li>卸载扩展即清除。</li>
+        <li>各服务商的 API Key 仅保存在浏览器本地 <code>storage.local</code>，并按服务商隔离存储；</li>
+        <li>Key 仅随对应的翻译请求发送给该服务商，<strong>绝不会</strong>被发送给我们或任何第三方；</li>
+        <li>卸载扩展或清除站点数据后，密钥即被删除。</li>
       </ul>
 
       <h3>其他本地数据</h3>
       <ul>
-        <li>暂停翻译的网站列表、用户自定义术语表、翻译统计，均只保存在浏览器本地，不会上传；</li>
-        <li>图片翻译任务临时存入浏览器 IndexedDB，读取后即删除（24 小时内自动清理）。</li>
+        <li>暂停翻译的网站列表、你自定义的术语表、翻译统计与偏好设置，均只保存在浏览器本地，不会上传；</li>
+        <li>图片翻译的临时文件存入浏览器 <code>IndexedDB</code>，读取后即删除，最长 24 小时内自动清理。</li>
       </ul>
 
-      <h2>权限说明</h2>
-      <table class="perm-table">
+      <h3>本网站</h3>
+      <p>本网站为静态托管，不设置 Cookie、不运行分析脚本、不收集表单信息。你通过 GitHub 与我们交互时，相关数据处理遵循 GitHub 的隐私政策。</p>
+
+      <h2 id="thirdparty" class="reveal">四、第三方服务</h2>
+      <p>
+        翻译能力由<strong>你自行选择</strong>的服务商提供。一旦你选用某家服务商，相应的网页内容、图片与 API Key 将按其指令发往该服务商，并受其服务条款与隐私政策约束。不同服务商的数据处理地点、保留期限与合规资质各不相同，请在使用前自行评估。
+      </p>
+      <p>
+        其中，「Google 翻译（免 Key）」使用的是非官方公开端点，<strong>无服务等级保证</strong>，可能随时限流或变更，仅建议用于体验；正式使用请配置支持 API Key 的服务。我们对任何第三方服务商的数据处理行为<strong>不承担责任</strong>。
+      </p>
+
+      <h2 id="legal" class="reveal">五、法律依据（以 GDPR 为例）</h2>
+      <p>
+        对于欧洲经济区（EEA）等地的用户：由于好翻不在服务器端收集或处理个人数据，<strong>运营方通常不充当翻译内容的「数据控制者」</strong>。数据主要在你的设备本地处理，或在你明确指示下交由你选定的服务商处理。
+      </p>
+      <ul>
+        <li>在本地执行的翻译缓存、设置与术语表处理，属于为向你提供服务所必需（履行合同 / 正当利益）；</li>
+        <li>将内容发送给你所选定的第三方 AI 服务商，基于你的<strong>明确同意</strong>，你可随时在设置中更换或停止。</li>
+      </ul>
+
+      <h2 id="retention" class="reveal">六、数据存储与保留</h2>
+      <ul>
+        <li>所有由扩展产生的数据均存储于你的浏览器本地，<strong>由你完全掌控</strong>；</li>
+        <li>翻译缓存默认保留 30 天，可在设置中缩短、关闭或手动清空；</li>
+        <li>卸载扩展、清除浏览器站点数据，或移除对应服务商配置，即可彻底删除相关本地数据。</li>
+      </ul>
+
+      <h2 id="rights" class="reveal">七、你的权利</h2>
+      <p>
+        根据你所在司法辖区的法律（如 GDPR、CCPA 等），你可能对个人数据享有访问、更正、删除、限制处理、可携带与反对等权利。鉴于我们不在服务器端持有你的任何个人数据，你可直接通过以下方式行使：
+      </p>
+      <ul>
+        <li><strong>本地数据</strong>：通过扩展设置清空缓存 / 术语表，或卸载扩展即可删除；</li>
+        <li><strong>已发送给第三方服务商的数据</strong>：请按该服务商的流程向其提出请求；</li>
+        <li><strong>其他疑问</strong>：可通过下方联系方式向我们提出，我们将在不持有数据的前提下尽力协助指引。</li>
+      </ul>
+
+      <h2 id="transfer" class="reveal">八、国际数据传输</h2>
+      <p>
+        好翻自身不会将你的数据传输到任何服务器。但你所选用的第三方翻译服务商可能在你所在国家 / 地区之外处理数据，相关跨境传输受其自身政策与适用法律的约束。请在选用前查阅对应服务商的说明。
+      </p>
+
+      <h2 id="children" class="reveal">九、儿童隐私</h2>
+      <p>
+        好翻并非专门针对儿童设计，我们亦不主动收集任何人的个人信息，包括儿童。若你认为有儿童的数据经由第三方服务商被处理，请通过该服务商或其监护人处理，并可就本扩展行为与我们联系。
+      </p>
+
+      <h2 id="security" class="reveal">十、安全</h2>
+      <ul>
+        <li>API Key 等敏感信息仅存于浏览器本地隔离存储，不会被我们获取；</li>
+        <li>翻译请求按你的配置直连所选服务商，并默认携带注入防护；</li>
+        <li>请妥善保管你的 API Key，避免在其所属平台之外泄露。需提醒的是，<strong>没有任何传输或存储方式是绝对安全的</strong>，我们仅承诺采取与上述设计一致的合理措施。</li>
+      </ul>
+
+      <h2 id="changes" class="reveal">十一、本政策的变更</h2>
+      <p>
+        我们可能不时更新本政策以反映功能或合规要求的变化。重大变更将通过项目 Release Notes 或仓库说明予以提示，更新日期见于本页顶部。建议你定期查阅。
+      </p>
+
+      <h2 id="disclaimer" class="reveal">十二、免责声明</h2>
+      <p>
+        好翻以开源形式「按原样（as is）」提供，不提供担保。在适用法律允许的最大范围内，运营方不对因使用或无法使用本扩展而产生的任何直接或间接损失承担责任。你应自行评估所选翻译服务商的合规性与适用性，并确保你的使用行为符合所在地法律（例如雇主持有设备、企业网络或受监管行业下的使用要求）。本政策为一般性说明，<strong>不构成法律意见</strong>。
+      </p>
+
+      <h2 id="contact" class="reveal">十三、联系我们</h2>
+      <p>
+        对本政策或数据处理有疑问，可通过
+        <a href="https://github.com/Lokeily/hao-fan/issues" target="_blank" rel="noopener">GitHub Issues</a>
+        与我们联系。由于我们不持有用户数据，通常无法代为查询或删除任何个人数据。
+      </p>
+
+      <h2 id="permissions" class="reveal">权限说明</h2>
+      <table class="perm-table reveal">
         <thead>
           <tr><th>权限</th><th>用途</th></tr>
         </thead>
@@ -112,24 +223,22 @@
       </table>
       <p>扩展<strong>不会</strong>在未经你操作的情况下发起翻译请求。</p>
 
-      <h2>第三方服务</h2>
+      <h2 id="english" class="reveal">English Summary</h2>
       <p>
-        翻译服务由你自行选择，其数据处理遵循对应服务商的服务条款与隐私政策。使用第三方 AI 服务可能产生费用，由服务商计费。
-      </p>
-
-      <h2>联系方式</h2>
-      <p>
-        问题与反馈：请在
-        <a href="https://github.com/Lokeily/hao-fan/issues" target="_blank" rel="noopener">GitHub Issues</a>
-        提交。
+        Open Translator CN ("好翻") is an open-source browser extension. In short: <strong>we do not collect, store, or process any personal data on any server.</strong> The extension runs locally in your browser. When you translate, the text or images are sent only to the translation provider <strong>you explicitly choose</strong>, and are handled under that provider's own terms. Your API keys are stored only in your browser's local storage and are sent solely to the corresponding provider. We operate no backend, no analytics, and no accounts. This static website uses no cookies or tracking. For users in the EEA, the operator is generally not the data controller of translation content; processing occurs on-device or at your chosen provider under your consent. You may exercise your rights by clearing local data or contacting the relevant provider. This policy is provided in Chinese; where local law grants non-waivable rights, those rights are preserved.
       </p>
     </main>
+    </div>
 
     <footer>
       <div class="footer-inner">
         <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
         <div class="footer-links">
           <a href="index.html">首页</a>
+          <a href="features.html">功能特性</a>
+          <a href="providers.html">翻译服务</a>
+          <a href="install.html">安装指南</a>
+          <a href="faq.html">常见问题</a>
           <a
             class="footer-github"
             href="https://github.com/Lokeily/hao-fan"
@@ -144,6 +253,9 @@
         </div>
       </div>
     </footer>
+    <button class="to-top" aria-label="回到顶部" title="回到顶部">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
     <script src="assets/js/main.js" defer></script>
   </body>
 </html>

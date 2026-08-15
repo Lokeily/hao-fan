@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>翻译服务 · 好翻</title>
+    <meta name="description" content="好翻（Open Translator CN）支持的翻译服务：12+ 家 AI 服务商（DeepSeek、OpenAI、智谱、腾讯混元等）与 3 家传统机器翻译，附 API Key 配置方法。" />
+    <link rel="icon" type="image/png" href="assets/img/icon-48.png" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <div class="scroll-progress"></div>
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="index.html">
+          <img src="assets/img/icon-128.png" alt="好翻" />
+          <span>好翻</span>
+        </a>
+        <div class="nav-right">
+          <button class="nav-toggle" aria-label="菜单" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+          <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="features.html">功能特性</a>
+            <a href="providers.html" class="active">翻译服务</a>
+            <a href="install.html">安装指南</a>
+            <a href="faq.html">常见问题</a>
+            <a href="privacy.html">隐私政策</a>
+            <a
+              class="nav-github"
+              href="https://github.com/Lokeily/hao-fan"
+              target="_blank"
+              rel="noopener"
+              aria-label="在 GitHub 上查看好翻"
+            >
+              <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
+            </a>
+            <a
+              class="nav-cta"
+              href="https://github.com/Lokeily/hao-fan/releases/latest"
+              target="_blank"
+              rel="noopener"
+              >下载</a
+            >
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <header class="page-hero reveal reveal--blur">
+      <div class="breadcrumb">
+        <a href="index.html">首页</a>
+        <span class="sep">/</span>
+        <span>翻译服务</span>
+      </div>
+      <div class="eyebrow">用你自己的账号与额度</div>
+      <h1>支持的翻译服务</h1>
+      <p>密钥只保存在本地。下面是内置预设的服务商，你也可以接入任意 OpenAI 兼容接口或本地模型。</p>
+    </header>
+
+    <section class="block" style="padding-top:48px;padding-bottom:8px;">
+      <div class="container">
+        <div class="hero-visual" data-parallax="0.05" style="margin-top:24px;">
+          <div class="hero-visual-inner">
+            <div class="win">
+              <div class="win-bar">
+                <span></span><span></span><span></span>
+                <span class="win-url">好翻 · 设置</span>
+              </div>
+              <div class="win-body" style="font-size:15px;">
+                <p class="src" style="margin-bottom:8px;"><strong>翻译服务商</strong></p>
+                <div class="prov" style="font-weight:600;">DeepSeek ▾</div>
+                <p class="src" style="margin:16px 0 6px;"><strong>API Key</strong></p>
+                <div class="demo-url" style="display:block;text-align:left;color:var(--text);">sk-••••••••••••••••••••</div>
+                <p class="src" style="margin:16px 0 6px;"><strong>目标语言</strong></p>
+                <div class="prov" style="font-weight:600;">简体中文</div>
+                <p class="tgt" data-typetext="✓ 连接成功（延迟 230ms）" style="margin-top:18px;color:var(--green);border-left-color:var(--green);font-weight:600;"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="visual-cap">在设置里选好服务商、填好 Key、点「测试连接」即可。Key 只存在你本地，连接状态也只在你设备上显示。</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:8px;padding-bottom:8px;">
+      <div class="container">
+        <div class="stats reveal">
+          <div class="stat">
+            <div class="num" data-count="12" data-suffix="+">12+</div>
+            <div class="label">内置 AI 翻译服务</div>
+          </div>
+          <div class="stat">
+            <div class="num" data-count="3">3</div>
+            <div class="label">家传统机器翻译</div>
+          </div>
+          <div class="stat">
+            <div class="num" data-count="0">0</div>
+            <div class="label">中转服务器</div>
+          </div>
+          <div class="stat">
+            <div class="num" data-count="100" data-suffix="%">100%</div>
+            <div class="label">密钥本地隔离存储</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2>AI 服务</h2>
+          <p>内置 12+ 家 AI 服务商预设，覆盖国内外主流大模型。</p>
+        </div>
+        <div class="prov-grid" data-stagger>
+          <div class="prov-group reveal">
+            <h3>国内大模型</h3>
+            <div class="prov-chips">
+              <span class="prov">DeepSeek</span>
+              <span class="prov">智谱 GLM</span>
+              <span class="prov">腾讯混元</span>
+              <span class="prov">通义千问</span>
+              <span class="prov">Kimi</span>
+              <span class="prov">百川智能</span>
+              <span class="prov">豆包</span>
+            </div>
+          </div>
+          <div class="prov-group reveal">
+            <h3>国际与聚合</h3>
+            <div class="prov-chips">
+              <span class="prov">OpenAI</span>
+              <span class="prov">Google Gemini</span>
+              <span class="prov">OpenRouter</span>
+              <span class="prov">Ollama 本地模型</span>
+              <span class="prov">任意 OpenAI 兼容接口</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="traditional" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2>传统机器翻译</h2>
+          <p>不想折腾 API Key？下面这些也能直接用。</p>
+        </div>
+        <div class="prov-grid" data-stagger>
+          <div class="prov-group reveal">
+            <h3>免 Key 体验</h3>
+            <div class="prov-chips">
+              <span class="prov">Google 翻译（免 Key）</span>
+            </div>
+          </div>
+          <div class="prov-group reveal">
+            <h3>需 Key 的传统服务</h3>
+            <div class="prov-chips">
+              <span class="prov">DeepL</span>
+              <span class="prov">Microsoft 翻译</span>
+            </div>
+          </div>
+        </div>
+        <p class="prov-note reveal">
+          Google 翻译（免 Key）走的是非官方免费端点，无服务等级保证，偶尔会限流或临时不可用，建议仅用于体验；正式使用请配置支持 API Key 的服务。
+        </p>
+      </div>
+    </section>
+
+    <section class="block" id="configure">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2>如何配置 API Key</h2>
+          <p>三步即可让你的扩展连上所选服务商。密钥只会被发给对应服务商，不会经过任何中转。</p>
+        </div>
+        <div class="steps reveal">
+          <div class="step">
+            <div class="num">1</div>
+            <h3>打开设置</h3>
+            <p>点击工具栏「好翻」图标 → 打开「设置」。</p>
+          </div>
+          <div class="step">
+            <div class="num">2</div>
+            <h3>选择服务商并填 Key</h3>
+            <p>从下拉列表选择服务商（如 DeepSeek、OpenAI），填入你在该平台申请的 API Key，设置目标语言。</p>
+          </div>
+          <div class="step">
+            <div class="num">3</div>
+            <h3>测试连接</h3>
+            <p>点击「测试连接」确认可用，回到网页点「译」按钮即可开始翻译。</p>
+          </div>
+        </div>
+        <p class="prov-note reveal">
+          想先体验？在设置中选择「Google 翻译」即可免 Key 使用。所有 Key 仅存于浏览器本地 <code>storage.local</code>，按服务商隔离。
+        </p>
+        <div class="center-cta reveal">
+          <a class="btn btn-ghost" href="install.html">还不会安装？看安装指南 →</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" style="background:var(--bg-soft);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+      <div class="container">
+        <div class="split reveal reveal--left">
+          <div class="split-text">
+            <h3>你的 Key，只住在你本地</h3>
+            <p>API Key 保存在浏览器本地的 <code>storage.local</code>，按服务商隔离存储。它只会随你发起的翻译请求，发往<strong>对应</strong>的服务商——绝不会经过好翻的任何服务器，我们既看不到，也收不到。</p>
+            <p>想彻底清除？卸载扩展或清除站点数据即可，没有账号、没有残留。</p>
+          </div>
+          <div class="split-media">
+            <div class="win">
+              <div class="win-bar"><span></span><span></span><span></span><span class="win-url">数据只朝下走，不经中转</span></div>
+              <div class="win-body" style="font-size:15px;">
+                <p class="src" style="margin-bottom:6px;">🖥️ 你的浏览器（本地）</p>
+                <p class="src" style="margin:0 0 6px 14px;">· Key 隔离存储</p>
+                <p class="src" style="margin:0 0 6px 14px;">· 译文本地缓存</p>
+                <p class="src">☁️ 直连你选的服务商（不经我们）</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="footer-inner">
+        <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
+        <div class="footer-links">
+          <a href="index.html">首页</a>
+          <a href="features.html">功能特性</a>
+          <a href="install.html">安装指南</a>
+          <a href="faq.html">常见问题</a>
+          <a href="privacy.html">隐私政策</a>
+          <a
+            class="footer-github"
+            href="https://github.com/Lokeily/hao-fan"
+            target="_blank"
+            rel="noopener"
+            aria-label="在 GitHub 上查看好翻"
+          >
+            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
+            GitHub
+          </a>
+          <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载</a>
+        </div>
+      </div>
+    </footer>
+    <button class="to-top" aria-label="回到顶部" title="回到顶部">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
+    <script src="assets/js/main.js" defer></script>
+  </body>
+</html>
