@@ -357,10 +357,7 @@ a:hover {
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px 28px;
-  padding: 26px 24px;
-  background: var(--bg-soft);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  padding: 22px 24px;
 }
 .trust span {
   display: inline-flex;
@@ -1385,10 +1382,7 @@ body.nav-open .nav-toggle span:nth-child(3) {
 /* ---- 双语对照展示区（跟随系统主题，不单独黑场）---- */
 .showcase {
   position: relative;
-  padding: 104px 0;
-  background: var(--bg-soft);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  padding: 100px 0;
   overflow: hidden;
 }
 .showcase::before {
