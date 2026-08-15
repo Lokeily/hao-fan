@@ -444,7 +444,11 @@ export interface SettingsPanelOptions {
   sitePaused: boolean;
   siteHost: string;
   autoTranslate: boolean;
+  hoverTranslate: boolean;
+  inputTranslate: boolean;
   onAutoToggle: (enabled: boolean) => void;
+  onHoverToggle: (enabled: boolean) => void;
+  onInputToggle: (enabled: boolean) => void;
   onTargetLang: (value: string) => void;
   onProvider: (value: string) => void;
   onSiteToggle: (paused: boolean) => void;
@@ -455,7 +459,14 @@ export interface SettingsPanelOptions {
 
 export interface SettingsPanel {
   host: HTMLElement;
-  update: (patch: Partial<Pick<SettingsPanelOptions, 'targetLang' | 'provider' | 'sitePaused'>>) => void;
+  update: (
+    patch: Partial<
+      Pick<
+        SettingsPanelOptions,
+        'targetLang' | 'provider' | 'sitePaused' | 'autoTranslate' | 'hoverTranslate' | 'inputTranslate'
+      >
+    >,
+  ) => void;
 }
 
 export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
@@ -465,14 +476,18 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   host.style.setProperty('all', 'initial', 'important');
   host.style.setProperty('position', 'fixed', 'important');
   host.style.setProperty('z-index', '2147483647', 'important');
-  host.style.setProperty('width', '300px', 'important');
-  host.style.setProperty('border-radius', '14px', 'important');
+  host.style.setProperty('width', '320px', 'important');
+  host.style.setProperty('border-radius', '16px', 'important');
   const theme = themeColors();
   host.style.setProperty('background', theme.surface, 'important');
   host.style.setProperty('color', theme.text, 'important');
   host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
-  host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.28)', 'important');
-  host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
+  host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.3)', 'important');
+  host.style.setProperty(
+    'font-family',
+    '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
+    'important',
+  );
   host.style.setProperty('overflow', 'hidden', 'important');
 
   const shadow = host.attachShadow({ mode: 'open' });
@@ -483,50 +498,99 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     .head {
       display: flex; align-items: center; gap: 8px;
       padding: 12px 14px; cursor: grab;
-      border-bottom: 1px solid rgba(60,60,67,0.14);
+      border-bottom: 1px solid ${theme.border};
       user-select: none;
     }
     .head:active { cursor: grabbing; }
     .title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 0; }
     .close {
       width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px;
-      background: transparent; color: #8e8e93; font-size: 16px; line-height: 1; cursor: pointer;
+      background: transparent; color: ${theme.text2}; font-size: 16px; line-height: 1; cursor: pointer;
     }
-    .close:hover { background: rgba(60,64,67,0.1); color: #1d1d1f; }
-    .body { padding: 4px 14px 12px; }
-    .row { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid rgba(60,60,67,0.12); }
+    .close:hover { background: rgba(128,128,128,0.16); color: ${theme.text}; }
+    .body { padding: 10px 12px 12px; }
+
+    /* iOS inset grouped：分区卡片 */
+    .group {
+      margin-bottom: 10px;
+      border-radius: 12px;
+      background: ${theme.text === '#f5f5f7' ? 'rgba(255,255,255,0.08)' : 'rgba(60,60,67,0.06)'};
+      overflow: hidden;
+    }
+    .group:last-child { margin-bottom: 0; }
+    .group-title {
+      padding: 10px 12px 4px;
+      font-size: 11px; font-weight: 600;
+      color: ${theme.text2}; letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }
+    .row {
+      display: flex; align-items: center; gap: 10px;
+      min-height: 44px; padding: 0 12px;
+      border-bottom: 1px solid ${theme.border};
+    }
     .row:last-child { border-bottom: 0; }
-    .row label { flex: 1; font-size: 13px; color: #3c3c43; }
-    select {
-      width: 130px; min-height: 30px; padding: 4px 8px;
-      border: 1px solid rgba(60,60,67,0.2); border-radius: 8px;
-      background: #f2f2f7; color: #1d1d1f; font-size: 12px; font-family: inherit;
+    .row-label {
+      flex: 1; min-width: 0;
+      font-size: 13px; color: ${theme.text};
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .switch { position: relative; width: 42px; height: 25px; flex: 0 0 42px; }
-    .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .row select {
+      width: 128px; min-height: 32px; padding: 4px 8px;
+      border: 1px solid ${theme.border}; border-radius: 9px;
+      background: ${theme.surface}; color: ${theme.text};
+      font-size: 12px; font-family: inherit;
+      -webkit-appearance: none; appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, ${theme.text2} 50%),
+        linear-gradient(135deg, ${theme.text2} 50%, transparent 50%);
+      background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%;
+      background-size: 5px 5px;
+      background-repeat: no-repeat;
+    }
+    .row select:focus { outline: 2px solid rgba(0,122,255,0.4); outline-offset: 1px; }
+
+    /* iOS 开关：input 覆盖整个开关区域，点击任意位置都能切换 */
+    .switch {
+      position: relative;
+      width: 46px; height: 28px; flex: 0 0 46px;
+    }
+    .switch input {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      margin: 0; padding: 0;
+      opacity: 0; cursor: pointer; z-index: 1;
+    }
     .track {
-      display: flex; width: 100%; height: 100%; padding: 2px;
-      border-radius: 13px; background: #e5e5ea; transition: background 0.2s ease;
+      display: flex; align-items: center;
+      width: 100%; height: 100%; padding: 2px;
+      border-radius: 14px;
+      background: ${theme.text === '#f5f5f7' ? '#3a3a3c' : '#e5e5ea'};
+      transition: background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+      pointer-events: none;
     }
-    .track span { width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.25); transition: transform 0.2s cubic-bezier(0.2,0.8,0.2,1); }
+    .knob {
+      width: 24px; height: 24px; flex: 0 0 24px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
     .switch input:checked + .track { background: #34c759; }
-    .switch input:checked + .track span { transform: translateX(17px); }
+    .switch input:checked + .track .knob { transform: translateX(18px); }
+    .switch input:focus-visible + .track { outline: 3px solid rgba(0,122,255,0.35); outline-offset: 1px; }
+
     .full {
-      display: block; width: 100%; min-height: 34px; margin-top: 10px;
-      border: 0; border-radius: 9px; background: rgba(0,122,255,0.12);
-      color: #007aff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+      display: block; width: 100%; min-height: 36px; margin-top: 2px;
+      border: 0; border-radius: 10px;
+      background: rgba(0, 122, 255, 0.12);
+      color: #007aff; font-size: 13px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: background 0.15s ease;
     }
-    .full:hover { background: rgba(0,122,255,0.2); }
-    .host { color: #8e8e93; font-size: 11px; }
+    .full:hover { background: rgba(0, 122, 255, 0.2); }
     @media (prefers-color-scheme: dark) {
-      .head { border-bottom-color: rgba(84,84,88,0.4); }
-      .row { border-bottom-color: rgba(84,84,88,0.35); }
-      .row label { color: #d1d1d6; }
-      select { border-color: rgba(84,84,88,0.5); background: #2c2c2e; color: #f5f5f7; }
-      .close { color: #8e8e93; }
-      .close:hover { background: rgba(255,255,255,0.1); color: #f5f5f7; }
-      .track { background: #3a3a3c; }
-      .host { color: #8e8e93; }
+      .full { color: #0a84ff; background: rgba(10,132,255,0.2); }
+      .full:hover { background: rgba(10,132,255,0.3); }
     }
   `;
 
@@ -546,9 +610,16 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   const body = document.createElement('div');
   body.className = 'body';
 
+  // 分组：翻译
+  const translateGroup = document.createElement('div');
+  translateGroup.className = 'group';
+  const tTitle = document.createElement('div');
+  tTitle.className = 'group-title';
+  tTitle.textContent = '翻译';
   const langRow = document.createElement('div');
   langRow.className = 'row';
-  const langLabel = document.createElement('label');
+  const langLabel = document.createElement('span');
+  langLabel.className = 'row-label';
   langLabel.textContent = '目标语言';
   const langSel = document.createElement('select');
   langSel.setAttribute('aria-label', '目标语言');
@@ -561,10 +632,10 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   langSel.value = opts.targetLang;
   langSel.addEventListener('change', () => opts.onTargetLang(langSel.value));
   langRow.append(langLabel, langSel);
-
   const provRow = document.createElement('div');
   provRow.className = 'row';
-  const provLabel = document.createElement('label');
+  const provLabel = document.createElement('span');
+  provLabel.className = 'row-label';
   provLabel.textContent = '翻译引擎';
   const provSel = document.createElement('select');
   provSel.setAttribute('aria-label', '翻译引擎');
@@ -577,48 +648,66 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   provSel.value = opts.provider;
   provSel.addEventListener('change', () => opts.onProvider(provSel.value));
   provRow.append(provLabel, provSel);
+  translateGroup.append(tTitle, langRow, provRow);
 
-  const autoRow = document.createElement('div');
-  autoRow.className = 'row';
-  const autoLabel = document.createElement('label');
-  autoLabel.textContent = '自动翻译此站（打开页面即译）';
-  const autoToggle = document.createElement('span');
-  autoToggle.className = 'switch';
-  const autoInput = document.createElement('input');
-  autoInput.type = 'checkbox';
-  autoInput.checked = opts.autoTranslate;
-  const autoTrack = document.createElement('span');
-  autoTrack.className = 'track';
-  autoTrack.appendChild(document.createElement('span'));
-  autoToggle.append(autoInput, autoTrack);
-  autoInput.addEventListener('change', () => opts.onAutoToggle(autoInput.checked));
-  autoRow.append(autoLabel, autoToggle);
+  // 分组：开关（iOS 风格）
+  const makeSwitchRow = (
+    label: string,
+    checked: boolean,
+    onChange: (on: boolean) => void,
+    ariaLabel: string,
+  ): HTMLDivElement => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const rowLabel = document.createElement('span');
+    rowLabel.className = 'row-label';
+    rowLabel.textContent = label;
+    const sw = document.createElement('span');
+    sw.className = 'switch';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = checked;
+    input.setAttribute('aria-label', ariaLabel);
+    const track = document.createElement('span');
+    track.className = 'track';
+    const knob = document.createElement('span');
+    knob.className = 'knob';
+    track.appendChild(knob);
+    sw.append(input, track);
+    input.addEventListener('change', () => onChange(input.checked));
+    row.append(rowLabel, sw);
+    return row;
+  };
 
-  const siteRow = document.createElement('div');
-  siteRow.className = 'row';
-  const siteLabel = document.createElement('label');
-  siteLabel.textContent = `暂停本站翻译（${opts.siteHost}）`;
-  const siteToggle = document.createElement('span');
-  siteToggle.className = 'switch';
-  const siteInput = document.createElement('input');
-  siteInput.type = 'checkbox';
-  siteInput.checked = opts.sitePaused;
-  const track = document.createElement('span');
-  track.className = 'track';
-  const knob = document.createElement('span');
-  track.appendChild(knob);
-  siteToggle.append(siteInput, track);
-  siteInput.addEventListener('change', () => opts.onSiteToggle(siteInput.checked));
-  siteRow.append(siteLabel, siteToggle);
+  const siteGroup = document.createElement('div');
+  siteGroup.className = 'group';
+  const sTitle = document.createElement('div');
+  sTitle.className = 'group-title';
+  sTitle.textContent = '本站';
+  siteGroup.append(
+    sTitle,
+    makeSwitchRow('自动翻译此站', opts.autoTranslate, opts.onAutoToggle, '自动翻译此站'),
+    makeSwitchRow(`暂停本站翻译（${opts.siteHost}）`, opts.sitePaused, opts.onSiteToggle, '暂停本站翻译'),
+  );
+
+  const featureGroup = document.createElement('div');
+  featureGroup.className = 'group';
+  const fTitle = document.createElement('div');
+  fTitle.className = 'group-title';
+  fTitle.textContent = '交互';
+  featureGroup.append(
+    fTitle,
+    makeSwitchRow('悬停翻译', opts.hoverTranslate, opts.onHoverToggle, '悬停翻译'),
+    makeSwitchRow('输入框翻译', opts.inputTranslate, opts.onInputToggle, '输入框翻译'),
+  );
 
   const fullBtn = document.createElement('button');
   fullBtn.type = 'button';
   fullBtn.className = 'full';
-  fullBtn.textContent = '打开完整设置 ⚙';
+  fullBtn.textContent = '打开完整设置';
   fullBtn.addEventListener('click', opts.onOpenFullSettings);
 
-  body.append(langRow, provRow, autoRow, siteRow, fullBtn);
-  // 注意：shadow root 已挂载在 host 上，不能 host.appendChild(shadow)（会清空 shadow）。
+  body.append(translateGroup, siteGroup, featureGroup, fullBtn);
   shadow.append(style, head, body);
   document.documentElement.appendChild(host);
 
@@ -631,14 +720,19 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     if (patch.provider !== undefined && provSel.value !== patch.provider) {
       provSel.value = patch.provider;
     }
-    if (patch.sitePaused !== undefined && siteInput.checked !== patch.sitePaused) {
-      siteInput.checked = patch.sitePaused;
-    }
+    const syncSwitch = (checked: boolean | undefined, ariaLabel: string) => {
+      if (checked === undefined) return;
+      const input = shadow.querySelector(`input[aria-label="${ariaLabel}"]`) as HTMLInputElement | null;
+      if (input && input.checked !== checked) input.checked = checked;
+    };
+    syncSwitch(patch.sitePaused, '暂停本站翻译');
+    syncSwitch(patch.autoTranslate, '自动翻译此站');
+    syncSwitch(patch.hoverTranslate, '悬停翻译');
+    syncSwitch(patch.inputTranslate, '输入框翻译');
   };
 
   return { host, update };
 }
-
 
 // ===== 悬停翻译气泡：鼠标悬停段落时显示译文小浮层 =====
 export function createHoverBubble(

@@ -384,13 +384,19 @@ test('quick settings panel: language and engine changes persist', async ({ page 
 test('full settings panel opens as an in-page panel with the settings form', async ({ page }) => {
   await page.goto('/tests/browser/selection-regression.html');
   await page.locator('#ot-settings-btn').click();
-  await page.locator('#ot-settings-panel').getByRole('button', { name: '打开完整设置 ⚙' }).click();
+  await page.locator('#ot-settings-panel').getByRole('button', { name: '打开完整设置' }).click();
   const full = page.locator('#ot-full-settings');
   await expect(full).toBeVisible();
   // 内联渲染完整设置表单（不再使用 iframe——网页无法嵌入扩展页面会被浏览器拦截）
   await expect(full.locator('.ot-form')).toHaveCount(1);
   await expect(full.locator('h2', { hasText: '模型服务' })).toBeVisible();
   await expect(full.locator('h2', { hasText: '翻译偏好' })).toBeVisible();
+  // 样式已内嵌打包：表单字段带圆角卡片背景（iOS 分组样式生效）
+  const bg = await full
+    .locator('.ot-form-section')
+    .first()
+    .evaluate((el) => getComputedStyle(el).borderRadius);
+  expect(bg).not.toBe('0px');
   // 关闭
   await full.getByRole('button', { name: '关闭完整设置' }).click();
   await expect(full).toBeHidden();
@@ -425,4 +431,41 @@ test('settings panel follows dark color scheme with readable text', async ({ pag
   // 深色系统：面板为不透明深色底（可读，不透明）
   expect(bg).toMatch(/rgb\(2[0-9],\s*2[0-9],\s*3[0-9]\)|rgb\(28,\s*28,\s*30\)/);
   await expect(panel.getByRole('combobox', { name: '目标语言' })).toBeVisible();
+});
+
+test('quick settings switches: apple toggles are clickable and persist', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+
+  // 自动翻译此站：默认关 → 点击开（input 覆盖整个开关区域，可直接点击）
+  const autoInput = panel.getByRole('checkbox', { name: '自动翻译此站' });
+  await expect(autoInput).not.toBeChecked();
+  await autoInput.check({ force: true });
+  await page.waitForTimeout(300);
+  const sites = await page.evaluate(
+    async () => (await (window as any).chrome.storage.local.get('autoSites')).autoSites,
+  );
+  const host = new URL(page.url()).host;
+  expect(sites).toContain(host);
+  await expect(autoInput).toBeChecked();
+
+  // 悬停翻译开关存在且可切换
+  const hoverInput = panel.getByRole('checkbox', { name: '悬停翻译' });
+  await expect(hoverInput).toBeChecked(); // 默认开
+  await hoverInput.uncheck({ force: true });
+  await page.waitForTimeout(300);
+  const cfg = await page.evaluate(
+    async () => (await (window as any).chrome.storage.local.get('config')).config,
+  );
+  expect(cfg.hoverTranslate).toBe(false);
+
+  // 开关视觉为 iOS 风格：绿色轨道 + 右侧圆圈
+  const track = autoInput.locator('xpath=./following-sibling::*[1]');
+  const trackBg = await track.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(trackBg).toMatch(/rgb\(52,\s*199,\s*89/); // #34c759 绿色
+  const knob = track.locator('.knob');
+  const knobTransform = await knob.evaluate((el) => getComputedStyle(el).transform);
+  expect(knobTransform).not.toBe('none'); // 已右移（开启态）
 });

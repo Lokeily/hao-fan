@@ -36,6 +36,8 @@ import { randomId } from '../utils/id.ts';
 import { isSiteDisabled, withSiteDisabled } from '../utils/site-policy.ts';
 import { normalizeConfig } from '../utils/config.ts';
 import { buildConfigForm } from '../utils/ui.ts';
+// 设置页样式直接打包进内容脚本（?raw），完整设置面板无需 fetch 扩展资源。
+import fullSettingsCss from '../styles/options.css?raw';
 import { LANGUAGES } from '../utils/languages.ts';
 import { PROVIDERS } from '../utils/providers.ts';
 import '../styles/content.css';
@@ -1606,33 +1608,13 @@ export default defineContentScript({
       makeDraggable(host, head, () => {});
 
       // 内联渲染完整设置表单（不再使用 iframe——网页无法嵌入扩展页面，会被浏览器拦截）。
-      // 从扩展读取 options.html 解析其 CSS，注入 shadow 后构建表单；CSS 不可用时降级为无样式。
-      void (async () => {
-        try {
-          const htmlUrl = browser.runtime.getURL('/options.html');
-          const htmlText = await (await fetch(htmlUrl)).text();
-          const linkMatch = htmlText.match(/href="([^"]+\.css)"/);
-          if (linkMatch) {
-            let cssUrl = linkMatch[1];
-            if (!/^(chrome-extension|moz-extension|https?:)\/\//.test(cssUrl)) {
-              cssUrl = new URL(
-                cssUrl.replace(/^\//, ''),
-                browser.runtime.getURL('/options.html'),
-              ).href;
-            }
-            const cssText = await (await fetch(cssUrl)).text();
-            const sheet = document.createElement('style');
-            // 作用域适配：:root → :host；body → .ot-full-settings-body
-            sheet.textContent = cssText
-              .replace(/:root/g, ':host')
-              .replace(/\bbody\b/g, '.ot-full-settings-body');
-            shadow.prepend(sheet);
-          }
-        } catch {
-          /* CSS 不可用时表单仍可用，仅无样式 */
-        }
-        buildConfigForm(mount, false);
-      })();
+      // 样式直接来自打包进内容脚本的 options.css（?raw），不依赖网络与 web_accessible_resources。
+      const sheet = document.createElement('style');
+      sheet.textContent = fullSettingsCss
+        .replace(/:root/g, ':host')
+        .replace(/\bbody\b/g, '.ot-full-settings-body');
+      shadow.prepend(sheet);
+      buildConfigForm(mount, false);
     }
 
     async function openSettingsPanel(anchorX: number, anchorY: number) {
@@ -1645,6 +1627,8 @@ export default defineContentScript({
         ]);
         const paused = isSiteDisabled(disabledSites, location.href);
         const autoOn = isSiteDisabled(autoSites, location.href);
+        const hoverOn = cfg.hoverTranslate !== false;
+        const inputOn = cfg.inputTranslate !== false;
         let panelX = anchorX;
         let panelY = anchorY;
         try {
@@ -1664,10 +1648,24 @@ export default defineContentScript({
           sitePaused: paused,
           siteHost: location.host,
           autoTranslate: autoOn,
+          hoverTranslate: hoverOn,
+          inputTranslate: inputOn,
           onAutoToggle: (enabled) => {
             void (async () => {
               const sites = await autoSitesItem.getValue();
               await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+            })();
+          },
+          onHoverToggle: (enabled) => {
+            void (async () => {
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({ ...current, hoverTranslate: enabled });
+            })();
+          },
+          onInputToggle: (enabled) => {
+            void (async () => {
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({ ...current, inputTranslate: enabled });
             })();
           },
           onTargetLang: (value) => {
@@ -1708,16 +1706,23 @@ export default defineContentScript({
             void settingsPanelPosItem.setValue({ x, y }).catch(() => {});
           },
         });
-        const maxX = window.innerWidth - 308;
-        const maxY = window.innerHeight - 320;
+        // 默认定位在齿轮上方（工具栏常驻右下角，放下方会超出视口）；
+        // 上方放不下再放下方，最后按面板实际尺寸夹取在视口内。
+        const panelW = settingsPanel.host.offsetWidth || 320;
+        const panelH = settingsPanel.host.offsetHeight || 400;
+        if (panelY + panelH > window.innerHeight - 8 && anchorY - panelH - 8 >= 8) {
+          panelY = anchorY - panelH - 8;
+        }
+        const maxX = Math.max(8, window.innerWidth - panelW - 8);
+        const maxY = Math.max(8, window.innerHeight - panelH - 8);
         settingsPanel.host.style.setProperty(
           'left',
-          `${Math.min(Math.max(8, panelX), Math.max(8, maxX))}px`,
+          `${Math.min(Math.max(8, panelX), maxX)}px`,
           'important',
         );
         settingsPanel.host.style.setProperty(
           'top',
-          `${Math.min(Math.max(8, panelY), Math.max(8, maxY))}px`,
+          `${Math.min(Math.max(8, panelY), maxY)}px`,
           'important',
         );
       } catch {
