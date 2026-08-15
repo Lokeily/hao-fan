@@ -1,5 +1,11 @@
 # 更新日志（Changelog）
 
+## v0.1.20 (2026-08-15)
+
+- 优化：下拉完整显示——超长引擎名缩短（OpenRouter（Claude / GPT / Gemini …）→
+  OpenRouter 等），快速面板引擎下拉加宽至 170px；所有引擎/模型/语言下拉
+  增加悬停 title 提示当前完整值，不再截断。
+
 ## v0.1.19 (2026-08-15)
 
 - 修复（重大）：完整设置面板点击即关闭——遮罩 pointerdown 用 e.target === host

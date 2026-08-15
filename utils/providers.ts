@@ -42,7 +42,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: 'openrouter',
-    name: 'OpenRouter（Claude / GPT / Gemini …）',
+    name: 'OpenRouter',
     type: 'llm',
     baseUrl: 'https://openrouter.ai/api/v1',
     models: [
@@ -111,7 +111,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: 'kimi',
-    name: 'Kimi（月之暗面）',
+    name: 'Kimi',
     type: 'llm',
     baseUrl: 'https://api.moonshot.cn/v1',
     models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
@@ -133,7 +133,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: 'doubao',
-    name: '豆包（火山方舟）',
+    name: '豆包',
     type: 'llm',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     models: ['doubao-lite-32k', 'doubao-pro-32k', 'doubao-vision-pro'],
@@ -157,7 +157,7 @@ export const PROVIDERS: Provider[] = [
   // ===== 全球顶尖传统翻译引擎 =====
   {
     id: 'google',
-    name: 'Google 翻译（免费）',
+    name: 'Google 翻译',
     type: 'mt',
     baseUrl: 'https://translate.googleapis.com',
     models: [],

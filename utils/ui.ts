@@ -270,6 +270,14 @@ export function buildConfigForm(
     o.value = p.id;
     o.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
     providerSel.appendChild(o);
+  });
+  const refreshSelectTitles = () => {
+    providerSel.title = providerSel.options[providerSel.selectedIndex]?.textContent || '';
+    modelSel.title = modelSel.options[modelSel.selectedIndex]?.textContent || modelSel.value;
+    sourceSel.title = sourceSel.value;
+    targetSel.title = targetSel.value;
+  };
+  PROVIDERS.forEach((p) => {
     if (p.id !== 'google') {
       const so = document.createElement('option');
       so.value = p.id;
@@ -371,6 +379,7 @@ export function buildConfigForm(
     setIfDiff(inputTranslateChk, cfg.inputTranslate !== false);
     setIfDiff(translationStyleSel, cfg.translationStyle || 'plain');
     syncCheckState();
+    refreshSelectTitles();
   }
 
   function save(): Promise<boolean> {
@@ -430,6 +439,7 @@ export function buildConfigForm(
   providerSel.addEventListener('change', () => {
     cfg = withProviderApiKey(cfg, keyInput.value);
     cfg.provider = providerSel.value;
+    refreshSelectTitles();
     fillModels(cfg.provider);
     const p = PROVIDERS.find((x) => x.id === cfg.provider);
     cfg.model = p?.defaultModel || '';
@@ -474,7 +484,12 @@ export function buildConfigForm(
     hoverTranslateChk,
     inputTranslateChk,
     translationStyleSel,
-  ].forEach((el) => el.addEventListener('change', save));
+  ].forEach((el) =>
+    el.addEventListener('change', () => {
+      save();
+      refreshSelectTitles();
+    }),
+  );
 
   // checkbox 勾选样式同步（:has 兼容替代）
   [cacheChk, glossaryChk, customVisionChk, streamingChk, contextChk, qualityChk, autoLearnChk,

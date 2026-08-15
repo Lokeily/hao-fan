@@ -536,7 +536,7 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .row select {
-      width: 128px; min-height: 32px; padding: 4px 8px;
+      width: 170px; min-height: 32px; padding: 4px 8px;
       border: 1px solid ${theme.border}; border-radius: 9px;
       background: ${theme.surface}; color: ${theme.text};
       font-size: 12px; font-family: inherit;
@@ -630,7 +630,11 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     langSel.appendChild(o);
   });
   langSel.value = opts.targetLang;
-  langSel.addEventListener('change', () => opts.onTargetLang(langSel.value));
+  langSel.title = langSel.value;
+  langSel.addEventListener('change', () => {
+    langSel.title = langSel.value;
+    opts.onTargetLang(langSel.value);
+  });
   langRow.append(langLabel, langSel);
   const provRow = document.createElement('div');
   provRow.className = 'row';
@@ -646,7 +650,14 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     provSel.appendChild(o);
   });
   provSel.value = opts.provider;
-  provSel.addEventListener('change', () => opts.onProvider(provSel.value));
+  const provTitle = () => {
+    provSel.title = provSel.options[provSel.selectedIndex]?.textContent || provSel.value;
+  };
+  provTitle();
+  provSel.addEventListener('change', () => {
+    provTitle();
+    opts.onProvider(provSel.value);
+  });
   provRow.append(provLabel, provSel);
   translateGroup.append(tTitle, langRow, provRow);
 
