@@ -512,3 +512,37 @@ test('full settings modal: centered overlay with blur and sync with quick panel'
     .getByRole('checkbox', { name: '自动翻译此站' });
   await expect(quickAuto2).not.toBeChecked(); // 大面板 → 小面板一致
 });
+
+test('stability: rapid translate/cancel/pause/resume cycles never hang', async ({ page }) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  // 模拟较慢的模型响应，让加载态可被观察
+  await page.locator('html').evaluate((el) => {
+    el.dataset.batchDelays = JSON.stringify([500, 1500, 500, 1500, 500, 1500]);
+  });
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+
+  // 三轮：翻译开始（加载态）→ 取消 → 再翻译 → 完成
+  for (let round = 0; round < 3; round++) {
+    await toolbar.click();
+    await expect(toolbar).toHaveAttribute('aria-busy', 'true');
+    await toolbar.click(); // 取消
+    await expect(toolbar).toHaveAttribute('aria-busy', 'false');
+  }
+
+  // 暂停本站 → 工具栏消失且无残留译文
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({ disabledSites: [location.host] });
+  });
+  await expect(toolbar).toBeHidden({ timeout: 8000 });
+  await expect(page.locator('.ot-translation')).toHaveCount(0);
+
+  // 恢复本站 → 工具栏回来，翻译仍可用
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({ disabledSites: [] });
+  });
+  await expect(toolbar).toBeVisible({ timeout: 8000 });
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+});

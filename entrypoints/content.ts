@@ -159,11 +159,14 @@ export default defineContentScript({
           (el as HTMLElement).dataset.style = currentTranslationStyle;
         });
       });
-      void configItem.getValue().then((v) => {
-        if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
-        hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
-        inputTranslateEnabled = v ? v.inputTranslate !== false : true;
-      });
+      void configItem
+        .getValue()
+        .then((v) => {
+          if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+          hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
+          inputTranslateEnabled = v ? v.inputTranslate !== false : true;
+        })
+        .catch(() => {});
       // 双向同步：设置变化时刷新已打开的大面板与快速设置面板，保证两边状态一致。
       // 回调内任何异常都不允许影响内容脚本主流程。
       const safeWatch = (item: { watch?: (cb: (v: any) => void) => void }, cb: (v: any) => void) => {
