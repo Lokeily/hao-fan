@@ -469,3 +469,46 @@ test('quick settings switches: apple toggles are clickable and persist', async (
   const knobTransform = await knob.evaluate((el) => getComputedStyle(el).transform);
   expect(knobTransform).not.toBe('none'); // 已右移（开启态）
 });
+
+test('full settings modal: centered overlay with blur and sync with quick panel', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 小面板先开启自动翻译（mock 预置 autoSites=[] → 初始关）
+  await page.locator('#ot-settings-btn').click();
+  const quickAuto = page
+    .locator('#ot-settings-panel')
+    .getByRole('checkbox', { name: '自动翻译此站' });
+  await expect(quickAuto).not.toBeChecked();
+  await quickAuto.check({ force: true });
+  await page.waitForTimeout(300);
+
+  // 打开大面板（小面板自动关闭）→ 本站开关读取到最新状态
+  await page.locator('#ot-settings-panel').getByRole('button', { name: '打开完整设置' }).click();
+  const full = page.locator('#ot-full-settings');
+  await expect(full).toBeVisible();
+  // 居中遮罩：全屏 fixed + 半透明背景（模糊遮罩）
+  const pos = await full.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { position: cs.position, inset: cs.inset, bg: cs.backgroundColor };
+  });
+  expect(pos.position).toBe('fixed');
+  expect(pos.inset).toBe('0px');
+  expect(pos.bg).toMatch(/rgba\(0,\s*0,\s*0/); // 半透明遮罩
+
+  await expect(full.locator('h2', { hasText: '本站' })).toBeVisible();
+  const autoFull = full.locator('input[data-site-ctx="auto"]');
+  await expect(autoFull).toBeChecked(); // 小面板 → 大面板一致
+
+  // 大面板关闭自动翻译 → 重新打开小面板 → 状态一致
+  // 合成点击（避免 Playwright 等待可能的导航信号；change 事件照常触发）
+  await autoFull.evaluate((el) => (el as HTMLInputElement).click());
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
+  await expect(full).toBeHidden();
+  await page.locator('#ot-settings-btn').click();
+  const quickAuto2 = page
+    .locator('#ot-settings-panel')
+    .getByRole('checkbox', { name: '自动翻译此站' });
+  await expect(quickAuto2).not.toBeChecked(); // 大面板 → 小面板一致
+});

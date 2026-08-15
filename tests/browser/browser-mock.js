@@ -27,6 +27,8 @@
   // 跨刷新仍能验证；每个测试用例独立 context，天然隔离。
   const memCache = {
     disabledSites: disabledFromQuery ? [location.host] : [],
+    // 测试环境默认不自动翻译（生产默认全开）；auto-translate 用例自行设置
+    autoSites: [],
   };
   const memRead = (key) => {
     try {

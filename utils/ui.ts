@@ -5,7 +5,28 @@ import { browser } from 'wxt/browser';
 import { getProviderApiKey, normalizeConfig, withProviderApiKey, type AppConfig } from './config.ts';
 
 // Options 页与 Popup 共用的配置表单。compact=true 时不显示提示文案（给 popup 用）。
-export function buildConfigForm(mount: HTMLElement, compact: boolean) {
+// siteCtx：页面内完整设置面板的站点级偏好（自动翻译/暂停本站），
+// 由调用方提供初始状态与写入回调，并可通过返回的 API 外部同步。
+export interface SettingsSiteCtx {
+  host: string;
+  autoTranslate: boolean;
+  paused: boolean;
+  onAuto: (enabled: boolean) => void;
+  onPause: (paused: boolean) => void;
+}
+
+export interface ConfigFormApi {
+  /** 从存储重新填充表单（值相同则不动控件，避免打断输入） */
+  update: () => void;
+  /** 外部同步站点开关状态（可只传其一） */
+  updateSiteState: (auto?: boolean, paused?: boolean) => void;
+}
+
+export function buildConfigForm(
+  mount: HTMLElement,
+  compact: boolean,
+  siteCtx?: SettingsSiteCtx,
+): ConfigFormApi {
   let cfg: AppConfig = normalizeConfig(configItem.defaultValue);
 
   const advancedFields = `
@@ -75,6 +96,24 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
           </label>
         </div>
       </section>
+
+      ${
+        siteCtx
+          ? `<section class="ot-form-section">
+        <h2>本站</h2>
+        <div class="ot-switches">
+          <label class="ot-check" id="ot-full-auto">
+            <input type="checkbox" data-site-ctx="auto" ${siteCtx.autoTranslate ? 'checked' : ''} />
+            <span><strong>自动翻译此站</strong><small>打开 ${siteCtx.host} 的页面时自动开始翻译</small></span>
+          </label>
+          <label class="ot-check" id="ot-full-pause">
+            <input type="checkbox" data-site-ctx="pause" ${siteCtx.paused ? 'checked' : ''} />
+            <span><strong>暂停本站翻译</strong><small>立即停止翻译并清理译文</small></span>
+          </label>
+        </div>
+      </section>`
+          : ''
+      }
 
       <section class="ot-form-section">
         <h2>节省 Token</h2>
@@ -289,7 +328,6 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   function fill() {
     providerSel.value = cfg.provider;
     fillModels(cfg.provider);
-    // 回填模型：若当前 model 在下拉里则选下拉，否则填入文本框
     const hasModels = !modelSel.hidden;
     const inSelect = hasModels && Array.from(modelSel.options).some((o) => o.value === cfg.model);
     if (inSelect) {
@@ -302,29 +340,36 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
       }
       modelText.value = cfg.model;
     }
-    baseInput.value = cfg.baseUrl;
-    keyInput.value = getProviderApiKey(cfg);
-    sourceSel.value = cfg.sourceLang;
-    targetSel.value = cfg.targetLang;
-    toneSel.value = cfg.tone || '自然流畅';
-    promptInput.value = cfg.systemPrompt;
-    cacheChk.checked = cfg.cacheEnabled;
-    glossaryChk.checked = cfg.glossaryEnabled !== false;
-    glossaryInput.value = cfg.customGlossary || '';
-    customVisionChk.checked = cfg.customVision === true;
-    streamingChk.checked = cfg.streaming !== false;
-    contextChk.checked = cfg.contextAware !== false;
-    qualityChk.checked = cfg.qualityCheck !== false;
-    autoLearnChk.checked = cfg.autoLearnTerms !== false;
-    sentenceChk.checked = cfg.sentenceCache !== false;
-    glossaryTermLimitSel.value = String(cfg.glossaryTermLimit ?? 12);
-    hoverTranslateChk.checked = cfg.hoverTranslate !== false;
-    inputTranslateChk.checked = cfg.inputTranslate !== false;
-    translationStyleSel.value = cfg.translationStyle || 'plain';
-    fallbackInput.value = (cfg.fallbackProviders || []).join(', ');
-    strongProviderSel.value = cfg.strongProvider || '';
-    strongModelInput.value = cfg.strongModel || '';
-    strongThresholdInput.value = String(cfg.strongThreshold || 1200);
+    // 值相同则不写回，避免外部同步打断正在输入的控件
+    const setIfDiff = (
+      el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+      value: string | boolean,
+    ) => {
+      if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+        if (el.checked !== Boolean(value)) el.checked = Boolean(value);
+      } else if (String(el.value) !== String(value)) {
+        el.value = String(value);
+      }
+    };
+    setIfDiff(baseInput, cfg.baseUrl);
+    setIfDiff(keyInput, getProviderApiKey(cfg));
+    setIfDiff(sourceSel, cfg.sourceLang);
+    setIfDiff(targetSel, cfg.targetLang);
+    setIfDiff(toneSel, cfg.tone || '自然流畅');
+    setIfDiff(promptInput, cfg.systemPrompt);
+    setIfDiff(cacheChk, cfg.cacheEnabled);
+    setIfDiff(glossaryChk, cfg.glossaryEnabled !== false);
+    setIfDiff(glossaryInput, cfg.customGlossary || '');
+    setIfDiff(customVisionChk, cfg.customVision === true);
+    setIfDiff(streamingChk, cfg.streaming !== false);
+    setIfDiff(contextChk, cfg.contextAware !== false);
+    setIfDiff(qualityChk, cfg.qualityCheck !== false);
+    setIfDiff(autoLearnChk, cfg.autoLearnTerms !== false);
+    setIfDiff(sentenceChk, cfg.sentenceCache !== false);
+    setIfDiff(glossaryTermLimitSel, String(cfg.glossaryTermLimit ?? 12));
+    setIfDiff(hoverTranslateChk, cfg.hoverTranslate !== false);
+    setIfDiff(inputTranslateChk, cfg.inputTranslate !== false);
+    setIfDiff(translationStyleSel, cfg.translationStyle || 'plain');
     syncCheckState();
   }
 
@@ -489,6 +534,14 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     mount.insertAdjacentElement('beforebegin', hint);
   }
 
+  // 站点偏好开关（页面内完整设置面板专用）
+  const autoSiteInput = mount.querySelector('[data-site-ctx="auto"]') as HTMLInputElement | null;
+  const pauseSiteInput = mount.querySelector('[data-site-ctx="pause"]') as HTMLInputElement | null;
+  if (siteCtx && autoSiteInput && pauseSiteInput) {
+    autoSiteInput.addEventListener('change', () => siteCtx.onAuto(autoSiteInput.checked));
+    pauseSiteInput.addEventListener('change', () => siteCtx.onPause(pauseSiteInput.checked));
+  }
+
   fill();
   setFormLoading(true);
   void configItem
@@ -499,4 +552,13 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     })
     .catch(() => setStatus('读取设置失败，当前显示默认配置', true))
     .finally(() => setFormLoading(false));
+
+  return {
+    update: fill,
+    updateSiteState: (auto, paused) => {
+      if (auto !== undefined && autoSiteInput) autoSiteInput.checked = auto;
+      if (paused !== undefined && pauseSiteInput) pauseSiteInput.checked = paused;
+      syncCheckState();
+    },
+  };
 }

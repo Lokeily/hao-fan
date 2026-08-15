@@ -119,7 +119,9 @@ export default defineContentScript({
         // 自动翻译此站：站点在自动翻译列表且未被暂停时，页面加载后自动开始翻译。
         try {
           const autoSites = await autoSitesItem.getValue();
-          if (isSiteDisabled(autoSites, location.href)) {
+          // null（未配置）= 默认自动翻译此站；配置过则按列表判断
+          const autoEnabled = autoSites === null || isSiteDisabled(autoSites, location.href);
+          if (autoEnabled) {
             await new Promise<void>((resolve) => {
               if (sitePolicyLoaded) {
                 resolve();
@@ -161,6 +163,30 @@ export default defineContentScript({
         if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
         hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
         inputTranslateEnabled = v ? v.inputTranslate !== false : true;
+      });
+      // 双向同步：设置变化时刷新已打开的大面板与快速设置面板，保证两边状态一致。
+      void configItem.watch?.((v) => {
+        if (v) {
+          hoverTranslateEnabled = v.hoverTranslate !== false;
+          inputTranslateEnabled = v.inputTranslate !== false;
+          fullSettingsFormApi?.update();
+          settingsPanel?.update({
+            targetLang: v.targetLang,
+            provider: v.provider,
+            hoverTranslate: v.hoverTranslate !== false,
+            inputTranslate: v.inputTranslate !== false,
+          });
+        }
+      });
+      void disabledSitesItem.watch?.((sites) => {
+        const paused = isSiteDisabled(sites, location.href);
+        settingsPanel?.update({ sitePaused: paused });
+        fullSettingsFormApi?.updateSiteState(undefined, paused);
+      });
+      void autoSitesItem.watch?.((sites) => {
+        const autoOn = sites === null || isSiteDisabled(sites, location.href);
+        settingsPanel?.update({ autoTranslate: autoOn });
+        fullSettingsFormApi?.updateSiteState(autoOn, undefined);
       });
     } catch {
       /* 极少数页面中 storage 监听不可用时，仅保留当前页面会话缓存。 */
@@ -1525,65 +1551,85 @@ export default defineContentScript({
       settingsPanel = null;
     }
 
-    // ===== 页面内完整设置大面板：iframe 加载扩展设置页，右上角全部设置都在这里 =====
+    // ===== 页面内完整设置大面板（网页中央弹窗） =====
     let fullSettingsHost: HTMLElement | null = null;
+    let fullSettingsFormApi: ReturnType<typeof buildConfigForm> | null = null;
 
     function closeFullSettings() {
       fullSettingsHost?.remove();
       fullSettingsHost = null;
+      fullSettingsFormApi = null;
     }
 
     function openFullSettingsPanel() {
       closeSettingsPanel();
       closeFullSettings();
       const theme = themeColors();
+      const dark = theme.text === '#f5f5f7';
+      // 遮罩层：全屏半透明 + 背景模糊，点击空白处关闭
       const host = document.createElement('div');
       host.id = 'ot-full-settings';
       host.dataset.haofanUi = 'true';
       host.style.setProperty('all', 'initial', 'important');
       host.style.setProperty('position', 'fixed', 'important');
-      host.style.setProperty('z-index', '2147483647', 'important');
-      host.style.setProperty('width', 'min(600px, calc(100vw - 32px))', 'important');
-      host.style.setProperty('height', 'min(720px, calc(100vh - 32px))', 'important');
-      host.style.setProperty('left', 'max(16px, calc(100vw - 632px))', 'important');
-      host.style.setProperty('top', '16px', 'important');
-      host.style.setProperty('border-radius', '16px', 'important');
-      host.style.setProperty('background', theme.surface, 'important');
-      host.style.setProperty('color', theme.text, 'important');
-      host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
-      host.style.setProperty('box-shadow', '0 24px 64px rgba(0,0,0,0.32)', 'important');
-      host.style.setProperty('overflow', 'hidden', 'important');
-      host.style.setProperty(
-        'font-family',
-        '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
-        'important',
-      );
+      host.style.setProperty('inset', '0', 'important');
+      host.style.setProperty('z-index', '2147483646', 'important');
+      host.style.setProperty('background', dark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.4)', 'important');
+      host.style.setProperty('backdrop-filter', 'blur(6px) saturate(120%)', 'important');
+      host.style.setProperty('-webkit-backdrop-filter', 'blur(6px) saturate(120%)', 'important');
+      host.style.setProperty('display', 'flex', 'important');
+      host.style.setProperty('align-items', 'center', 'important');
+      host.style.setProperty('justify-content', 'center', 'important');
+      host.style.setProperty('animation', 'ot-modal-fade 0.18s ease', 'important');
 
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
       style.textContent = `
         :host { color-scheme: light dark; }
         * { box-sizing: border-box; }
+        @keyframes ot-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ot-modal-pop {
+          from { opacity: 0; transform: scale(0.96) translateY(10px); }
+          to { opacity: 1; transform: none; }
+        }
+        .modal {
+          display: flex; flex-direction: column;
+          width: min(640px, calc(100vw - 40px));
+          height: min(76vh, 720px);
+          border-radius: 18px;
+          background: ${theme.surface};
+          color: ${theme.text};
+          border: 1px solid ${theme.border};
+          box-shadow: 0 32px 80px rgba(0,0,0,0.35);
+          overflow: hidden;
+          animation: ot-modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
         .head {
           display: flex; align-items: center; gap: 8px;
-          padding: 10px 14px;
+          padding: 12px 16px;
           border-bottom: 1px solid ${theme.border};
-          cursor: grab; user-select: none;
+          user-select: none;
         }
-        .title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 0; }
+        .title { flex: 1; font-size: 15px; font-weight: 700; letter-spacing: 0; }
         .close {
-          width: 28px; height: 28px; padding: 0;
-          border: 0; border-radius: 8px;
+          width: 30px; height: 30px; padding: 0;
+          border: 0; border-radius: 9px;
           background: transparent; color: ${theme.text2};
-          font-size: 18px; line-height: 1; cursor: pointer;
+          font-size: 20px; line-height: 1; cursor: pointer;
         }
-        .close:hover { background: rgba(128,128,128,0.18); }
+        .close:hover { background: rgba(128,128,128,0.18); color: ${theme.text}; }
         .ot-full-settings-body {
-          height: calc(100% - 43px);
+          flex: 1; min-height: 0;
           overflow-y: auto;
           overscroll-behavior: contain;
-          padding: 8px 16px 32px;
+          padding: 4px 20px 36px;
         }
+        .foot {
+          display: flex; align-items: center; justify-content: center; gap: 12px;
+          padding: 10px 16px;
+          border-top: 1px solid ${theme.border};
+        }
+        .foot-hint { color: ${theme.text2}; font-size: 11px; }
       `;
       const head = document.createElement('div');
       head.className = 'head';
@@ -1602,19 +1648,64 @@ export default defineContentScript({
       body.className = 'ot-full-settings-body';
       const mount = document.createElement('div');
       body.appendChild(mount);
-      shadow.append(style, head, body);
+      const foot = document.createElement('div');
+      foot.className = 'foot';
+      const hint = document.createElement('span');
+      hint.className = 'foot-hint';
+      hint.textContent = '设置自动保存 · 快捷键 Alt+T 翻译当前网页';
+      foot.appendChild(hint);
+      shadow.append(style, head, body, foot);
       document.documentElement.appendChild(host);
       fullSettingsHost = host;
-      makeDraggable(host, head, () => {});
 
-      // 内联渲染完整设置表单（不再使用 iframe——网页无法嵌入扩展页面，会被浏览器拦截）。
-      // 样式直接来自打包进内容脚本的 options.css（?raw），不依赖网络与 web_accessible_resources。
+      // 点击遮罩空白处关闭；Esc 关闭
+      host.addEventListener('pointerdown', (e) => {
+        if (e.target === host) closeFullSettings();
+      });
+      const escHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') closeFullSettings();
+      };
+      document.addEventListener('keydown', escHandler, true);
+      host.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeFullSettings();
+      });
+      window.addEventListener(
+        'pointerup',
+        () => {},
+        { once: true },
+      );
+
+      // 样式直接来自打包进内容脚本的 options.css（?raw），不依赖网络。
       const sheet = document.createElement('style');
       sheet.textContent = fullSettingsCss
         .replace(/:root/g, ':host')
         .replace(/\bbody\b/g, '.ot-full-settings-body');
       shadow.prepend(sheet);
-      buildConfigForm(mount, false);
+
+      // 站点偏好初始状态
+      void (async () => {
+        const [disabledSites, autoSites] = await Promise.all([
+          disabledSitesItem.getValue(),
+          autoSitesItem.getValue(),
+        ]);
+        fullSettingsFormApi = buildConfigForm(mount, false, {
+          host: location.host,
+          autoTranslate: isSiteDisabled(autoSites, location.href),
+          paused: isSiteDisabled(disabledSites, location.href),
+          onAuto: (enabled) => {
+            void (async () => {
+              const sites = await autoSitesItem.getValue();
+              await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+            })();
+          },
+          onPause: (paused) => {
+            void (async () => {
+              const sites = await disabledSitesItem.getValue();
+              await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
+            })();
+          },
+        });
+      })();
     }
 
     async function openSettingsPanel(anchorX: number, anchorY: number) {
@@ -1626,7 +1717,7 @@ export default defineContentScript({
           autoSitesItem.getValue(),
         ]);
         const paused = isSiteDisabled(disabledSites, location.href);
-        const autoOn = isSiteDisabled(autoSites, location.href);
+        const autoOn = autoSites === null || isSiteDisabled(autoSites, location.href);
         const hoverOn = cfg.hoverTranslate !== false;
         const inputOn = cfg.inputTranslate !== false;
         let panelX = anchorX;
