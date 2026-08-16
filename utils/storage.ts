@@ -15,3 +15,9 @@ export const usageItem = storage.defineItem<UsageTotals>('local:usageStats', {
 export const disabledSitesItem = storage.defineItem<string[]>('local:disabledSites', {
   defaultValue: [],
 });
+
+// 悬浮工具栏的拖拽位置（右下角像素偏移），null 表示使用默认右下角。
+export const toolbarPosItem = storage.defineItem<{ right: number; bottom: number } | null>(
+  'local:toolbarPos',
+  { defaultValue: null },
+);

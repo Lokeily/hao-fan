@@ -1,13 +1,26 @@
 // 内容脚本的纯 UI 构建辅助（从 entrypoints/content.ts 拆分）。
 // 只负责「用原生 DOM 构造隔离良好的界面元素」，不持有页面翻译状态，
 // 因此可独立维护与测试。
+import { textOfBlock } from './dom.ts';
+
+export interface TranslationNodeOptions {
+  // 译文可直接编辑（hover 即改），修改后回调 source/edited 供术语自学习。
+  editable?: boolean;
+  onEdit?: (source: string, edited: string) => void;
+  // 质量自检标记：'fidelity-corrected' 表示经保真校验并自动校正。
+  note?: string;
+}
 
 // ===== 译文嵌入节点 =====
 // 直接在原文文字下方插入译文节点，形成原文与译文的对照显示，嵌入文档流
 // 随页面滚动/缩放自然跟随，不产生叠加层遮挡。
 // 用 <span> + display:block（而非 <div>）渲染，避免 <div> 被塞进 <p>/<li>/<a>
 // 等不可含块级元素的容器时浏览器自动闭合父节点，导致译文错位/堆叠。
-export function createTranslationNode(translation: string, anchor: Element): HTMLSpanElement {
+export function createTranslationNode(
+  translation: string,
+  anchor: Element,
+  options: TranslationNodeOptions = {},
+): HTMLSpanElement {
   const host = document.createElement('span');
   host.className = 'ot-translation';
   host.dataset.haofanTranslation = 'true';
@@ -56,11 +69,72 @@ export function createTranslationNode(translation: string, anchor: Element): HTM
       overflow-wrap: anywhere;
       white-space: normal;
     }
+    .text[contenteditable="true"] {
+      cursor: text;
+      border-radius: 4px;
+      outline: none;
+      transition: background 0.12s ease, box-shadow 0.12s ease;
+    }
+    .text[contenteditable="true"]:hover {
+      background: rgba(26, 115, 232, 0.10);
+      box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.35);
+    }
+    .text[contenteditable="true"]:focus {
+      background: rgba(26, 115, 232, 0.16);
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.55);
+      opacity: 1;
+    }
+    .fidelity-flag {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 0 5px;
+      border-radius: 4px;
+      background: rgba(124, 179, 66, 0.18);
+      color: #2e7d32;
+      font-size: 11px;
+      line-height: 1.6;
+      vertical-align: middle;
+      cursor: help;
+    }
+    @media (prefers-color-scheme: dark) {
+      .fidelity-flag { background: rgba(124, 179, 66, 0.28); color: #a5d6a7; }
+    }
   `;
   const text = document.createElement('span');
   text.className = 'text';
   text.textContent = translation;
+  text.dataset.base = translation;
   shadow.append(style, text);
+  if (options.note === 'fidelity-corrected') {
+    const flag = document.createElement('span');
+    flag.className = 'fidelity-flag';
+    flag.textContent = '⚑ 已校正';
+    flag.title = '译文已通过保真校验并自动校正（数字 / 链接 / 代码符号已保留）';
+    shadow.appendChild(flag);
+  }
+  if (options.editable) {
+    const sourceText = textOfBlock(anchor);
+    text.setAttribute('contenteditable', 'true');
+    text.setAttribute('role', 'textbox');
+    text.setAttribute('aria-label', '译文（可直接编辑，修改将被记住）');
+    text.setAttribute('spellcheck', 'false');
+    host.classList.add('ot-editable');
+    text.addEventListener('blur', () => {
+      const base = text.dataset.base ?? translation;
+      const edited = text.textContent ?? '';
+      // 仅在相对「基线译文」确有改动时才记术语；流式渲染过程中程序写入不算手动编辑。
+      if (edited.trim() && edited.trim() !== base.trim()) {
+        options.onEdit?.(sourceText, edited.trim());
+      }
+    });
+    // 阻止编辑时触发页面自身的快捷键（如 Ctrl/Cmd+Z 影响正文）。
+    text.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        text.textContent = text.dataset.base ?? translation;
+        (text as HTMLElement).blur();
+      }
+    });
+  }
   return host;
 }
 

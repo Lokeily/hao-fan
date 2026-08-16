@@ -23,6 +23,25 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
       <label class="ot-field ot-field-wide">我的术语表 <span>每行：源词=译文</span>
         <textarea data-f="customGlossary" rows="3" placeholder="GitHub=GitHub\nrepository=代码仓库\nissue=工单"></textarea>
       </label>
+      <label class="ot-check ot-field-wide" data-fallback-toggle>
+        <input data-f="fallbackEnabled" type="checkbox" />
+        <span><strong>备用引擎（故障转移）</strong><small>主引擎密钥 / 端点 / 模型不可用时自动切换</small></span>
+      </label>
+      <label class="ot-field">备用引擎
+        <select data-f="fallbackProvider"></select>
+      </label>
+      <label class="ot-field ot-field-wide">备用 API Key
+        <input data-f="fallbackApiKey" type="password" autocomplete="new-password" placeholder="留空则沿用主引擎同服务商 Key" />
+      </label>
+      <label class="ot-field ot-field-wide">备用 Base URL
+        <input data-f="fallbackBaseUrl" type="url" inputmode="url" placeholder="留空则用该引擎默认端点" />
+      </label>
+      <label class="ot-field ot-field-wide">备用模型
+        <input data-f="fallbackModel" type="text" placeholder="留空则沿用主模型" />
+      </label>
+      <label class="ot-field ot-field-wide">长文强模型
+        <input data-f="longTextModel" type="text" placeholder="如 gpt-4o；超长段落自动改用" />
+      </label>
     </div>
   `;
 
@@ -75,6 +94,9 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
             <input data-f="glossaryEnabled" type="checkbox" />
             <span><strong>术语库</strong><small>本地命中术语，不调用模型</small></span>
           </label>
+          <label class="ot-field ot-field-wide">术语注入上限 <span>单批注入术语条数上限（0–60，默认 24）</span>
+            <input data-f="glossaryInjectionLimit" type="number" min="0" max="60" step="1" placeholder="24" />
+          </label>
         </div>
       </section>
 
@@ -107,8 +129,15 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   const cacheChk = mount.querySelector('[data-f=cacheEnabled]') as HTMLInputElement;
   const glossaryChk = mount.querySelector('[data-f=glossaryEnabled]') as HTMLInputElement;
   const glossaryInput = mount.querySelector('[data-f=customGlossary]') as HTMLTextAreaElement;
+  const glossaryLimitInput = mount.querySelector('[data-f=glossaryInjectionLimit]') as HTMLInputElement;
   const customVisionChk = mount.querySelector('[data-f=customVision]') as HTMLInputElement;
   const customVisionRow = mount.querySelector('[data-custom-vision]') as HTMLElement;
+  const fallbackEnabledChk = mount.querySelector('[data-f=fallbackEnabled]') as HTMLInputElement;
+  const fallbackProviderSel = mount.querySelector('[data-f=fallbackProvider]') as HTMLSelectElement;
+  const fallbackApiKeyInput = mount.querySelector('[data-f=fallbackApiKey]') as HTMLInputElement;
+  const fallbackBaseUrlInput = mount.querySelector('[data-f=fallbackBaseUrl]') as HTMLInputElement;
+  const fallbackModelInput = mount.querySelector('[data-f=fallbackModel]') as HTMLInputElement;
+  const longTextModelInput = mount.querySelector('[data-f=longTextModel]') as HTMLInputElement;
   const testBtn = mount.querySelector('[data-f=test]') as HTMLButtonElement;
   const status = mount.querySelector('.ot-status') as HTMLElement;
   const advanced = mount.querySelector('.ot-advanced') as HTMLDetailsElement | null;
@@ -150,6 +179,10 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     o.value = p.id;
     o.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
     providerSel.appendChild(o);
+    const fo = document.createElement('option');
+    fo.value = p.id;
+    fo.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
+    fallbackProviderSel.appendChild(fo);
   });
 
   LANGUAGES.forEach((l) => {
@@ -216,7 +249,14 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cacheChk.checked = cfg.cacheEnabled;
     glossaryChk.checked = cfg.glossaryEnabled !== false;
     glossaryInput.value = cfg.customGlossary || '';
+    glossaryLimitInput.value = cfg.glossaryInjectionLimit ? String(cfg.glossaryInjectionLimit) : '24';
     customVisionChk.checked = cfg.customVision === true;
+    fallbackEnabledChk.checked = cfg.fallbackEnabled === true;
+    fallbackProviderSel.value = cfg.fallbackProvider || cfg.provider;
+    fallbackApiKeyInput.value = cfg.fallbackApiKey || '';
+    fallbackBaseUrlInput.value = cfg.fallbackBaseUrl || '';
+    fallbackModelInput.value = cfg.fallbackModel || '';
+    longTextModelInput.value = cfg.longTextModel || '';
   }
 
   function save(): Promise<boolean> {
@@ -236,7 +276,14 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.cacheEnabled = cacheChk.checked;
     cfg.glossaryEnabled = glossaryChk.checked;
     cfg.customGlossary = glossaryInput.value;
+    cfg.glossaryInjectionLimit = Math.max(0, Math.min(60, Number(glossaryLimitInput.value) || 24));
     cfg.customVision = customVisionChk.checked;
+    cfg.fallbackEnabled = fallbackEnabledChk.checked;
+    cfg.fallbackProvider = fallbackProviderSel.value;
+    cfg.fallbackApiKey = fallbackApiKeyInput.value.trim();
+    cfg.fallbackBaseUrl = fallbackBaseUrlInput.value.trim();
+    cfg.fallbackModel = fallbackModelInput.value.trim();
+    cfg.longTextModel = longTextModelInput.value.trim();
     const snapshot: AppConfig = { ...cfg, apiKeys: { ...cfg.apiKeys } };
     const write = saveQueue.catch(() => {}).then(() => configItem.setValue(snapshot));
     saveQueue = write.then(
@@ -291,10 +338,34 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     glossaryChk,
     glossaryInput,
     customVisionChk,
+    fallbackEnabledChk,
+    fallbackProviderSel,
+    fallbackApiKeyInput,
+    fallbackBaseUrlInput,
+    fallbackModelInput,
+    longTextModelInput,
+    glossaryLimitInput,
   ].forEach((el) => el.addEventListener('change', save));
 
-  [modelText, baseInput, keyInput, promptInput, glossaryInput].forEach((el) => {
+  [
+    modelText,
+    baseInput,
+    keyInput,
+    promptInput,
+    glossaryInput,
+    fallbackApiKeyInput,
+    fallbackBaseUrlInput,
+    fallbackModelInput,
+    longTextModelInput,
+    glossaryLimitInput,
+  ].forEach((el) => {
     el.addEventListener('input', () => scheduleSave());
+  });
+
+  fallbackProviderSel.addEventListener('change', () => {
+    const p = PROVIDERS.find((x) => x.id === fallbackProviderSel.value);
+    if (p?.baseUrl && !fallbackBaseUrlInput.value.trim()) fallbackBaseUrlInput.value = p.baseUrl;
+    void save();
   });
   window.addEventListener(
     'pagehide',

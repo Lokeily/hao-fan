@@ -16,6 +16,24 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ===== 加载旋转指示（翻译中） ===== */
+.ot-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ot-spin 0.7s linear infinite;
+}
+@keyframes ot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ===== 悬浮翻译按钮（苹果蓝圆点）—— !important 防止站点 CSS 覆盖 ===== */
 .ot-toolbar {
   position: fixed !important;

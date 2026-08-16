@@ -328,36 +328,46 @@ function normalize(text: string): string {
 }
 
 // 合并「内置库 + 用户库」，用户库覆盖内置。
-function mergedMap(target: string, custom: TermMap): TermMap {
+export function mergedMap(target: string, custom: TermMap): TermMap {
   const builtin = BUILTIN[target] || {};
   return { ...builtin, ...custom };
 }
 
 // ★ 整条精确命中：若整段文本本身就是一个术语 → 直接返回译文（0 Token）。
 // 仅用于短文本（术语通常很短），避免误伤长句。
-export function matchExact(text: string, target: string, custom: TermMap): string | null {
+// merged 可传入预合并的术语表（一次翻译内复用，避免反复重建 250 条内置库）。
+export function matchExact(
+  text: string,
+  target: string,
+  custom: TermMap,
+  merged?: TermMap,
+): string | null {
   const key = normalize(text);
   if (!key || key.length > 40) return null; // 超长不当作术语
-  const map = mergedMap(target, custom);
+  const map = merged ?? mergedMap(target, custom);
   return map[key] ?? null;
 }
 
 // ★ 提取「当前文本里出现的术语」用于提示词注入，保证同一术语译法一致。
 // 只回传确实出现在文本中的条目，避免整本术语库塞进 prompt 反而涨 Token。
 // 返回形如 ["Settings → 设置", "Dashboard → 仪表盘"]，最多 limit 条。
+// merged 可传入预合并的术语表（一次翻译内复用），放置于 limit 之前以兼容既有调用。
 export function relevantTerms(
   texts: string[],
   target: string,
   custom: TermMap,
+  merged?: TermMap,
   limit = 24,
 ): string[] {
-  const map = mergedMap(target, custom);
+  const map = merged ?? mergedMap(target, custom);
   const customKeys = Object.keys(custom);
   const customSet = new Set(customKeys);
-  const entries = [
-    ...customKeys,
-    ...Object.keys(BUILTIN[target] || {}).filter((key) => !customSet.has(key)),
-  ];
+  const entries = merged
+    ? Object.keys(map)
+    : [
+        ...customKeys,
+        ...Object.keys(BUILTIN[target] || {}).filter((key) => !customSet.has(key)),
+      ];
   if (entries.length === 0) return [];
   const haystack = texts.join('\n').toLowerCase();
   const out: string[] = [];

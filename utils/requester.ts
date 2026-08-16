@@ -181,3 +181,71 @@ export async function postJson(
   }
   throw lastErr ?? new Error('请求失败');
 }
+
+// 流式读取 OpenAI 兼容的 SSE 响应，逐块把 `choices[0].delta.content` 通过 onDelta 回调吐出。
+// 用于「流式输出」：首段译文边生成边渲染。背景 service worker 的 fetch 支持 ReadableStream。
+// 返回末尾的 usage / finish_reason（部分供应商在 [DONE] 前的最后一帧附带 usage）。
+export async function streamChatCompletions(
+  url: string,
+  headers: Record<string, string>,
+  body: string,
+  onDelta: (delta: string) => void,
+  opts: PostJsonOpts = {},
+): Promise<{ usage?: any; finishReason: string }> {
+  const timeout = opts.timeout ?? 20000;
+  const safeHeaders: Record<string, string> = {};
+  for (const k of Object.keys(headers)) safeHeaders[k] = toLatin1(headers[k]);
+  const res = await fetchWithTimeout(
+    url,
+    { method: 'POST', headers: safeHeaders, body, signal: opts.signal },
+    timeout,
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new HttpRequestError(res.status, detail, retryAfterMs(res.headers.get('retry-after')));
+  }
+  // 不支持流式（无 body 流）时退化为整段读取，仍触发一次 onDelta，保证调用方逻辑一致。
+  if (!res.body) {
+    const data = await res.json().catch(() => ({}));
+    const content = String(data?.choices?.[0]?.message?.content ?? '');
+    if (content) onDelta(content);
+    return { usage: data?.usage, finishReason: String(data?.choices?.[0]?.finish_reason || '') };
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let usage: any = undefined;
+  let finishReason = '';
+  try {
+    while (true) {
+      opts.signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let split: number;
+      while ((split = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        const dataLine = frame
+          .split('\n')
+          .find((l) => l.startsWith('data:'));
+        if (!dataLine) continue;
+        const payload = dataLine.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload);
+          const delta = String(json?.choices?.[0]?.delta?.content ?? '');
+          if (delta) onDelta(delta);
+          if (json?.usage) usage = json.usage;
+          const fr = String(json?.choices?.[0]?.finish_reason || '');
+          if (fr) finishReason = fr;
+        } catch {
+          /* 跳过无法解析的帧（注释 / 心跳） */
+        }
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return { usage, finishReason };
+}
