@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Two-column translation regression</title>
+<style>
+  body { margin: 24px; font: 15px/1.6 system-ui; }
+  .cols { display: flex; gap: 24px; }
+  .col { flex: 1; }
+  .floaty { float: left; width: 45%; margin-right: 5%; }
+  .clearfix::after { content: ""; display: table; clear: both; }
+  p { margin: 10px 0; }
+</style>
+<script src="./browser-mock.js"></script>
+</head>
+<body>
+  <h1>Two column layout test</h1>
+  <section class="cols">
+    <div class="col">
+      <p>The left column begins with a statement about renewable energy adoption.</p>
+      <p>Grid storage capacity doubled across major markets last year.</p>
+      <p>Offshore wind farms now supply a meaningful share of coastal demand.</p>
+    </div>
+    <div class="col">
+      <p>The right column covers financial markets and investor sentiment.</p>
+      <p>Equity indices closed higher after the central bank statement.</p>
+      <p>Bond yields eased as inflation expectations moderated.</p>
+    </div>
+  </section>
+  <div class="clearfix">
+    <div class="floaty">
+      <p>Floated block one holds product announcement details.</p>
+      <p>Floated block two continues with pricing information.</p>
+    </div>
+  </div>
+  <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
+</body>
+</html>

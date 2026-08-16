@@ -34,7 +34,24 @@ class HttpRequestError extends Error {
   readonly retryAfter: number | null;
 
   constructor(status: number, detail: string, retryAfter: number | null) {
-    super(`请求失败 (${status})${detail ? `：${detail.slice(0, 300)}` : ''}`);
+    const shown = detail ? detail.slice(0, 300) : '';
+    // 认证类错误直出服务商原文对普通用户不友好，转为明确中文指引（保留服务商返回供排查）。
+    let message: string;
+    if (status === 401) {
+      message =
+        '请求失败 (401)：API Key 无效或已过期。请到设置页确认所选服务商正确，' +
+        '从服务商后台完整重新复制 API Key 并点击「测试连接」验证。';
+    } else if (status === 403) {
+      message =
+        '请求失败 (403)：API Key 无权限或账户受限。请检查服务商账户状态、' +
+        'Key 权限与余额，或更换 API Key。';
+    } else {
+      message = `请求失败 (${status})${shown ? `：${shown}` : ''}`;
+    }
+    if (shown && (status === 401 || status === 403)) {
+      message += `（服务商返回：${shown}）`;
+    }
+    super(message);
     this.name = 'HttpRequestError';
     this.status = status;
     this.retryAfter = retryAfter;
@@ -182,19 +199,28 @@ export async function postJson(
   throw lastErr ?? new Error('请求失败');
 }
 
-// 流式读取 OpenAI 兼容的 SSE 响应，逐块把 `choices[0].delta.content` 通过 onDelta 回调吐出。
-// 用于「流式输出」：首段译文边生成边渲染。背景 service worker 的 fetch 支持 ReadableStream。
-// 返回末尾的 usage / finish_reason（部分供应商在 [DONE] 前的最后一帧附带 usage）。
-export async function streamChatCompletions(
+export interface StreamMeta {
+  promptTokens?: number;
+  completionTokens?: number;
+  finishReason?: string;
+}
+
+// ===== SSE 流式聊天：边收边 yield 文本增量，首字延迟从「整块返回」降到「首个 token 到达」。 =====
+// 与 postJson 共享 header 的 Latin-1 兜底清洗与超时/取消逻辑。
+// 兼容两种响应形态：
+//   - 标准 SSE：每行 `data: {json}`，以 `data: [DONE]` 结束（OpenAI 兼容）。
+//   - 非流式兜底：个别端点忽略 stream 标志直接返回 `{choices:[{message:{content}}]}`，
+//     解析到 message.content 时一次性 yield。
+export async function* streamChat(
   url: string,
   headers: Record<string, string>,
   body: string,
-  onDelta: (delta: string) => void,
-  opts: PostJsonOpts = {},
-): Promise<{ usage?: any; finishReason: string }> {
+  opts: PostJsonOpts & { onMeta?: (meta: StreamMeta) => void } = {},
+): AsyncGenerator<string, void, unknown> {
   const timeout = opts.timeout ?? 20000;
   const safeHeaders: Record<string, string> = {};
   for (const k of Object.keys(headers)) safeHeaders[k] = toLatin1(headers[k]);
+
   const res = await fetchWithTimeout(
     url,
     { method: 'POST', headers: safeHeaders, body, signal: opts.signal },
@@ -204,48 +230,75 @@ export async function streamChatCompletions(
     const detail = await res.text().catch(() => '');
     throw new HttpRequestError(res.status, detail, retryAfterMs(res.headers.get('retry-after')));
   }
-  // 不支持流式（无 body 流）时退化为整段读取，仍触发一次 onDelta，保证调用方逻辑一致。
-  if (!res.body) {
-    const data = await res.json().catch(() => ({}));
-    const content = String(data?.choices?.[0]?.message?.content ?? '');
-    if (content) onDelta(content);
-    return { usage: data?.usage, finishReason: String(data?.choices?.[0]?.finish_reason || '') };
+  if (!res.body || typeof res.body.getReader !== 'function') {
+    // 极端环境下 body 不可读：退化为一次性 JSON。
+    const data = await res.json();
+    yield contentFromChunk(data) ?? '';
+    return;
   }
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let usage: any = undefined;
-  let finishReason = '';
   try {
     while (true) {
-      opts.signal?.throwIfAborted();
-      const { done, value } = await reader.read();
+      const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      let split: number;
-      while ((split = buffer.indexOf('\n\n')) >= 0) {
-        const frame = buffer.slice(0, split);
-        buffer = buffer.slice(split + 2);
-        const dataLine = frame
-          .split('\n')
-          .find((l) => l.startsWith('data:'));
-        if (!dataLine) continue;
-        const payload = dataLine.slice(5).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const json = JSON.parse(payload);
-          const delta = String(json?.choices?.[0]?.delta?.content ?? '');
-          if (delta) onDelta(delta);
-          if (json?.usage) usage = json.usage;
-          const fr = String(json?.choices?.[0]?.finish_reason || '');
-          if (fr) finishReason = fr;
-        } catch {
-          /* 跳过无法解析的帧（注释 / 心跳） */
-        }
+      let newline;
+      while ((newline = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newline).replace(/\r$/, '');
+        buffer = buffer.slice(newline + 1);
+        const delta = parseSseLine(line, opts.onMeta);
+        if (delta !== null) yield delta;
       }
     }
+    const tail = buffer.replace(/\r$/, '');
+    if (tail.trim()) {
+      const delta = parseSseLine(tail, opts.onMeta);
+      if (delta !== null) yield delta;
+    }
   } finally {
-    reader.cancel().catch(() => {});
+    try {
+      reader.releaseLock();
+    } catch {
+      /* 已结束 */
+    }
   }
-  return { usage, finishReason };
+}
+
+function parseSseLine(line: string, onMeta?: (meta: StreamMeta) => void): string | null {
+  const trimmed = line.trim();
+  if (!trimmed || !trimmed.startsWith('data:')) return null;
+  const payload = trimmed.slice(5).trim();
+  if (payload === '[DONE]') return null;
+  let json: any;
+  try {
+    json = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  // 增量：delta.content
+  const delta = json?.choices?.[0]?.delta?.content;
+  if (typeof delta === 'string' && delta.length > 0) return delta;
+  // 兜底：非流式 message.content 一次性给出
+  const messageContent = json?.choices?.[0]?.message?.content;
+  if (typeof messageContent === 'string' && messageContent.length > 0) return messageContent;
+  // 用量与结束原因
+  const finish = json?.choices?.[0]?.finish_reason;
+  if (typeof finish === 'string' && onMeta) {
+    onMeta({ finishReason: finish });
+  }
+  const usage = json?.usage;
+  if (usage && onMeta) {
+    onMeta({
+      promptTokens: Number(usage.prompt_tokens) || 0,
+      completionTokens: Number(usage.completion_tokens) || 0,
+    });
+  }
+  return null;
+}
+
+function contentFromChunk(data: any): string | null {
+  return data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.delta?.content ?? null;
 }

@@ -5,7 +5,31 @@ import { browser } from 'wxt/browser';
 import { getProviderApiKey, normalizeConfig, withProviderApiKey, type AppConfig } from './config.ts';
 
 // Options 页与 Popup 共用的配置表单。compact=true 时不显示提示文案（给 popup 用）。
-export function buildConfigForm(mount: HTMLElement, compact: boolean) {
+// siteCtx：页面内完整设置面板的站点级偏好（自动翻译/暂停本站），
+// 由调用方提供初始状态与写入回调，并可通过返回的 API 外部同步。
+export interface SettingsSiteCtx {
+  host: string;
+  autoTranslate: boolean;
+  paused: boolean;
+  onAuto: (enabled: boolean) => void;
+  onPause: (paused: boolean) => void;
+}
+
+export interface ConfigFormApi {
+  /**
+   * 用最新配置重填表单（值相同则不动控件，避免打断输入）。
+   * next 传入最新配置快照（如 storage watch 回调），否则用当前内存值。
+   */
+  update: (next?: AppConfig) => void;
+  /** 外部同步站点开关状态（可只传其一） */
+  updateSiteState: (auto?: boolean, paused?: boolean) => void;
+}
+
+export function buildConfigForm(
+  mount: HTMLElement,
+  compact: boolean,
+  siteCtx?: SettingsSiteCtx,
+): ConfigFormApi {
   let cfg: AppConfig = normalizeConfig(configItem.defaultValue);
 
   const advancedFields = `
@@ -23,24 +47,17 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
       <label class="ot-field ot-field-wide">我的术语表 <span>每行：源词=译文</span>
         <textarea data-f="customGlossary" rows="3" placeholder="GitHub=GitHub\nrepository=代码仓库\nissue=工单"></textarea>
       </label>
-      <label class="ot-check ot-field-wide" data-fallback-toggle>
-        <input data-f="fallbackEnabled" type="checkbox" />
-        <span><strong>备用引擎（故障转移）</strong><small>主引擎密钥 / 端点 / 模型不可用时自动切换</small></span>
+      <label class="ot-field ot-field-wide">备用引擎（故障转移） <span>主引擎限流/报错时按顺序切换，逗号分隔</span>
+        <input data-f="fallbackProviders" type="text" placeholder="deepl, openai" />
       </label>
-      <label class="ot-field">备用引擎
-        <select data-f="fallbackProvider"></select>
+      <label class="ot-field">长文强模型·引擎
+        <select data-f="strongProvider"><option value="">不启用</option></select>
       </label>
-      <label class="ot-field ot-field-wide">备用 API Key
-        <input data-f="fallbackApiKey" type="password" autocomplete="new-password" placeholder="留空则沿用主引擎同服务商 Key" />
+      <label class="ot-field">长文强模型·模型
+        <input data-f="strongModel" type="text" placeholder="如 gpt-4o" />
       </label>
-      <label class="ot-field ot-field-wide">备用 Base URL
-        <input data-f="fallbackBaseUrl" type="url" inputmode="url" placeholder="留空则用该引擎默认端点" />
-      </label>
-      <label class="ot-field ot-field-wide">备用模型
-        <input data-f="fallbackModel" type="text" placeholder="留空则沿用主模型" />
-      </label>
-      <label class="ot-field ot-field-wide">长文强模型
-        <input data-f="longTextModel" type="text" placeholder="如 gpt-4o；超长段落自动改用" />
+      <label class="ot-field">长文路由阈值（字符）
+        <input data-f="strongThreshold" type="number" min="200" step="100" />
       </label>
     </div>
   `;
@@ -83,6 +100,24 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
         </div>
       </section>
 
+      ${
+        siteCtx
+          ? `<section class="ot-form-section">
+        <h2>本站</h2>
+        <div class="ot-switches">
+          <label class="ot-check" id="ot-full-auto">
+            <input type="checkbox" data-site-ctx="auto" ${siteCtx.autoTranslate ? 'checked' : ''} />
+            <span><strong>自动翻译此站</strong><small>打开 ${siteCtx.host} 的页面时自动开始翻译</small></span>
+          </label>
+          <label class="ot-check" id="ot-full-pause">
+            <input type="checkbox" data-site-ctx="pause" ${siteCtx.paused ? 'checked' : ''} />
+            <span><strong>暂停本站翻译</strong><small>立即停止翻译并清理译文</small></span>
+          </label>
+        </div>
+      </section>`
+          : ''
+      }
+
       <section class="ot-form-section">
         <h2>节省 Token</h2>
         <div class="ot-switches">
@@ -94,8 +129,61 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
             <input data-f="glossaryEnabled" type="checkbox" />
             <span><strong>术语库</strong><small>本地命中术语，不调用模型</small></span>
           </label>
-          <label class="ot-field ot-field-wide">术语注入上限 <span>单批注入术语条数上限（0–60，默认 24）</span>
-            <input data-f="glossaryInjectionLimit" type="number" min="0" max="60" step="1" placeholder="24" />
+          <label class="ot-check">
+            <input data-f="sentenceCache" type="checkbox" />
+            <span><strong>句子级缓存</strong><small>按句缓存，SPA 微变只重译变化句</small></span>
+          </label>
+        </div>
+        <div class="ot-field-grid">
+          <label class="ot-field ot-field-wide">术语注入上限
+            <span>每批提示词注入的术语条数，越低越省 Token</span>
+            <select data-f="glossaryTermLimit">
+              <option value="0">关闭（不注入术语，最省）</option>
+              <option value="6">6 条（更省）</option>
+              <option value="12">12 条（推荐）</option>
+              <option value="24">24 条（译名更一致）</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="ot-form-section">
+        <h2>智能增强</h2>
+        <div class="ot-switches">
+          <label class="ot-check">
+            <input data-f="streaming" type="checkbox" />
+            <span><strong>流式输出</strong><small>首段边生成边显示，首字延迟更低</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="contextAware" type="checkbox" />
+            <span><strong>上下文感知</strong><small>结合页面标题与前段译文，长文更连贯</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="qualityCheck" type="checkbox" />
+            <span><strong>质量自检</strong><small>校验数字 / 链接 / 代码不被遗漏</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="autoLearnTerms" type="checkbox" />
+            <span><strong>译文可编辑 · 术语自学习</strong><small>修改译文自动沉淀进术语库</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="hoverTranslate" type="checkbox" />
+            <span><strong>悬停翻译</strong><small>鼠标悬停段落即显示译文气泡</small></span>
+          </label>
+          <label class="ot-check">
+            <input data-f="inputTranslate" type="checkbox" />
+            <span><strong>输入框翻译</strong><small>网页输入框聚焦时提供翻译入口</small></span>
+          </label>
+        </div>
+        <div class="ot-field-grid">
+          <label class="ot-field ot-field-wide">译文显示样式
+            <span>译文在原文下方的呈现方式</span>
+            <select data-f="translationStyle">
+              <option value="plain">默认（清淡无装饰）</option>
+              <option value="dashed">蓝色虚线分隔</option>
+              <option value="underline">蓝色下划线</option>
+              <option value="highlight">浅蓝高亮块</option>
+            </select>
           </label>
         </div>
       </section>
@@ -132,12 +220,19 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   const glossaryLimitInput = mount.querySelector('[data-f=glossaryInjectionLimit]') as HTMLInputElement;
   const customVisionChk = mount.querySelector('[data-f=customVision]') as HTMLInputElement;
   const customVisionRow = mount.querySelector('[data-custom-vision]') as HTMLElement;
-  const fallbackEnabledChk = mount.querySelector('[data-f=fallbackEnabled]') as HTMLInputElement;
-  const fallbackProviderSel = mount.querySelector('[data-f=fallbackProvider]') as HTMLSelectElement;
-  const fallbackApiKeyInput = mount.querySelector('[data-f=fallbackApiKey]') as HTMLInputElement;
-  const fallbackBaseUrlInput = mount.querySelector('[data-f=fallbackBaseUrl]') as HTMLInputElement;
-  const fallbackModelInput = mount.querySelector('[data-f=fallbackModel]') as HTMLInputElement;
-  const longTextModelInput = mount.querySelector('[data-f=longTextModel]') as HTMLInputElement;
+  const streamingChk = mount.querySelector('[data-f=streaming]') as HTMLInputElement;
+  const contextChk = mount.querySelector('[data-f=contextAware]') as HTMLInputElement;
+  const qualityChk = mount.querySelector('[data-f=qualityCheck]') as HTMLInputElement;
+  const autoLearnChk = mount.querySelector('[data-f=autoLearnTerms]') as HTMLInputElement;
+  const sentenceChk = mount.querySelector('[data-f=sentenceCache]') as HTMLInputElement;
+  const glossaryTermLimitSel = mount.querySelector('[data-f=glossaryTermLimit]') as HTMLSelectElement;
+  const hoverTranslateChk = mount.querySelector('[data-f=hoverTranslate]') as HTMLInputElement;
+  const inputTranslateChk = mount.querySelector('[data-f=inputTranslate]') as HTMLInputElement;
+  const translationStyleSel = mount.querySelector('[data-f=translationStyle]') as HTMLSelectElement;
+  const fallbackInput = mount.querySelector('[data-f=fallbackProviders]') as HTMLInputElement;
+  const strongProviderSel = mount.querySelector('[data-f=strongProvider]') as HTMLSelectElement;
+  const strongModelInput = mount.querySelector('[data-f=strongModel]') as HTMLInputElement;
+  const strongThresholdInput = mount.querySelector('[data-f=strongThreshold]') as HTMLInputElement;
   const testBtn = mount.querySelector('[data-f=test]') as HTMLButtonElement;
   const status = mount.querySelector('.ot-status') as HTMLElement;
   const advanced = mount.querySelector('.ot-advanced') as HTMLDetailsElement | null;
@@ -184,6 +279,20 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     fo.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
     fallbackProviderSel.appendChild(fo);
   });
+  const refreshSelectTitles = () => {
+    providerSel.title = providerSel.options[providerSel.selectedIndex]?.textContent || '';
+    modelSel.title = modelSel.options[modelSel.selectedIndex]?.textContent || modelSel.value;
+    sourceSel.title = sourceSel.value;
+    targetSel.title = targetSel.value;
+  };
+  PROVIDERS.forEach((p) => {
+    if (p.id !== 'google') {
+      const so = document.createElement('option');
+      so.value = p.id;
+      so.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
+      strongProviderSel.appendChild(so);
+    }
+  });
 
   LANGUAGES.forEach((l) => {
     const s = document.createElement('option');
@@ -224,10 +333,22 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     if (advanced && providerId === 'custom') advanced.open = true;
   }
 
+  // checkbox 勾选样式：不用 :has()（旧浏览器不支持），由 JS 同步 class。
+  function syncCheckState() {
+    // 在表单容器内查询：页面内完整设置面板渲染在 Shadow DOM 里，
+    // document.querySelectorAll 查不到 shadow 内的开关（此前导致大屏开关全白）。
+    mount.querySelectorAll('.ot-form .ot-check').forEach((label) => {
+      const input = label.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+      label.classList.toggle('is-checked', Boolean(input?.checked));
+    });
+  }
+
   function fill() {
-    providerSel.value = cfg.provider;
-    fillModels(cfg.provider);
-    // 回填模型：若当前 model 在下拉里则选下拉，否则填入文本框
+    // 仅引擎变化时重建模型下拉；开关切换等外部同步不应反复重建（性能/闪烁）
+    if (providerSel.value !== cfg.provider) {
+      providerSel.value = cfg.provider;
+      fillModels(cfg.provider);
+    }
     const hasModels = !modelSel.hidden;
     const inSelect = hasModels && Array.from(modelSel.options).some((o) => o.value === cfg.model);
     if (inSelect) {
@@ -240,23 +361,38 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
       }
       modelText.value = cfg.model;
     }
-    baseInput.value = cfg.baseUrl;
-    keyInput.value = getProviderApiKey(cfg);
-    sourceSel.value = cfg.sourceLang;
-    targetSel.value = cfg.targetLang;
-    toneSel.value = cfg.tone || '自然流畅';
-    promptInput.value = cfg.systemPrompt;
-    cacheChk.checked = cfg.cacheEnabled;
-    glossaryChk.checked = cfg.glossaryEnabled !== false;
-    glossaryInput.value = cfg.customGlossary || '';
-    glossaryLimitInput.value = cfg.glossaryInjectionLimit ? String(cfg.glossaryInjectionLimit) : '24';
-    customVisionChk.checked = cfg.customVision === true;
-    fallbackEnabledChk.checked = cfg.fallbackEnabled === true;
-    fallbackProviderSel.value = cfg.fallbackProvider || cfg.provider;
-    fallbackApiKeyInput.value = cfg.fallbackApiKey || '';
-    fallbackBaseUrlInput.value = cfg.fallbackBaseUrl || '';
-    fallbackModelInput.value = cfg.fallbackModel || '';
-    longTextModelInput.value = cfg.longTextModel || '';
+    // 值相同则不写回，避免外部同步打断正在输入的控件
+    const setIfDiff = (
+      el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+      value: string | boolean,
+    ) => {
+      if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+        if (el.checked !== Boolean(value)) el.checked = Boolean(value);
+      } else if (String(el.value) !== String(value)) {
+        el.value = String(value);
+      }
+    };
+    setIfDiff(baseInput, cfg.baseUrl);
+    setIfDiff(keyInput, getProviderApiKey(cfg));
+    setIfDiff(sourceSel, cfg.sourceLang);
+    setIfDiff(targetSel, cfg.targetLang);
+    setIfDiff(toneSel, cfg.tone || '自然流畅');
+    setIfDiff(promptInput, cfg.systemPrompt);
+    setIfDiff(cacheChk, cfg.cacheEnabled);
+    setIfDiff(glossaryChk, cfg.glossaryEnabled !== false);
+    setIfDiff(glossaryInput, cfg.customGlossary || '');
+    setIfDiff(customVisionChk, cfg.customVision === true);
+    setIfDiff(streamingChk, cfg.streaming !== false);
+    setIfDiff(contextChk, cfg.contextAware !== false);
+    setIfDiff(qualityChk, cfg.qualityCheck !== false);
+    setIfDiff(autoLearnChk, cfg.autoLearnTerms !== false);
+    setIfDiff(sentenceChk, cfg.sentenceCache !== false);
+    setIfDiff(glossaryTermLimitSel, String(cfg.glossaryTermLimit ?? 12));
+    setIfDiff(hoverTranslateChk, cfg.hoverTranslate !== false);
+    setIfDiff(inputTranslateChk, cfg.inputTranslate !== false);
+    setIfDiff(translationStyleSel, cfg.translationStyle || 'plain');
+    syncCheckState();
+    refreshSelectTitles();
   }
 
   function save(): Promise<boolean> {
@@ -278,12 +414,22 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     cfg.customGlossary = glossaryInput.value;
     cfg.glossaryInjectionLimit = Math.max(0, Math.min(60, Number(glossaryLimitInput.value) || 24));
     cfg.customVision = customVisionChk.checked;
-    cfg.fallbackEnabled = fallbackEnabledChk.checked;
-    cfg.fallbackProvider = fallbackProviderSel.value;
-    cfg.fallbackApiKey = fallbackApiKeyInput.value.trim();
-    cfg.fallbackBaseUrl = fallbackBaseUrlInput.value.trim();
-    cfg.fallbackModel = fallbackModelInput.value.trim();
-    cfg.longTextModel = longTextModelInput.value.trim();
+    cfg.streaming = streamingChk.checked;
+    cfg.contextAware = contextChk.checked;
+    cfg.qualityCheck = qualityChk.checked;
+    cfg.autoLearnTerms = autoLearnChk.checked;
+    cfg.sentenceCache = sentenceChk.checked;
+    cfg.glossaryTermLimit = Number(glossaryTermLimitSel.value) || 12;
+    cfg.hoverTranslate = hoverTranslateChk.checked;
+    cfg.inputTranslate = inputTranslateChk.checked;
+    cfg.translationStyle = translationStyleSel.value;
+    cfg.fallbackProviders = fallbackInput.value
+      .split(/[,，\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    cfg.strongProvider = strongProviderSel.value;
+    cfg.strongModel = strongModelInput.value.trim();
+    cfg.strongThreshold = Number(strongThresholdInput.value) || 1200;
     const snapshot: AppConfig = { ...cfg, apiKeys: { ...cfg.apiKeys } };
     const write = saveQueue.catch(() => {}).then(() => configItem.setValue(snapshot));
     saveQueue = write.then(
@@ -307,6 +453,7 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   providerSel.addEventListener('change', () => {
     cfg = withProviderApiKey(cfg, keyInput.value);
     cfg.provider = providerSel.value;
+    refreshSelectTitles();
     fillModels(cfg.provider);
     const p = PROVIDERS.find((x) => x.id === cfg.provider);
     cfg.model = p?.defaultModel || '';
@@ -338,14 +485,31 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     glossaryChk,
     glossaryInput,
     customVisionChk,
-    fallbackEnabledChk,
-    fallbackProviderSel,
-    fallbackApiKeyInput,
-    fallbackBaseUrlInput,
-    fallbackModelInput,
-    longTextModelInput,
-    glossaryLimitInput,
-  ].forEach((el) => el.addEventListener('change', save));
+    streamingChk,
+    contextChk,
+    qualityChk,
+    autoLearnChk,
+    sentenceChk,
+    fallbackInput,
+    strongProviderSel,
+    strongModelInput,
+    strongThresholdInput,
+    glossaryTermLimitSel,
+    hoverTranslateChk,
+    inputTranslateChk,
+    translationStyleSel,
+  ].forEach((el) =>
+    el.addEventListener('change', () => {
+      save();
+      refreshSelectTitles();
+    }),
+  );
+
+  // checkbox 勾选样式同步（:has 兼容替代）
+  [cacheChk, glossaryChk, customVisionChk, streamingChk, contextChk, qualityChk, autoLearnChk,
+    sentenceChk, hoverTranslateChk, inputTranslateChk].forEach((el) => {
+    el.addEventListener('change', syncCheckState);
+  });
 
   [
     modelText,
@@ -353,11 +517,8 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     keyInput,
     promptInput,
     glossaryInput,
-    fallbackApiKeyInput,
-    fallbackBaseUrlInput,
-    fallbackModelInput,
-    longTextModelInput,
-    glossaryLimitInput,
+    fallbackInput,
+    strongModelInput,
   ].forEach((el) => {
     el.addEventListener('input', () => scheduleSave());
   });
@@ -403,8 +564,17 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
   if (!compact) {
     const hint = document.createElement('p');
     hint.className = 'ot-hint';
-    hint.textContent = 'API Key 仅保存在本地浏览器，并只发送给你选择的翻译服务商。';
+    hint.textContent =
+      'API Key 仅保存在本地浏览器，并只发送给你选择的翻译服务商。快捷键 Alt+T 可直接翻译当前网页。';
     mount.insertAdjacentElement('beforebegin', hint);
+  }
+
+  // 站点偏好开关（页面内完整设置面板专用）
+  const autoSiteInput = mount.querySelector('[data-site-ctx="auto"]') as HTMLInputElement | null;
+  const pauseSiteInput = mount.querySelector('[data-site-ctx="pause"]') as HTMLInputElement | null;
+  if (siteCtx && autoSiteInput && pauseSiteInput) {
+    autoSiteInput.addEventListener('change', () => siteCtx.onAuto(autoSiteInput.checked));
+    pauseSiteInput.addEventListener('change', () => siteCtx.onPause(pauseSiteInput.checked));
   }
 
   fill();
@@ -417,4 +587,16 @@ export function buildConfigForm(mount: HTMLElement, compact: boolean) {
     })
     .catch(() => setStatus('读取设置失败，当前显示默认配置', true))
     .finally(() => setFormLoading(false));
+
+  return {
+    update: (next?: AppConfig) => {
+      if (next) cfg = normalizeConfig(next);
+      fill();
+    },
+    updateSiteState: (auto, paused) => {
+      if (auto !== undefined && autoSiteInput) autoSiteInput.checked = auto;
+      if (paused !== undefined && pauseSiteInput) pauseSiteInput.checked = paused;
+      syncCheckState();
+    },
+  };
 }

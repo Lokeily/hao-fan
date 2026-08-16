@@ -1,18 +1,42 @@
 :root {
-  --bg: #f5f5f7;
+  /* ===== Apple 设计令牌（iOS/macOS Human Interface）===== */
+  --bg: #f2f2f7;
   --surface: #ffffff;
+  --surface-2: #f2f2f7;
   --text: #1d1d1f;
   --text-2: #6e6e73;
-  --text-3: #86868b;
-  --border: #d2d2d7;
-  --soft: #f2f2f7;
-  --accent: #0071e3;
-  --accent-hover: #0077ed;
-  --green: #248a3d;
-  --red: #c93434;
-  --radius: 10px;
+  --text-3: #8e8e93;
+  --separator: rgba(60, 60, 67, 0.16);
+  --separator-strong: rgba(60, 60, 67, 0.3);
+  --accent: #007aff;
+  --accent-hover: #0069d9;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --green: #34c759;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
   --font:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', 'PingFang SC',
+    'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --text: #f5f5f7;
+    --text-2: #aeaeb2;
+    --text-3: #8e8e93;
+    --separator: rgba(84, 84, 88, 0.4);
+    --separator-strong: rgba(84, 84, 88, 0.65);
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-soft: rgba(10, 132, 255, 0.22);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
 }
 
 * {
@@ -34,6 +58,7 @@ textarea {
 body {
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -50,28 +75,29 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 .ot-file:focus-within {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 1px;
 }
 
+/* ===== 设置页 ===== */
 .ot-page {
-  width: min(100%, 760px);
+  width: min(100%, 980px);
   margin: 0 auto;
+  padding: 28px 24px 64px;
 }
 
 .ot-page-head {
-  padding-bottom: 22px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 4px 22px;
 }
 
 .ot-page-brandline {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .ot-page-brand {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: var(--accent);
   font-size: 13px;
   font-weight: 700;
@@ -79,19 +105,20 @@ summary:focus-visible,
 
 h1 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .ot-hint {
-  margin: 16px 0 0;
+  margin: 18px 4px 0;
   color: var(--text-2);
   font-size: 13px;
   line-height: 1.6;
 }
 
+/* ===== 表单：iOS 分组卡片 ===== */
 .ot-form {
   margin: 0;
   transition: opacity 0.15s ease;
@@ -103,30 +130,48 @@ h1 {
 }
 
 .ot-form-section {
-  padding: 24px 0;
-  border-bottom: 1px solid var(--border);
+  margin: 14px 0;
+  padding: 0;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
 .ot-form-section h2 {
-  margin: 0 0 16px;
-  color: var(--text);
-  font-size: 15px;
+  margin: 0;
+  padding: 17px 16px 4px;
+  color: var(--text-2);
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.4;
   letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ot-form-section > h2:first-child {
+  padding-top: 13px;
 }
 
 .ot-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 0;
+  padding: 4px 16px 14px;
+}
+
+@media (min-width: 900px) {
+  .ot-field-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .ot-field {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
+  padding: 10px 6px;
   color: var(--text-2);
   font-size: 13px;
   font-weight: 600;
@@ -148,21 +193,22 @@ h1 {
 .ot-form textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
   color: var(--text);
   font-size: 14px;
   font-weight: 400;
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 .ot-form input,
 .ot-form select {
-  min-height: 40px;
-  padding: 8px 11px;
+  min-height: 38px;
+  padding: 7px 11px;
 }
 
 .ot-form textarea {
@@ -176,38 +222,63 @@ h1 {
 .ot-form select:focus,
 .ot-form textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
   outline: none;
 }
 
 .ot-form input:read-only {
-  background: var(--soft);
+  background: var(--surface-2);
   color: var(--text-3);
 }
 
+/* ===== iOS 风格开关行 ===== */
 .ot-switches {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--separator);
+  margin: 0 16px;
 }
 
 .ot-form .ot-check {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 58px;
+  min-height: 56px;
   margin: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--separator);
   color: var(--text);
   cursor: pointer;
 }
 
+.ot-form .ot-check:last-child {
+  border-bottom: 0;
+}
+
 .ot-form .ot-check input {
-  width: 18px;
-  min-height: 18px;
-  height: 18px;
-  margin: 0;
-  padding: 0;
-  flex: 0 0 auto;
-  accent-color: var(--accent);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.ot-form .ot-check::after {
+  content: '';
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  flex: 0 0 26px;
+  border: 2px solid var(--separator-strong);
+  border-radius: 50%;
+  background: transparent;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ot-form .ot-check.is-checked::after {
+  border-color: var(--accent);
+  background: var(--accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-6' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 14px no-repeat;
 }
 
 .ot-check span,
@@ -222,56 +293,70 @@ h1 {
 }
 
 .ot-check small {
-  margin-top: 3px;
+  margin-top: 2px;
   color: var(--text-3);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.4;
 }
 
+/* ===== 高级设置折叠 ===== */
 .ot-advanced {
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--separator);
+  margin: 0 16px;
+  padding: 12px 0;
 }
 
 .ot-advanced summary {
-  color: var(--text);
+  color: var(--accent);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
+  user-select: none;
 }
 
 .ot-advanced[open] summary {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
+/* ===== 表单操作 ===== */
 .ot-form-actions {
   display: flex;
-  min-height: 68px;
+  min-height: 64px;
   align-items: center;
   gap: 14px;
+  margin-top: 16px;
+  padding: 0 4px;
 }
 
 .ot-test-btn {
   flex: 0 0 auto;
   min-height: 38px;
   margin: 0;
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--accent);
-  font-size: 13px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
   font-weight: 650;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
 }
 
 .ot-test-btn:hover {
-  background: var(--soft);
+  background: var(--accent-hover);
+}
+
+.ot-test-btn:active {
+  transform: scale(0.97);
 }
 
 .ot-test-btn:disabled {
-  opacity: 0.58;
+  opacity: 0.55;
   cursor: progress;
 }
 
@@ -286,7 +371,7 @@ h1 {
   color: var(--red);
 }
 
-/* Popup */
+/* ===== Popup ===== */
 .ot-popup {
   width: 100%;
   padding: 14px 16px 18px;
@@ -308,7 +393,7 @@ h1 {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
 }
 
@@ -336,37 +421,38 @@ h1 {
   line-height: 1.35;
 }
 
+/* ===== iOS 分段控件（segmented control）===== */
 .ot-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3px;
+  gap: 2px;
   margin-bottom: 16px;
   padding: 3px;
-  border-radius: var(--radius);
-  background: var(--soft);
+  border-radius: 12px;
+  background: var(--surface-2);
 }
 
 .ot-popup .ot-tab {
-  min-height: 34px;
+  min-height: 32px;
   margin: 0;
-  padding: 7px 12px;
+  padding: 6px 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: transparent;
   color: var(--text-2);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .ot-popup .ot-tab.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .ot-panel.hidden {
@@ -379,6 +465,7 @@ h1 {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 7px;
+  padding: 0 2px;
 }
 
 .ot-section-label {
@@ -401,18 +488,23 @@ h1 {
   min-height: 94px;
   max-height: 180px;
   padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
   resize: vertical;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 .ot-popup #ot-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
   outline: none;
 }
 
@@ -423,15 +515,17 @@ h1 {
   margin-top: 10px;
 }
 
+/* ===== 网站暂停行（iOS cell + switch）===== */
 .ot-site-control {
   display: flex;
   min-height: 54px;
   align-items: center;
   gap: 12px;
   margin-top: 12px;
-  padding: 10px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
 }
 
@@ -468,38 +562,40 @@ h1 {
   opacity: 0;
 }
 
+/* iOS 开关 */
 .ot-switch-track {
+  position: relative;
   display: flex;
-  width: 36px;
-  height: 22px;
-  flex: 0 0 36px;
+  width: 44px;
+  height: 27px;
+  flex: 0 0 44px;
   align-items: center;
   padding: 2px;
-  border-radius: 11px;
-  background: var(--text-3);
-  transition: background 0.15s ease;
+  border-radius: 14px;
+  background: var(--surface-2);
+  transition: background 0.2s ease;
 }
 
 .ot-switch-track span {
-  width: 18px;
-  height: 18px;
+  width: 23px;
+  height: 23px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
-  transition: transform 0.15s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .ot-site-control input:checked + .ot-switch-track {
-  background: var(--accent);
+  background: var(--green);
 }
 
 .ot-site-control input:checked + .ot-switch-track span {
-  transform: translateX(14px);
+  transform: translateX(17px);
 }
 
 .ot-site-control input:focus-visible + .ot-switch-track {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 1px;
 }
 
 .ot-site-control input:disabled + .ot-switch-track {
@@ -512,14 +608,18 @@ h1 {
   min-height: 38px;
   margin: 0;
   padding: 8px 10px;
-  border-radius: var(--radius);
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
 }
 
 .ot-popup .ot-btn-primary {
-  border: 1px solid var(--accent);
+  border: 0;
   background: var(--accent);
   color: #fff;
 }
@@ -529,25 +629,30 @@ h1 {
 }
 
 .ot-popup .ot-btn-secondary {
-  border: 1px solid var(--border);
+  border: 1px solid var(--separator-strong);
   background: var(--surface);
   color: var(--text);
 }
 
 .ot-popup .ot-btn-secondary:hover {
-  background: var(--soft);
+  background: var(--surface-2);
+}
+
+.ot-popup .ot-btn-primary:active,
+.ot-popup .ot-btn-secondary:active {
+  transform: scale(0.97);
 }
 
 .ot-popup button:disabled {
-  opacity: 0.58;
+  opacity: 0.55;
   cursor: progress;
 }
 
 .ot-out {
   margin-top: 10px;
-  padding: 10px 11px;
-  border-left: 3px solid var(--accent);
-  background: #f8fafd;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
   color: var(--text);
   font-size: 13px;
   line-height: 1.55;
@@ -559,26 +664,26 @@ h1 {
 }
 
 .ot-out[data-tone='success'] {
-  border-left-color: var(--green);
-  background: #f3faf5;
-  color: #0d652d;
+  background: rgba(52, 199, 89, 0.14);
+  color: var(--green);
 }
 
 .ot-out[data-tone='error'] {
-  border-left-color: var(--red);
-  background: #fdf5f5;
-  color: #a50e0e;
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--red);
 }
 
 .ot-out:empty {
   display: none;
 }
 
+/* ===== Token 统计卡片 ===== */
 .ot-stats {
   margin-top: 14px;
-  padding: 13px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  padding: 13px 14px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .ot-stats-head {
@@ -591,16 +696,18 @@ h1 {
 
 .ot-popup .ot-stats-head button {
   margin: 0;
-  padding: 2px 4px;
+  padding: 3px 8px;
   border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: var(--text-3);
+  color: var(--accent);
   font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .ot-popup .ot-stats-head button:hover {
-  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .ot-stats-grid {
@@ -612,12 +719,12 @@ h1 {
 .ot-stats-grid div {
   min-width: 0;
   padding: 7px 10px;
-  border-bottom: 1px solid var(--soft);
+  border-bottom: 1px solid var(--separator);
 }
 
 .ot-stats-grid div:nth-child(odd) {
   padding-left: 0;
-  border-right: 1px solid var(--soft);
+  border-right: 1px solid var(--separator);
 }
 
 .ot-stats-grid div:nth-child(even) {
@@ -658,7 +765,7 @@ h1 {
 .ot-stats-detail {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--separator);
 }
 
 .ot-img-row {
@@ -674,18 +781,19 @@ h1 {
   min-height: 34px;
   align-items: center;
   justify-content: flex-start;
-  padding: 7px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .ot-file:hover {
-  background: var(--soft);
+  background: rgba(0, 122, 255, 0.2);
 }
 
 .ot-img-caption {
@@ -719,21 +827,26 @@ h1 {
 }
 
 .ot-popup .ot-form-section {
-  padding: 14px 0;
+  margin: 10px 0;
 }
 
 .ot-popup .ot-form-section:first-child {
-  padding-top: 0;
+  margin-top: 0;
 }
 
 .ot-popup .ot-form-section h2 {
-  margin-bottom: 11px;
-  font-size: 13px;
+  padding: 14px 14px 2px;
+  font-size: 11px;
 }
 
 .ot-popup .ot-field-grid {
   grid-template-columns: 1fr;
-  gap: 11px;
+  gap: 0;
+  padding: 2px 14px 10px;
+}
+
+.ot-popup .ot-field {
+  padding: 8px 4px;
 }
 
 .ot-popup .ot-field-wide {
@@ -743,7 +856,7 @@ h1 {
 .ot-popup .ot-form input,
 .ot-popup .ot-form select {
   min-height: 36px;
-  padding: 7px 9px;
+  padding: 6px 9px;
   font-size: 13px;
 }
 
@@ -752,18 +865,34 @@ h1 {
 }
 
 .ot-popup .ot-form .ot-check {
-  min-height: 52px;
+  min-height: 50px;
 }
 
 .ot-popup .ot-form-actions {
-  min-height: 58px;
+  min-height: 56px;
+  margin-top: 10px;
+}
+
+/* ===== 大屏双栏：设置页充分利用宽屏面积 ===== */
+@media (min-width: 1280px) {
+  .ot-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+
+  .ot-form-section {
+    margin: 0;
+  }
+
+  .ot-form-actions {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
 }
 
 @media (max-width: 600px) {
-  .ot-options-body {
-    padding: 24px 16px 40px;
-  }
-
   .ot-field-grid {
     grid-template-columns: 1fr;
   }

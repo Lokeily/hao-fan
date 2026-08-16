@@ -1,13 +1,28 @@
 import { defineConfig } from 'wxt';
+import { runPostbuild } from './scripts/postbuild';
 
 // 参考文档: https://wxt.dev
 export default defineConfig({
+  // 构建完成后统一处理页面资源（内联 CSS + 相对路径），wxt build 与 wxt zip 均会触发。
+  hooks: {
+    'build:done': async () => {
+      await runPostbuild();
+    },
+  },
   manifest: ({ browser }) => ({
     name: '好翻',
     description:
       '好翻 · 开源免费的沉浸式 AI 翻译插件，直连 DeepSeek、智谱、腾讯混元等国内大模型，用户自配 API Key，不经中转服务器。',
     // WXT 根据 entrypoints/options.html 与 popup.html 生成 options_ui / action.default_popup
     permissions: ['storage', 'activeTab', 'contextMenus', 'scripting'],
+    // 内容脚本需要 fetch 扩展设置页与样式（页面内完整设置面板），
+    // 未声明 web_accessible_resources 会被浏览器拦截。
+    web_accessible_resources: [
+      {
+        resources: ['options.html', 'assets/*'],
+        matches: ['<all_urls>'],
+      },
+    ],
     // 快捷键：Alt+T 翻译当前网页（浏览器设置页可自定义）
     commands: {
       'translate-page': {

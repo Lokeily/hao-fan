@@ -23,8 +23,37 @@
   const imageResultFromQuery = query.get('imageResult') === '1';
   let policyRaceTriggered = false;
   const cancelledJobs = new Set();
-  const memory = {
+  // storage mock 后端用真实 localStorage：内容脚本的持久化行为（如工具栏拖拽位置）
+  // 跨刷新仍能验证；每个测试用例独立 context，天然隔离。
+  const memCache = {
     disabledSites: disabledFromQuery ? [location.host] : [],
+    // 测试环境默认不自动翻译（生产默认全开）；auto-translate 用例自行设置
+    autoSites: [],
+  };
+  const memRead = (key) => {
+    try {
+      const raw = localStorage.getItem(`mock-storage:${key}`);
+      if (raw !== null) return JSON.parse(raw);
+    } catch {
+      /* 解析失败回退内存 */
+    }
+    return memCache[key];
+  };
+  const memWrite = (key, value) => {
+    memCache[key] = value;
+    try {
+      localStorage.setItem(`mock-storage:${key}`, JSON.stringify(value));
+    } catch {
+      /* localStorage 不可用时仅内存 */
+    }
+  };
+  const memory = {
+    get disabledSites() {
+      return memRead('disabledSites');
+    },
+    set disabledSites(v) {
+      memWrite('disabledSites', v);
+    },
   };
   // ===== IndexedDB 最小 mock =====
   // 图片翻译任务已从 storage.local 迁移到 IndexedDB（见 utils/image-job-store.ts），
@@ -158,25 +187,42 @@
         await new Promise((resolve) => setTimeout(resolve, 40));
         return { disabledSites: snapshot };
       }
-      if (typeof keys === 'string') return { [keys]: memory[keys] };
+      const read = (key) => memRead(key);
+      if (typeof keys === 'string') return { [keys]: read(keys) };
       if (Array.isArray(keys)) {
-        return Object.fromEntries(keys.map((key) => [key, memory[key]]));
+        return Object.fromEntries(keys.map((key) => [key, read(key)]));
       }
-      return { ...memory };
+      const all = {};
+      for (const key of Object.keys(memCache)) all[key] = read(key);
+      return all;
     },
     async set(values) {
       const changes = {};
       Object.entries(values).forEach(([key, value]) => {
-        changes[key] = { oldValue: memory[key], newValue: value };
-        memory[key] = value;
+        changes[key] = { oldValue: memRead(key), newValue: value };
+        memWrite(key, value);
       });
       storageEvents.emit(changes);
     },
     async remove(keys) {
-      for (const key of [keys].flat()) delete memory[key];
+      for (const key of [keys].flat()) {
+        try {
+          localStorage.removeItem(`mock-storage:${key}`);
+        } catch {
+          /* ignore */
+        }
+        delete memCache[key];
+      }
     },
     async clear() {
-      Object.keys(memory).forEach((key) => delete memory[key]);
+      for (const key of Object.keys(memCache)) {
+        try {
+          localStorage.removeItem(`mock-storage:${key}`);
+        } catch {
+          /* ignore */
+        }
+        delete memCache[key];
+      }
     },
   };
   const root = document.documentElement;

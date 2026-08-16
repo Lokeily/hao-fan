@@ -10,6 +10,7 @@ export interface TranslationStats {
   promptTokens: number;
   completionTokens: number;
   requests: number;
+  qualityIssues: number; // 质量自检发现「原文符号/数字/链接缺失」的段落数
 }
 
 export interface UsageTotals extends TranslationStats {
@@ -29,6 +30,7 @@ export const EMPTY_STATS: TranslationStats = {
   promptTokens: 0,
   completionTokens: 0,
   requests: 0,
+  qualityIssues: 0,
 };
 
 export const EMPTY_USAGE_TOTALS: UsageTotals = {

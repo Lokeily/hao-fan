@@ -9,6 +9,18 @@ import { MAX_TEXT_CHARS } from '../../utils/messages.ts';
 import '../../styles/options.css';
 
 if (typeof document !== 'undefined' && typeof location !== 'undefined') {
+  // 防御性基础样式：即使外部 CSS 加载失败，弹窗也保持可读（背景/字体/宽度）。
+  // 颜色跟随系统深浅色（不能写死浅色，否则深色系统下白字浅底看不清）。
+  const defensiveDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  document.body.style.setProperty('width', '360px');
+  document.body.style.setProperty('margin', '0');
+  document.body.style.setProperty('background', defensiveDark ? '#000000' : '#f2f2f7');
+  document.body.style.setProperty('color', defensiveDark ? '#f5f5f7' : '#1d1d1f');
+  document.body.style.setProperty(
+    'font-family',
+    '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
+  );
+  document.body.style.setProperty('color-scheme', 'light dark');
   const logoUrl =
     typeof browser.runtime.getURL === 'function'
       ? browser.runtime.getURL('/icon-128.png')
@@ -75,7 +87,17 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
     </div>
   `;
 
-  buildConfigForm(document.getElementById('ot-form-mount') as HTMLElement, true);
+  // 表单渲染保护：异常时不至于整页空白，提示可恢复操作
+  try {
+    buildConfigForm(document.getElementById('ot-form-mount') as HTMLElement, true);
+  } catch {
+    const mount = document.getElementById('ot-form-mount');
+    if (mount) {
+      mount.textContent = '设置加载失败，请重新打开弹窗或检查扩展状态';
+      mount.style.cssText =
+        'padding:12px;font-size:13px;color:#ff3b30;border-radius:10px;background:rgba(255,59,48,0.08);';
+    }
+  }
 
   // 标签页切换
   const tabs = Array.from(document.querySelectorAll('.ot-tab')) as HTMLButtonElement[];
@@ -106,6 +128,8 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   });
 
   const input = document.getElementById('ot-input') as HTMLTextAreaElement;
+  // 打开弹窗自动聚焦输入框，直接输入即可翻译（多数用户场景）
+  input?.focus({ preventScroll: true });
   const inputCount = document.getElementById('ot-input-count') as HTMLElement;
   const out = document.getElementById('ot-out') as HTMLElement;
   const fileInput = document.getElementById('ot-file') as HTMLInputElement;

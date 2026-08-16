@@ -12,18 +12,35 @@ import {
   closestTextBlock,
 } from '../utils/dom.ts';
 import { planTextChunks, takeFirstTextChunk } from '../utils/chunking.ts';
-import { configItem, disabledSitesItem, toolbarPosItem } from '../utils/storage.ts';
+import {
+  configItem,
+  disabledSitesItem,
+  autoSitesItem,
+  toolbarPosItem,
+  settingsPanelPosItem,
+} from '../utils/storage.ts';
 import {
   createTranslationNode,
   createNoticeHost,
   createSelectionUiStyle,
+  createSettingsPanel,
+  createHoverBubble,
+  createInputTranslateButton,
+  makeDraggable,
+  themeColors,
 } from '../utils/content-ui.ts';
 import { buildConfigForm } from '../utils/ui.ts';
 import { mountImageResultOverlay } from '../utils/image-overlay.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
 import { randomId } from '../utils/id.ts';
-import { isSiteDisabled } from '../utils/site-policy.ts';
+import { isSiteDisabled, withSiteDisabled } from '../utils/site-policy.ts';
+import { normalizeConfig } from '../utils/config.ts';
+import { buildConfigForm } from '../utils/ui.ts';
+// 设置页样式直接打包进内容脚本（?raw），完整设置面板无需 fetch 扩展资源。
+import fullSettingsCss from '../styles/options.css?raw';
+import { LANGUAGES } from '../utils/languages.ts';
+import { PROVIDERS } from '../utils/providers.ts';
 import '../styles/content.css';
 
 let activeImageCleanup: (() => void) | null = null;
@@ -55,7 +72,7 @@ export default defineContentScript({
 
     let busy = false;
     let translatedCount = 0; // 已插入译文计数（避免每次 querySelectorAll 全文档统计，省性能）
-    let totalSegCount = 0; // 本次翻译预计总段数（用于"已译 X / Y 段"进度）
+    let pageTotalFound = 0; // 本次整页扫描发现的段落总数（进度显示用）
     let estimatedTokensSaved = 0;
     let dynamicActive = false;
     let dynamicObserver: MutationObserver | null = null;
@@ -73,6 +90,9 @@ export default defineContentScript({
     let retryCounts = new WeakMap<Element, number>();
     const sessionTranslations = new SessionTranslationCache();
     let translationConfigRevision = 0;
+    let currentTranslationStyle = 'plain';
+    let hoverTranslateEnabled = true;
+    let inputTranslateEnabled = true;
     let noticeHost: HTMLElement | null = null;
     const noticeCycles = new NoticeCycleGate();
     let blockedPageJobId: string | null = null;
@@ -96,6 +116,33 @@ export default defineContentScript({
           setSiteDisabledState(isSiteDisabled(sites, location.href));
         }
       })
+      .then(async () => {
+        // 自动翻译此站：站点在自动翻译列表且未被暂停时，页面加载后自动开始翻译。
+        try {
+          const autoSites = await autoSitesItem.getValue();
+          // null（未配置）= 默认自动翻译此站；配置过则按列表判断
+          const autoEnabled = autoSites === null || isSiteDisabled(autoSites, location.href);
+          if (autoEnabled) {
+            await new Promise<void>((resolve) => {
+              if (sitePolicyLoaded) {
+                resolve();
+                return;
+              }
+              const timer = setInterval(() => {
+                if (sitePolicyLoaded) {
+                  clearInterval(timer);
+                  resolve();
+                }
+              }, 60);
+            });
+            if (!siteDisabled && !document.querySelector('.ot-translation')) {
+              void translatePage(true);
+            }
+          }
+        } catch {
+          /* 存储不可用时跳过自动翻译 */
+        }
+      })
       .catch(() => {
         if (!sitePolicyLoaded) setSiteDisabledState(false);
       });
@@ -103,9 +150,60 @@ export default defineContentScript({
     // 页面内的开关/弹层反复创建相同 DOM 时直接复用译文；配置变化后立即失效，
     // 避免把旧语言或旧模型的结果继续显示出来。
     try {
-      configItem.watch(() => {
+      configItem.watch((v) => {
         translationConfigRevision++;
         sessionTranslations.clear();
+        if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+        hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
+        inputTranslateEnabled = v ? v.inputTranslate !== false : true;
+        document.querySelectorAll('.ot-translation').forEach((el) => {
+          (el as HTMLElement).dataset.style = currentTranslationStyle;
+        });
+      });
+      void configItem
+        .getValue()
+        .then((v) => {
+          if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+          hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
+          inputTranslateEnabled = v ? v.inputTranslate !== false : true;
+        })
+        .catch(() => {});
+      // 双向同步：设置变化时刷新已打开的大面板与快速设置面板，保证两边状态一致。
+      // 回调内任何异常都不允许影响内容脚本主流程。
+      const safeWatch = (item: { watch?: (cb: (v: any) => void) => void }, cb: (v: any) => void) => {
+        try {
+          item.watch?.((v) => {
+            try {
+              cb(v);
+            } catch {
+              /* 面板刷新失败不影响翻译主流程 */
+            }
+          });
+        } catch {
+          /* storage 监听不可用时静默降级 */
+        }
+      };
+      safeWatch(configItem, (v) => {
+        if (!v) return;
+        hoverTranslateEnabled = v.hoverTranslate !== false;
+        inputTranslateEnabled = v.inputTranslate !== false;
+        fullSettingsFormApi?.update(v);
+        settingsPanel?.update({
+          targetLang: v.targetLang,
+          provider: v.provider,
+          hoverTranslate: v.hoverTranslate !== false,
+          inputTranslate: v.inputTranslate !== false,
+        });
+      });
+      safeWatch(disabledSitesItem, (sites) => {
+        const paused = isSiteDisabled(sites, location.href);
+        settingsPanel?.update({ sitePaused: paused });
+        fullSettingsFormApi?.updateSiteState(undefined, paused);
+      });
+      safeWatch(autoSitesItem, (sites) => {
+        const autoOn = sites === null || isSiteDisabled(sites, location.href);
+        settingsPanel?.update({ autoTranslate: autoOn });
+        fullSettingsFormApi?.updateSiteState(autoOn, undefined);
       });
     } catch {
       /* 极少数页面中 storage 监听不可用时，仅保留当前页面会话缓存。 */
@@ -156,23 +254,43 @@ export default defineContentScript({
       noticeHost = createNoticeHost(title, message, closeNotice);
       document.documentElement.appendChild(noticeHost);
     }
+    // 译文可编辑 → 术语自动学习：把原文与用户修改后的译文发给后台抽取术语并沉淀。
+    function handleTranslationEdit(el: Element, newTranslation: string) {
+      const node = translationNodes.get(el);
+      const source = node?.dataset.source || textOfBlock(el);
+      if (!source) return;
+      sendRuntimeMessage({
+        type: 'LEARN_TERM',
+        payload: { source, edited: newTranslation },
+      })
+        .then((r: any) => {
+          if (r?.ok && r.learned) showStatus('已学习该术语 ✓', true);
+          else if (r?.ok && !r.learned) showStatus(r?.reason || '未发现可学习的术语调整', true);
+          else showStatus(r?.error || '术语学习失败', true);
+        })
+        .catch(() => showStatus('术语学习失败', true));
+    }
+
     // ===== 译文嵌入（网页嵌入对照方案）：直接在原文文字下方插入译文节点 =====
     // 节点构建见 utils/content-ui.ts 的 createTranslationNode。
-    function insertTranslation(
-      el: Element,
-      translation: string,
-      options: { editable?: boolean; onEdit?: (s: string, e: string) => void; note?: string } = {},
-    ) {
-      // 流式 delta 直接调用本函数；若节点已被页面动态移除（导航/局部刷新），
-      // 写入会抛错且发生在未 await 的监听回调中。先判连防异常，保持安静失败。
-      if (!el.isConnected) return;
+    function insertTranslation(el: Element, translation: string, sourceText?: string) {
       const existing = translationNodes.get(el);
       if (existing?.isConnected) {
         const text = existing.shadowRoot?.querySelector('.text');
-        if (text) text.textContent = translation;
+        if (text) {
+          text.textContent = translation;
+          // 移除流式占位脉冲动画（译文到达后不再闪烁）
+          text.classList.remove('is-pending');
+        }
+        existing.dataset.translation = translation;
+        existing.dataset.source = sourceText ?? existing.dataset.source ?? '';
         return;
       }
-      const node = createTranslationNode(translation, el, options);
+      const node = createTranslationNode(translation, el, {
+        sourceText,
+        onEdit: (next) => handleTranslationEdit(el, next),
+        style: currentTranslationStyle,
+      });
       translationNodes.set(el, node);
       const tag = el.tagName;
       const role = el.getAttribute('role');
@@ -208,7 +326,21 @@ export default defineContentScript({
         parentDisplay === 'inline-flex' ||
         parentDisplay === 'grid' ||
         parentDisplay === 'inline-grid';
-      if (parentCreatesLayout) el.appendChild(node);
+      // float 元素与 CSS 多列（column-count/width）布局：afterend 插入的兄弟节点
+      // 会被 float 挤出容器，或作为新列项流入下一列——译文与原文视觉错位。
+      // 一律嵌入原文块内部，译文紧随原文且不改变页面布局。
+      const ownFloat = getComputedStyle(el).float;
+      let columnAncestor = false;
+      let depth = 0;
+      for (let p = el.parentElement; p && p !== document.documentElement && depth < 3; p = p.parentElement) {
+        depth++;
+        const cs = getComputedStyle(p);
+        if (cs.columnCount !== 'auto' || cs.columnWidth !== 'auto') {
+          columnAncestor = true;
+          break;
+        }
+      }
+      if (parentCreatesLayout || ownFloat !== 'none' || columnAncestor) el.appendChild(node);
       else el.insertAdjacentElement('afterend', node);
     }
 
@@ -268,7 +400,7 @@ export default defineContentScript({
         markTranslated(el);
         return 'skipped';
       }
-      insertTranslation(el, translation, { editable: true, onEdit: learnTerm, note });
+      insertTranslation(el, translation, original);
       markTranslated(el);
       return 'inserted';
     }
@@ -290,41 +422,10 @@ export default defineContentScript({
     let statusSpinner: HTMLElement | null = null;
     let statusText: HTMLElement | null = null;
     let statusTimer: ReturnType<typeof setTimeout> | null = null;
-    function ensureStatusEl() {
-      if (statusEl) return;
-      statusEl = document.createElement('div');
-      statusEl.id = 'ot-status';
-      statusEl.setAttribute('role', 'status');
-      statusEl.setAttribute('aria-live', 'polite');
-      Object.assign(statusEl.style, {
-        position: 'fixed',
-        right: '20px',
-        bottom: '74px',
-        zIndex: '2147483646',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '7px',
-        background: 'rgba(28,28,30,0.86)',
-        color: '#fff',
-        font: '12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        padding: '6px 11px',
-        borderRadius: '8px',
-        pointerEvents: 'none',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-        opacity: '0',
-        transition: 'opacity 0.2s ease',
-        maxWidth: '260px',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      });
-      statusSpinner = document.createElement('span');
-      statusSpinner.className = 'ot-spinner';
-      statusSpinner.style.display = 'none';
-      statusText = document.createElement('span');
-      statusEl.append(statusSpinner, statusText);
-      document.documentElement.appendChild(statusEl);
+    function progressText(): string {
+      return pageTotalFound > 0 ? `${translatedCount}/${pageTotalFound}` : String(translatedCount);
     }
+
     function showStatus(text: string, transient = false) {
       ensureStatusEl();
       statusSpinner!.style.display = 'none';
@@ -389,7 +490,7 @@ export default defineContentScript({
       activeImageCleanup = null;
       document.querySelectorAll('.ot-img-panel, .ot-img-seg').forEach((el) => el.remove());
       translatedCount = 0;
-      totalSegCount = 0;
+      pageTotalFound = 0;
       estimatedTokensSaved = 0;
       hideStatus();
     }
@@ -415,6 +516,164 @@ export default defineContentScript({
       const n = Math.min(concurrency, Math.max(1, chunks.length));
       await Promise.all(Array.from({ length: n }, () => worker()));
       return failures;
+    }
+
+    // ===== SSE 流式首块：逐段预创建节点，边收边渲染，首字延迟降到首个 token =====
+    let streamPort: ReturnType<typeof runtime.connect> | null = null;
+    function getStreamPort(): ReturnType<typeof runtime.connect> | null {
+      if (streamPort && (streamPort as any).onDisconnect) return streamPort;
+      try {
+        streamPort = runtime.connect({ name: 'haofan-stream' });
+        streamPort.onDisconnect.addListener(() => {
+          streamPort = null;
+        });
+      } catch {
+        streamPort = null;
+      }
+      return streamPort;
+    }
+
+    // 滑动窗口上下文：页面标题 + 上一段译文，供后台做上下文感知翻译。
+    let lastTranslation = '';
+    function pageContext(): { title?: string; prev?: string } {
+      return { title: document.title || undefined, prev: lastTranslation || undefined };
+    }
+
+    async function translateChunkStreaming(
+      items: TranslationItem[],
+      jobId: string | undefined,
+      context: { title?: string; prev?: string } | undefined,
+    ): Promise<void> {
+      const port = getStreamPort();
+      if (!port) {
+        await translateChunk(items, jobId, context);
+        return;
+      }
+      if (jobId && activePageJobId !== jobId) return;
+      const requestConfigRevision = translationConfigRevision;
+      let inserted = 0;
+      let idSeq = 0;
+      const streamCallId = `${Date.now().toString(36)}${randomId().slice(0, 4)}`;
+      const done: Promise<void>[] = [];
+      // 流式请求兜底：后台 SW 休眠/扩展重载会断开端口，若不处理，done 将永久挂起，
+      // 导致整页翻译卡死（busy 永远为 true）。断开或超时后立即收尾，
+      // 未完成段落重新进入视口观察队列，由懒翻译/动态扫描补译。
+      const pending: { settle: () => void; el: Element }[] = [];
+      const settleAll = () => {
+        for (const p of pending) {
+          p.settle();
+          p.el.classList.remove(PENDING_CLASS);
+          if (p.el.isConnected) {
+            observeForLazyTranslation([{ el: p.el, text: textOfBlock(p.el) }]);
+          }
+        }
+        pending.length = 0;
+      };
+      port.onDisconnect.addListener(settleAll);
+      for (const item of items) {
+        if (jobId && activePageJobId !== jobId) break;
+        if (!item.el.isConnected) continue;
+        (item.el as HTMLElement).classList.add(PENDING_CLASS);
+        insertTranslation(item.el, '', item.text);
+        const node = translationNodes.get(item.el);
+        const id = `${streamCallId}-s${idSeq++}`;
+        const p = new Promise<void>((resolve) => {
+          const entry = {
+            settle: () => resolve(),
+            el: item.el,
+          };
+          pending.push(entry);
+          // 超时兜底：与后台单次请求超时（20s）对齐，多给 5s 余量。
+          const timer = setTimeout(() => {
+            const idx = pending.indexOf(entry);
+            if (idx >= 0) pending.splice(idx, 1);
+            entry.settle();
+            entry.el.classList.remove(PENDING_CLASS);
+            // 移除"…"占位节点，等待重试
+            const node = translationNodes.get(entry.el);
+            node?.remove();
+            translationNodes.delete(entry.el);
+            if (entry.el.isConnected) {
+              observeForLazyTranslation([{ el: entry.el, text: textOfBlock(entry.el) }]);
+            }
+          }, 25_000);
+          const onMsg = (msg: any) => {
+            if (!msg || msg.id !== id) return;
+            if (typeof msg.delta === 'string' && node?.isConnected) {
+              const text = node.shadowRoot?.querySelector('.text');
+              if (text) {
+                text.textContent = msg.delta;
+                text.classList.remove('is-pending');
+              }
+            }
+            if (msg.done) {
+              clearTimeout(timer);
+              const idx = pending.indexOf(entry);
+              if (idx >= 0) pending.splice(idx, 1);
+              try {
+                port.onMessage.removeListener(onMsg);
+              } catch {
+                /* 端口已断开 */
+              }
+              if (jobId && activePageJobId !== jobId) {
+                resolve();
+                return;
+              }
+              if (msg.error) {
+                // 流式请求失败：告知用户原因，移除占位节点，段落回到懒翻译队列待重试
+                (item.el as HTMLElement).classList.remove(PENDING_CLASS);
+                node?.remove();
+                translationNodes.delete(item.el);
+                showNotice(String(msg.error), jobId || 'page-translation');
+                if (item.el.isConnected) {
+                  observeForLazyTranslation([{ el: item.el, text: textOfBlock(item.el) }]);
+                }
+                resolve();
+                return;
+              }
+              const translation = typeof msg.translation === 'string' ? msg.translation : '';
+              if (node?.isConnected) {
+                const text = node.shadowRoot?.querySelector('.text');
+                if (text) {
+                  text.textContent = translation || '';
+                  text.classList.remove('is-pending');
+                }
+              }
+              if (requestConfigRevision === translationConfigRevision) {
+                if (translation) {
+                  lastTranslation = translation;
+                  sessionTranslations.remember(item.text, translation);
+                  const outcome = applyTranslation(item.el, item.text, translation);
+                  if (outcome === 'inserted') inserted++;
+                  else if (outcome === 'stale') {
+                    const cur = textOfBlock(item.el);
+                    if (cur.length >= 2) observeForLazyTranslation([{ el: item.el, text: cur }]);
+                  }
+                  if (msg.issue && Array.isArray(msg.issue) && msg.issue.length) {
+                    node?.setAttribute('data-quality', 'warn');
+                  }
+                } else {
+                  (item.el as HTMLElement).classList.remove(PENDING_CLASS);
+                }
+              }
+              resolve();
+            }
+          };
+          port.onMessage.addListener(onMsg);
+          port.postMessage({ type: 'translate-one', id, text: item.text, jobId, context });
+        });
+        done.push(p);
+      }
+      await Promise.all(done);
+      try {
+        port.onDisconnect.removeListener(settleAll);
+      } catch {
+        /* 端口已断开 */
+      }
+      if (jobId && activePageJobId === jobId && inserted > 0) {
+        translatedCount += inserted;
+        showStatus(`翻译中… 已译 ${progressText()} 段`);
+      }
     }
 
     function isInViewport(element: Element): boolean {
@@ -509,12 +768,12 @@ export default defineContentScript({
           maxCharacters: DYNAMIC_CHUNK_CHARACTERS,
         });
         const failures = await runChunkQueue(chunks, LAZY_CONCURRENCY, (chunk) =>
-          translateChunk(chunk, jobId),
+          translateChunk(chunk, jobId, pageContext()),
         );
         if (activePageJobId === jobId) {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
           const failureText = failures > 0 ? ` · ${failures} 批失败` : '';
-          showStatus(`已翻译 ${translatedCount} 段${savedText}${failureText} · 滚动时继续`, true);
+          showStatus(`已翻译 ${progressText()} 段${savedText}${failureText} · 滚动时继续`, true);
         }
       } finally {
         if (activePageJobId === jobId) {
@@ -539,6 +798,7 @@ export default defineContentScript({
     async function fallbackTranslateIndividually(
       items: { el: Element; text: string }[],
       jobId: string | undefined,
+      context?: { title?: string; prev?: string },
     ): Promise<void> {
       const snapshotRevision = translationConfigRevision;
       let inserted = 0;
@@ -552,7 +812,7 @@ export default defineContentScript({
           try {
             const r: any = await sendRuntimeMessage({
               type: 'TRANSLATE_ONE',
-              payload: { text: item.text, jobId, pageContext: buildPageContext(item.el) },
+              payload: { text: item.text, jobId, context },
             });
             if (!r?.ok) throw new Error(r?.error || '逐条翻译失败');
             const t = typeof r.translation === 'string' ? r.translation : '';
@@ -567,6 +827,11 @@ export default defineContentScript({
               const currentText = textOfBlock(item.el);
               if (currentText.length >= 2) stale.push({ el: item.el, text: currentText });
             }
+            if (r.issue && Array.isArray(r.issue) && r.issue.length > 0) {
+              const node = translationNodes.get(item.el);
+              node?.setAttribute('data-quality', 'warn');
+              node?.setAttribute('title', '质量自检：原文中的数字 / 链接 / 代码可能未完整保留，请核对');
+            }
             estimatedTokensSaved += Math.max(0, Number(r.stats?.estimatedTokensSaved) || 0);
             retryCounts.delete(item.el);
           } catch (error) {
@@ -578,22 +843,17 @@ export default defineContentScript({
       if (jobId && activePageJobId !== jobId) return;
       if (stale.length > 0) observeForLazyTranslation(stale);
       translatedCount += inserted;
-      if (inserted > 0) showProgress(true);
+      if (inserted > 0) showStatus(`翻译中… 已译 ${progressText()} 段`);
       if (failures > 0) {
         throw firstError instanceof Error ? firstError : new Error(`${failures} 段逐条翻译失败`);
       }
     }
 
-    // 仅当错误指向「引擎整体不可用」（密钥/权限/端点/模型）时才令本页停机，
-    // 否则（空结果、输出截断等可恢复错误）只跳过本批，让整页其余内容继续翻译。
-    function isPageBlockingError(error: unknown): boolean {
-      const message = error instanceof Error ? error.message : String(error);
-      return /(请先在设置页填写 API Key|API Key 含有|未配置 API Base URL|不支持的翻译引擎|不支持的.*模型|401|403|Unauthorized|Forbidden)/i.test(
-        message,
-      );
-    }
-
-    async function translateChunk(items: { el: Element; text: string }[], jobId?: string) {
+    async function translateChunk(
+      items: { el: Element; text: string }[],
+      jobId?: string,
+      context?: { title?: string; prev?: string },
+    ) {
       if (jobId && (activePageJobId !== jobId || blockedPageJobId === jobId)) {
         items.forEach((item) => (item.el as HTMLElement).classList.remove(PENDING_CLASS));
         return;
@@ -603,12 +863,12 @@ export default defineContentScript({
         const texts = items.map((x) => x.text);
         const res = (await sendRuntimeMessage({
           type: 'TRANSLATE_BATCH',
-          payload: { texts, jobId, pageContext: buildPageContext() },
+          payload: { texts, jobId, context },
         })) as
           | {
               ok?: boolean;
               translations?: unknown;
-              notes?: unknown;
+              issues?: (string[] | null)[] | null;
               stats?: { estimatedTokensSaved?: number };
               error?: string;
             }
@@ -617,50 +877,17 @@ export default defineContentScript({
         if (!res?.ok) throw new Error(res?.error || '翻译失败');
         const translations = res.translations;
         if (!Array.isArray(translations) || translations.length !== items.length) {
-          // 批量响应条目数异常（模型偶发漏条目 / 多余条目）。
-          // 已成功返回的条目直接应用，仅对缺失或解析失败的条目逐条回退，
-          // 避免把整批已成功的内容也重发一遍，浪费 Token 与请求额度；整页其余翻译继续。
-          const missing: { el: Element; text: string }[] = [];
-          let inserted = 0;
-          const stale: TranslationItem[] = [];
-          items.forEach((item, k) => {
-            const t =
-              Array.isArray(translations) && typeof translations[k] === 'string'
-                ? (translations[k] as string)
-                : '';
-            if (t) {
-              if (requestConfigRevision === translationConfigRevision) {
-                sessionTranslations.remember(item.text, t);
-              }
-              const outcome = applyTranslation(
-                item.el,
-                item.text,
-                t,
-                Array.isArray(res.notes) ? ((res.notes as (string | null)[])[k] ?? undefined) : undefined,
-              );
-              if (outcome === 'inserted') inserted++;
-              else if (outcome === 'stale') {
-                (item.el as HTMLElement).classList.remove(PENDING_CLASS);
-                const currentText = textOfBlock(item.el);
-                if (currentText.length >= 2) stale.push({ el: item.el, text: currentText });
-              }
-              retryCounts.delete(item.el);
-            } else {
-              missing.push(item);
-            }
-          });
-          if (stale.length > 0 && (!jobId || activePageJobId === jobId)) {
-            observeForLazyTranslation(stale);
-          }
-          translatedCount += inserted;
-          if (inserted > 0) showProgress(true);
-          if (missing.length > 0) {
-            await fallbackTranslateIndividually(missing, jobId);
-          }
+          // 批量响应条目数异常：逐条回退翻译，避免整页翻译被单批错误中断。
+          await fallbackTranslateIndividually(items, jobId, context);
           return;
         }
         const saved = Number(res.stats?.estimatedTokensSaved) || 0;
         estimatedTokensSaved += Math.max(0, saved);
+        // 更新上下文窗口：非流式批量完成后，以最后一段译文作为后续翻译的语境
+        const lastText = items[items.length - 1];
+        if (lastText && typeof translations[items.length - 1] === 'string' && translations[items.length - 1]) {
+          lastTranslation = translations[items.length - 1];
+        }
 
         // 译文直接嵌入原文下方（<span>+display:block，见 makeTranslationNode），形成双语对照
         let inserted = 0;
@@ -683,6 +910,13 @@ export default defineContentScript({
             (x.el as HTMLElement).classList.remove(PENDING_CLASS);
             if (currentText.length >= 2) stale.push({ el: x.el, text: currentText });
           }
+          // 质量自检发现原文符号缺失：标记该译文，提示用户核对。
+          const issue = res.issues?.[k];
+          if (issue && Array.isArray(issue) && issue.length > 0) {
+            const node = translationNodes.get(x.el);
+            node?.setAttribute('data-quality', 'warn');
+            node?.setAttribute('title', '质量自检：原文中的数字 / 链接 / 代码可能未完整保留，请核对');
+          }
           retryCounts.delete(x.el);
         });
         if (stale.length > 0 && (!jobId || activePageJobId === jobId)) {
@@ -690,7 +924,8 @@ export default defineContentScript({
         }
         translatedCount += inserted;
         if (inserted > 0) {
-          showProgress(true);
+          const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
+          showStatus(`翻译中… 已译 ${progressText()} 段${savedText}`);
         }
       } catch (error) {
         if (jobId && activePageJobId !== jobId) return;
@@ -877,17 +1112,14 @@ export default defineContentScript({
         let failures = 0;
         if (firstChunk.length > 0) {
           try {
-            // 首块首段走流式输出（极低首字延迟），其余并行走普通批；任一失败不影响整体。
-            const tailFailed = await translateFirstChunkStreamed(firstChunk, jobId);
-            if (tailFailed) failures++;
+            await translateChunkStreaming(firstChunk, jobId, pageContext());
           } catch {
             failures++;
           }
         }
         await scanPromise;
         if (activePageJobId !== jobId) return;
-        // 扫描结束，foundCount 即本次预计总段数 → 进度分母变真实。
-        totalSegCount = foundCount;
+        pageTotalFound = foundCount;
         if (foundCount === 0) {
           showStatus('未找到可翻译的文本内容', true);
           return;
@@ -901,18 +1133,20 @@ export default defineContentScript({
           maxCharacters: PAGE_CHUNK_CHARACTERS,
         });
         failures += await runChunkQueue(chunks, LAZY_CONCURRENCY, (chunk) =>
-          translateChunk(chunk, jobId!),
+          translateChunk(chunk, jobId!, pageContext()),
         );
         if (activePageJobId !== jobId) return;
 
         if (failures > 0) {
-          showStatus(`已翻译 ${translatedCount} 段，${failures} 个批次失败`, true);
+          showStatus(`已翻译 ${progressText()} 段，${failures} 个批次失败`, true);
         } else if (translatedCount === 0) {
           const savedText =
             estimatedTokensSaved > 0 ? `，本地约省 ${estimatedTokensSaved} Token` : '';
           showStatus(`无需翻译（内容已为目标语言）${savedText}`, true);
         } else {
-          showProgress(false);
+          const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
+          const lazyText = deferredCount > 0 ? ' · 滚动时继续' : '';
+          showStatus(`已翻译 ${progressText()} 段${savedText}${lazyText}`, true);
         }
       } catch (e: any) {
         showNotice(e?.message || '翻译失败', jobId || 'page-translation');
@@ -945,6 +1179,12 @@ export default defineContentScript({
         viewportObserver?.unobserve(element);
         lazyPending.delete(element);
         const translation = translationNodes.get(element);
+        // 用户编辑并学习过的译文予以保留，避免 SPA 更新时被重新翻译覆盖。
+        if (translation?.dataset.edited === 'true') {
+          const classes = (element as HTMLElement).classList;
+          classes?.remove(PENDING_CLASS, OBSERVED_CLASS);
+          return;
+        }
         if (translation?.isConnected) translatedCount = Math.max(0, translatedCount - 1);
         translation?.remove();
         translationNodes.delete(element);
@@ -1178,7 +1418,8 @@ export default defineContentScript({
         setToolbarLoading(false);
         hideSelectionUi();
         closeNotice();
-        closeSettingsPopover();
+        closeSettingsPanel();
+        closeFullSettings();
         document.getElementById('ot-toolbar')?.remove();
       } else {
         mountToolbar();
@@ -1472,188 +1713,721 @@ export default defineContentScript({
     // ============================================================
     // ★ 悬浮工具按钮 — 彻底重构：确保在任何网页上都可见
     // ============================================================
-    // ===== 悬浮工具栏：可拖拽的 [译 + ⚙] 按钮组，⚙ 打开页面内快速设置 =====
-    let settingsPopover: HTMLElement | null = null;
-    let justDragged = false;
-    // 快速设置浮层内表单样式（复用 Options 页 .ot-form* 规则，注入到 Shadow DOM 隔离）。
-    const FORM_CSS = `
-      :host { color-scheme: light dark; }
-      * { box-sizing: border-box; }
-      .sp-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #d2d2d7; background: #f8f9fa; }
-      .sp-head button { width: 28px; height: 28px; border: 0; background: transparent; color: #5f6368; font-size: 20px; line-height: 1; border-radius: 6px; cursor: pointer; }
-      .sp-head button:hover { background: rgba(60,64,67,.08); color: #202124; }
-      .sp-body { padding: 4px 14px 14px; overflow: auto; }
-      .ot-form { margin: 0; }
-      .ot-form.is-loading { opacity: .62; cursor: wait; }
-      .ot-form-section { padding: 14px 0; border-bottom: 1px solid #d2d2d7; }
-      .ot-form-section:last-of-type { border-bottom: 0; }
-      .ot-form-section h2 { margin: 0 0 11px; color: #1d1d1f; font-size: 13px; font-weight: 650; }
-      .ot-field-grid { display: grid; grid-template-columns: 1fr; gap: 11px; }
-      .ot-field { display: flex; min-width: 0; flex-direction: column; gap: 7px; color: #6e6e73; font-size: 13px; font-weight: 600; }
-      .ot-field > span { color: #86868b; font-size: 12px; font-weight: 400; }
-      .ot-field-wide { grid-column: auto; }
-      .ot-form input, .ot-form select, .ot-form textarea { width: 100%; min-width: 0; border: 1px solid #d2d2d7; border-radius: 10px; background: #fff; color: #1d1d1f; font-size: 13px; font-weight: 400; }
-      .ot-form input, .ot-form select { min-height: 36px; padding: 8px 11px; }
-      .ot-form textarea { min-height: 64px; padding: 10px 11px; line-height: 1.5; resize: vertical; }
-      .ot-form input:focus, .ot-form select:focus, .ot-form textarea:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(26,115,232,.12); outline: none; }
-      .ot-form input:read-only { background: #f2f2f7; color: #86868b; }
-      .ot-check { display: flex; align-items: center; gap: 12px; min-height: 52px; margin: 0; color: #1d1d1f; cursor: pointer; }
-      .ot-check input { width: 18px; min-height: 18px; height: 18px; margin: 0; padding: 0; flex: 0 0 auto; accent-color: #0071e3; }
-      .ot-check span, .ot-check strong, .ot-check small { display: block; }
-      .ot-check strong { font-size: 14px; font-weight: 600; }
-      .ot-check small { margin-top: 3px; color: #86868b; font-size: 12px; font-weight: 400; line-height: 1.4; }
-      .ot-advanced { padding: 8px 0; border-bottom: 1px solid #d2d2d7; }
-      .ot-advanced summary { color: #1d1d1f; font-size: 13px; font-weight: 650; cursor: pointer; }
-      .ot-advanced[open] summary { margin-bottom: 10px; }
-      .ot-form-actions { display: flex; align-items: center; gap: 14px; min-height: 48px; padding-top: 12px; }
-      .ot-test-btn { flex: 0 0 auto; min-height: 36px; padding: 8px 14px; border: 1px solid #d2d2d7; border-radius: 10px; background: #fff; color: #0071e3; font-size: 13px; font-weight: 650; cursor: pointer; }
-      .ot-test-btn:hover { background: #f2f2f7; }
-      .ot-test-btn:disabled { opacity: .58; cursor: progress; }
-      .ot-status { min-width: 0; color: #248a3d; font-size: 12px; line-height: 1.5; }
-      .ot-status.is-error { color: #c93434; }
-      @media (prefers-color-scheme: dark) {
-        :host { --text:#f0f6fc; }
-        .sp-head { background: #161b22; border-color: #30363d; }
-        .sp-body, .ot-form-section, .ot-advanced, .ot-form input, .ot-form select, .ot-form textarea, .ot-test-btn { background:#161b22; border-color:#30363d; color:#f0f6fc; }
-        .ot-form-section h2, .ot-check strong, .ot-advanced summary { color:#f0f6fc; }
-        .ot-field, .ot-check small { color:#9da7b3; }
-        .ot-test-btn { color:#58a6ff; }
-      }
-    `;
+    // ===== 悬浮工具按钮组（可拖动）：译 + 设置入口 =====
+    let settingsPanel: ReturnType<typeof createSettingsPanel> | null = null;
+    // 设置写入串行队列：多入口（快速面板/大面板/自动翻译）并发写入时防止
+    // "读旧值-写新值"互相覆盖（竞态）。
+    let settingsWriteQueue: Promise<void> = Promise.resolve();
+    const enqueueSettingsWrite = (task: () => Promise<void>): void => {
+      settingsWriteQueue = settingsWriteQueue.then(task).catch(() => {});
+    };
 
-    function closeSettingsPopover() {
-      settingsPopover?.remove();
-      settingsPopover = null;
-      document.removeEventListener('pointerdown', onSettingsOutside, true);
-      document.removeEventListener('keydown', onSettingsKey, true);
+    function closeSettingsPanel() {
+      settingsPanel?.host.remove();
+      settingsPanel = null;
     }
-    function onSettingsOutside(e: Event) {
-      if (settingsPopover && !e.composedPath().includes(settingsPopover)) closeSettingsPopover();
+
+    // ===== 页面内完整设置大面板（网页中央弹窗） =====
+    let fullSettingsHost: HTMLElement | null = null;
+    let fullSettingsFormApi: ReturnType<typeof buildConfigForm> | null = null;
+    let fullSettingsEsc: ((e: KeyboardEvent) => void) | null = null;
+    let fullSettingsWheelLock: ((e: WheelEvent) => void) | null = null;
+    let fullSettingsTouchLock: ((e: TouchEvent) => void) | null = null;
+
+    function closeFullSettings() {
+      if (fullSettingsEsc) {
+        document.removeEventListener('keydown', fullSettingsEsc, true);
+        fullSettingsEsc = null;
+      }
+      if (fullSettingsWheelLock) {
+        window.removeEventListener('wheel', fullSettingsWheelLock, true);
+        fullSettingsWheelLock = null;
+      }
+      if (fullSettingsTouchLock) {
+        window.removeEventListener('touchmove', fullSettingsTouchLock, true);
+        fullSettingsTouchLock = null;
+      }
+      fullSettingsHost?.remove();
+      fullSettingsHost = null;
+      fullSettingsFormApi = null;
     }
-    function onSettingsKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') closeSettingsPopover();
+
+    function openFullSettingsPanel() {
+      closeSettingsPanel();
+      closeFullSettings();
+      const theme = themeColors();
+      const dark = theme.text === '#f5f5f7';
+      // 遮罩层：全屏半透明 + 背景模糊，点击空白处关闭
+      const host = document.createElement('div');
+      host.id = 'ot-full-settings';
+      host.dataset.haofanUi = 'true';
+      host.style.setProperty('all', 'initial', 'important');
+      host.style.setProperty('position', 'fixed', 'important');
+      host.style.setProperty('inset', '0', 'important');
+      host.style.setProperty('z-index', '2147483646', 'important');
+      host.style.setProperty('background', dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.45)', 'important');
+      host.style.setProperty('backdrop-filter', 'blur(12px) saturate(110%)', 'important');
+      host.style.setProperty('-webkit-backdrop-filter', 'blur(12px) saturate(110%)', 'important');
+      host.style.setProperty('display', 'flex', 'important');
+      host.style.setProperty('align-items', 'center', 'important');
+      host.style.setProperty('justify-content', 'center', 'important');
+      host.style.setProperty('animation', 'ot-modal-fade 0.18s ease', 'important');
+
+      const shadow = host.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = `
+        :host { color-scheme: light dark; }
+        * { box-sizing: border-box; }
+        @keyframes ot-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ot-modal-pop {
+          from { opacity: 0; transform: scale(0.96) translateY(10px); }
+          to { opacity: 1; transform: none; }
+        }
+        .modal {
+          display: flex; flex-direction: column;
+          width: min(640px, calc(100vw - 48px));
+          height: min(74vh, 700px);
+          max-height: calc(100vh - 48px);
+          border-radius: 20px;
+          background: ${theme.surface};
+          color: ${theme.text};
+          border: 1px solid ${theme.border};
+          box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 48px 120px rgba(0,0,0,0.45);
+          overflow: hidden;
+          animation: ot-modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .head {
+          display: flex; align-items: center; gap: 8px;
+          padding: 12px 16px;
+          border-bottom: 1px solid ${theme.border};
+          user-select: none;
+        }
+        .title { flex: 1; font-size: 15px; font-weight: 700; letter-spacing: 0; }
+        .close {
+          width: 30px; height: 30px; padding: 0;
+          border: 0; border-radius: 9px;
+          background: transparent; color: ${theme.text2};
+          font-size: 20px; line-height: 1; cursor: pointer;
+        }
+        .close:hover { background: rgba(128,128,128,0.18); color: ${theme.text}; }
+        .ot-full-settings-body {
+          flex: 1; min-height: 0;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          padding: 4px 20px 36px;
+        }
+        .foot {
+          display: flex; align-items: center; justify-content: center; gap: 12px;
+          padding: 10px 16px;
+          border-top: 1px solid ${theme.border};
+        }
+        .foot-hint { color: ${theme.text2}; font-size: 11px; }
+      `;
+      const head = document.createElement('div');
+      head.className = 'head';
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = '好翻 · 完整设置';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'close';
+      close.textContent = '×';
+      close.setAttribute('aria-label', '关闭完整设置');
+      close.addEventListener('click', closeFullSettings);
+      head.append(title, close);
+
+      const body = document.createElement('div');
+      body.className = 'ot-full-settings-body';
+      const mount = document.createElement('div');
+      body.appendChild(mount);
+      const foot = document.createElement('div');
+      foot.className = 'foot';
+      const hint = document.createElement('span');
+      hint.className = 'foot-hint';
+      hint.textContent = '设置自动保存 · 快捷键 Alt+T 翻译当前网页';
+      foot.appendChild(hint);
+      // 关键：head/body/foot 必须包在 .modal 容器内——遮罩 host 是 flex 居中，
+      // 直接平铺会把三者拉成水平一排（此前"排版一团糟"的根因）。
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.append(head, body, foot);
+      shadow.append(style, modal);
+      document.documentElement.appendChild(host);
+      fullSettingsHost = host;
+
+      // 点击遮罩空白处关闭；Esc 关闭。
+      // 注意：不能用 e.target === host——Shadow DOM 事件重定向会把面板内部的
+      // 点击目标重定向为 host，导致"点击输入框/下拉就关闭面板"。
+      // composedPath() 返回真实目标（不重定向），用它判断点击是否落在面板外。
+      host.addEventListener('pointerdown', (e) => {
+        const path = e.composedPath();
+        if (path[0] === host) closeFullSettings();
+      });
+      const escHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') closeFullSettings();
+      };
+      fullSettingsEsc = escHandler;
+      document.addEventListener('keydown', escHandler, true);
+      // 弹窗打开期间锁定页面滚动：滚轮/触摸落在面板外（遮罩上）时阻止，
+      // 面板内部滚动不受影响（此前全局拦截导致面板内容也滚不动）。
+      const inModal = (target: EventTarget | null) => {
+        const el = target instanceof Element ? target : null;
+        if (!el) return false;
+        // 事件目标在面板 shadow 树内（含面板内部元素）→ 不拦截，面板可正常滚动
+        return Boolean(shadow.contains(el));
+      };
+      fullSettingsWheelLock = (e: WheelEvent) => {
+        if (!inModal(e.target)) e.preventDefault();
+      };
+      fullSettingsTouchLock = (e: TouchEvent) => {
+        if (!inModal(e.target)) e.preventDefault();
+      };
+      window.addEventListener('wheel', fullSettingsWheelLock, true);
+      window.addEventListener('touchmove', fullSettingsTouchLock, true);
+      window.addEventListener(
+        'pointerup',
+        () => {},
+        { once: true },
+      );
+
+      // 样式直接来自打包进内容脚本的 options.css（?raw），不依赖网络。
+      const sheet = document.createElement('style');
+      sheet.textContent = fullSettingsCss
+        .replace(/:root/g, ':host')
+        .replace(/\bbody\b/g, '.ot-full-settings-body');
+      shadow.prepend(sheet);
+
+      // 站点偏好初始状态
+      void (async () => {
+        const [disabledSites, autoSites] = await Promise.all([
+          disabledSitesItem.getValue(),
+          autoSitesItem.getValue(),
+        ]);
+        try {
+          fullSettingsFormApi = buildConfigForm(mount, false, {
+            host: location.host,
+            autoTranslate: isSiteDisabled(autoSites, location.href),
+            paused: isSiteDisabled(disabledSites, location.href),
+            onAuto: (enabled) => {
+              enqueueSettingsWrite(async () => {
+                const sites = await autoSitesItem.getValue();
+                await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+              });
+            },
+            onPause: (paused) => {
+              enqueueSettingsWrite(async () => {
+                const sites = await disabledSitesItem.getValue();
+                await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
+              });
+            },
+          });
+        } catch {
+          // 表单构建失败：面板保留头部与关闭按钮，不崩溃内容脚本
+          mount.textContent = '设置加载失败，请重新打开';
+          mount.style.cssText = 'padding:12px;font-size:13px;color:#ff3b30;';
+        }
+      })();
     }
-    function toggleSettingsPopover() {
-      if (settingsPopover) {
-        closeSettingsPopover();
+
+    async function openSettingsPanel(anchorX: number, anchorY: number) {
+      closeSettingsPanel();
+      try {
+        const cfg = normalizeConfig(await configItem.getValue());
+        const [disabledSites, autoSites] = await Promise.all([
+          disabledSitesItem.getValue(),
+          autoSitesItem.getValue(),
+        ]);
+        const paused = isSiteDisabled(disabledSites, location.href);
+        const autoOn = autoSites === null || isSiteDisabled(autoSites, location.href);
+        const hoverOn = cfg.hoverTranslate !== false;
+        const inputOn = cfg.inputTranslate !== false;
+        let panelX = anchorX;
+        let panelY = anchorY;
+        try {
+          const saved = await settingsPanelPosItem.getValue();
+          if (saved) {
+            panelX = saved.x;
+            panelY = saved.y;
+          }
+        } catch {
+          /* 无持久化位置时跟随锚点 */
+        }
+        settingsPanel = createSettingsPanel({
+          languages: LANGUAGES.map((l) => l.name),
+          providers: PROVIDERS.map((p) => ({ id: p.id, name: p.name, needsKey: p.needsKey })),
+          targetLang: cfg.targetLang,
+          provider: cfg.provider,
+          sitePaused: paused,
+          siteHost: location.host,
+          autoTranslate: autoOn,
+          hoverTranslate: hoverOn,
+          inputTranslate: inputOn,
+          onAutoToggle: (enabled) => {
+            enqueueSettingsWrite(async () => {
+              const sites = await autoSitesItem.getValue();
+              await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+            });
+          },
+          onHoverToggle: (enabled) => {
+            enqueueSettingsWrite(async () => {
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({ ...current, hoverTranslate: enabled });
+            });
+          },
+          onInputToggle: (enabled) => {
+            enqueueSettingsWrite(async () => {
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({ ...current, inputTranslate: enabled });
+            });
+          },
+          onTargetLang: (value) => {
+            enqueueSettingsWrite(async () => {
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({ ...current, targetLang: value });
+              translationConfigRevision++;
+              sessionTranslations.clear();
+            });
+          },
+          onProvider: (value) => {
+            enqueueSettingsWrite(async () => {
+              const provider = PROVIDERS.find((p) => p.id === value);
+              if (!provider) return;
+              const current = normalizeConfig(await configItem.getValue());
+              await configItem.setValue({
+                ...current,
+                provider: value,
+                baseUrl: provider.baseUrl,
+                model: provider.defaultModel,
+              });
+              translationConfigRevision++;
+              sessionTranslations.clear();
+            });
+          },
+          onSiteToggle: (paused) => {
+            enqueueSettingsWrite(async () => {
+              const sites = await disabledSitesItem.getValue();
+              await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
+            });
+          },
+          onOpenFullSettings: () => {
+            closeSettingsPanel();
+            openFullSettingsPanel();
+          },
+          onClose: closeSettingsPanel,
+          onDrag: (x, y) => {
+            void settingsPanelPosItem.setValue({ x, y }).catch(() => {});
+          },
+        });
+        // 默认定位在齿轮上方（工具栏常驻右下角，放下方会超出视口）；
+        // 上方放不下再放下方，最后按面板实际尺寸夹取在视口内。
+        const panelW = settingsPanel.host.offsetWidth || 320;
+        const panelH = settingsPanel.host.offsetHeight || 400;
+        if (panelY + panelH > window.innerHeight - 8 && anchorY - panelH - 8 >= 8) {
+          panelY = anchorY - panelH - 8;
+        }
+        const maxX = Math.max(8, window.innerWidth - panelW - 8);
+        const maxY = Math.max(8, window.innerHeight - panelH - 8);
+        settingsPanel.host.style.setProperty(
+          'left',
+          `${Math.min(Math.max(8, panelX), maxX)}px`,
+          'important',
+        );
+        settingsPanel.host.style.setProperty(
+          'top',
+          `${Math.min(Math.max(8, panelY), maxY)}px`,
+          'important',
+        );
+      } catch {
+        /* 存储不可用时静默 */
+      }
+    }
+
+    // ===== 悬停翻译：鼠标悬停段落 500ms 显示译文气泡（可固定） =====
+    let hoverBubble: ReturnType<typeof createHoverBubble> | null = null;
+    let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+    let hoverPinned = false;
+    let hoverEl: Element | null = null;
+
+    function hideHoverBubble() {
+      if (hoverPinned) return;
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+      }
+      if (hoverHideTimer) {
+        clearTimeout(hoverHideTimer);
+        hoverHideTimer = null;
+      }
+      hoverBubble?.host.remove();
+      hoverBubble = null;
+      hoverEl = null;
+    }
+
+    function showHoverBubbleFor(el: Element) {
+      if (hoverPinned) return;
+      hideHoverBubble();
+      hoverEl = el;
+      const text = textOfBlock(el);
+      if (text.length < 2) return;
+      if (el.querySelector(':scope > .ot-translation')) return;
+      hoverBubble = createHoverBubble(text, (pinned) => {
+        hoverPinned = pinned;
+      });
+      document.documentElement.appendChild(hoverBubble.host);
+      const rect = el.getBoundingClientRect();
+      const bw = 280;
+      const left = Math.min(Math.max(8, rect.left + 8), window.innerWidth - bw - 8);
+      const top = Math.min(Math.max(8, rect.bottom + 8), window.innerHeight - 80);
+      hoverBubble.host.style.setProperty('left', `${left}px`, 'important');
+      hoverBubble.host.style.setProperty('top', `${top}px`, 'important');
+      const cached = sessionTranslations.get(text);
+      if (cached !== undefined) {
+        hoverBubble.setTranslation(cached);
         return;
       }
-      const toolbar = document.getElementById('ot-toolbar');
-      if (!toolbar) return;
-      const pop = document.createElement('div');
-      pop.id = 'ot-settings-popover';
-      pop.dataset.haofanUi = 'true';
-      Object.assign(pop.style, {
-        position: 'fixed',
-        zIndex: '2147483646',
-        width: '320px',
-        maxHeight: '70vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: '#fff',
-        color: '#1d1d1f',
-        border: '1px solid #d2d2d7',
-        borderRadius: '12px',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-        overflow: 'hidden',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-      });
-      const shadow = pop.attachShadow({ mode: 'open' });
-      const style = document.createElement('style');
-      style.textContent = FORM_CSS;
-      const head = document.createElement('div');
-      head.className = 'sp-head';
-      const title = document.createElement('div');
-      title.textContent = '快速设置';
-      title.style.fontWeight = '650';
-      title.style.fontSize = '14px';
-      const closeBtn = document.createElement('button');
-      closeBtn.type = 'button';
-      closeBtn.textContent = '×';
-      closeBtn.title = '关闭';
-      closeBtn.setAttribute('aria-label', '关闭快速设置');
-      closeBtn.addEventListener('click', closeSettingsPopover);
-      head.append(title, closeBtn);
-      const body = document.createElement('div');
-      body.className = 'sp-body';
-      shadow.append(style, head, body);
-      // 复用 Options/Popup 共用配置表单；compact=true 隐藏提示文案，改动即时写入并生效。
-      buildConfigForm(body, true);
-      document.documentElement.appendChild(pop);
-      // 紧贴工具栏上方，越界则翻到下方。
-      const pr = pop.getBoundingClientRect();
-      const tr = toolbar.getBoundingClientRect();
-      let left = tr.left + tr.width - pr.width;
-      let top = tr.top - pr.height - 12;
-      if (top < 8) top = tr.bottom + 12;
-      if (left < 8) left = 8;
-      if (left + pr.width > window.innerWidth - 8) left = window.innerWidth - pr.width - 8;
-      pop.style.left = `${Math.max(8, left)}px`;
-      pop.style.top = `${Math.max(8, top)}px`;
-      settingsPopover = pop;
-      setTimeout(() => {
-        document.addEventListener('pointerdown', onSettingsOutside, true);
-        document.addEventListener('keydown', onSettingsKey, true);
-      }, 0);
+      void sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } })
+        .then((r: any) => {
+          if (!hoverBubble || hoverEl !== el) return;
+          if (r?.ok && typeof r.translation === 'string' && r.translation) {
+            hoverBubble.setTranslation(r.translation);
+            sessionTranslations.remember(text, r.translation);
+          } else {
+            hoverBubble.setTranslation(r?.error || '翻译失败');
+          }
+        })
+        .catch(() => {
+          if (hoverBubble && hoverEl === el) hoverBubble.setTranslation('翻译失败');
+        });
     }
+
+    document.addEventListener(
+      'mouseover',
+      (e) => {
+        if (!hoverTranslateEnabled) return;
+        const target = e.target as Element | null;
+        if (!target || !document.body.contains(target)) return;
+        if (
+          target.closest(
+            '#ot-hover-bubble, #ot-toolbar, .ot-translation, .ot-selbtn, #ot-error-modal, #ot-settings-panel, #ot-input-btn, #ot-input-result',
+          )
+        )
+          return;
+        if (target.closest('a, button, input, textarea, select, [contenteditable]')) return;
+        const el = closestTextBlock(target, true);
+        if (!el || !el.isConnected) return;
+        if (
+          el.classList.contains(TRANSLATED_CLASS) ||
+          el.classList.contains(PENDING_CLASS) ||
+          el.classList.contains(OBSERVED_CLASS)
+        )
+          return;
+        if (el === hoverEl) return;
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => showHoverBubbleFor(el), 500);
+      },
+      true,
+    );
+
+    let hoverHideTimer: ReturnType<typeof setTimeout> | null = null;
+    document.addEventListener(
+      'mousemove',
+      (e) => {
+        if (!hoverEl || hoverPinned || !hoverBubble) return;
+        const target = e.target as Element | null;
+        if (target && (target.closest('#ot-hover-bubble') || hoverEl.contains(target))) {
+          if (hoverHideTimer) {
+            clearTimeout(hoverHideTimer);
+            hoverHideTimer = null;
+          }
+          return;
+        }
+        // 延迟隐藏：给鼠标移向气泡的时间，避免气泡一闪就消失
+        if (!hoverHideTimer) {
+          hoverHideTimer = setTimeout(() => {
+            hoverHideTimer = null;
+            hideHoverBubble();
+          }, 260);
+        }
+      },
+      true,
+    );
+
+    document.addEventListener(
+      'click',
+      (e) => {
+        const target = e.target as Element | null;
+        if (target?.closest('#ot-hover-bubble')) return;
+        if (hoverPinned) {
+          hoverPinned = false;
+          hideHoverBubble();
+        }
+      },
+      true,
+    );
+
+    document.addEventListener('scroll', () => {
+      if (!hoverPinned) hideHoverBubble();
+    }, true);
+
+    // ===== 输入框翻译：聚焦网页输入框时显示「译」按钮 =====
+    let inputBtn: HTMLElement | null = null;
+    let inputTarget: HTMLTextAreaElement | HTMLInputElement | null = null;
+    let inputResultHost: HTMLElement | null = null;
+
+    function isTranslatableInput(el: Element | null): el is HTMLTextAreaElement | HTMLInputElement {
+      if (!el || !el.isConnected) return false;
+      if (el instanceof HTMLTextAreaElement) return true;
+      if (el instanceof HTMLInputElement) {
+        const type = (el.type || 'text').toLowerCase();
+        return ['text', 'search', 'url', 'email'].includes(type);
+      }
+      return false;
+    }
+
+    function positionInputBtn() {
+      if (!inputBtn || !inputTarget) return;
+      const r = inputTarget.getBoundingClientRect();
+      const left = Math.max(8, r.right - 40);
+      // 输入框高度足够（>44px）时按钮在框内右下角，否则移到框外下方避免遮挡
+      const inside = r.height > 44 ? r.bottom - 40 : r.bottom + 4;
+      inputBtn.style.setProperty('left', `${left}px`, 'important');
+      inputBtn.style.setProperty('top', `${Math.max(8, Math.min(inside, window.innerHeight - 36))}px`, 'important');
+    }
+
+    function hideInputTranslate() {
+      inputBtn?.remove();
+      inputBtn = null;
+      inputResultHost?.remove();
+      inputResultHost = null;
+      inputTarget = null;
+    }
+
+    async function translateInputContent() {
+      if (!inputTarget) return;
+      const text = inputTarget.value.trim();
+      if (!text) return;
+      inputResultHost?.remove();
+      const host = document.createElement('div');
+      host.id = 'ot-input-result';
+      host.dataset.haofanUi = 'true';
+      host.style.setProperty('all', 'initial', 'important');
+      host.style.setProperty('position', 'fixed', 'important');
+      host.style.setProperty('z-index', '2147483646', 'important');
+      host.style.setProperty('width', '320px', 'important');
+      host.style.setProperty('max-width', 'calc(100vw - 24px)', 'important');
+      host.style.setProperty('border-radius', '12px', 'important');
+      // 深浅色随系统（内联样式无法被 media query 覆盖，直接按当前外观计算）
+      const resultDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+      host.style.setProperty('background', resultDark ? 'rgba(28,28,30,0.96)' : 'rgba(255,255,255,0.96)', 'important');
+      host.style.setProperty('color', resultDark ? '#f5f5f7' : '#1d1d1f', 'important');
+      host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.2)', 'important');
+      host.style.setProperty('backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+      host.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(180%)', 'important');
+      host.style.setProperty('border', `1px solid ${resultDark ? 'rgba(84,84,88,0.5)' : 'rgba(60,60,67,0.14)'}`, 'important');
+      host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
+      host.style.setProperty('padding', '10px 12px', 'important');
+      host.style.setProperty('font-size', '13px', 'important');
+      host.style.setProperty('line-height', '1.55', 'important');
+      host.textContent = '翻译中…';
+      document.documentElement.appendChild(host);
+      inputResultHost = host;
+      const r = inputTarget.getBoundingClientRect();
+      host.style.setProperty('left', `${Math.min(Math.max(8, r.left), window.innerWidth - 328)}px`, 'important');
+      host.style.setProperty('top', `${Math.max(8, r.bottom + 6)}px`, 'important');
+      try {
+        const res: any = await sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } });
+        if (!inputResultHost) return;
+        if (res?.ok && typeof res.translation === 'string' && res.translation) {
+          host.textContent = res.translation;
+          const copy = document.createElement('button');
+          copy.type = 'button';
+          copy.textContent = '复制译文';
+          Object.assign(copy.style, {
+            display: 'block',
+            marginTop: '8px',
+            padding: '4px 10px',
+            border: '0',
+            borderRadius: '8px',
+            background: 'rgba(0,122,255,0.12)',
+            color: '#007aff',
+            fontSize: '12px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          });
+          copy.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(res.translation);
+              copy.textContent = '已复制';
+            } catch {
+              copy.textContent = '复制失败';
+            }
+          });
+          host.appendChild(copy);
+        } else {
+          host.textContent = res?.error || '翻译失败';
+        }
+      } catch {
+        if (inputResultHost) host.textContent = '翻译失败';
+      }
+    }
+
+    document.addEventListener(
+      'focusin',
+      (e) => {
+        if (!inputTranslateEnabled) return;
+        const target = e.target as Element | null;
+        if (!isTranslatableInput(target)) return;
+        hideInputTranslate();
+        inputTarget = target;
+        inputBtn = createInputTranslateButton(() => {
+          void translateInputContent();
+        });
+        document.documentElement.appendChild(inputBtn);
+        positionInputBtn();
+      },
+      true,
+    );
+
+    document.addEventListener(
+      'focusout',
+      (e) => {
+        const related = (e as FocusEvent).relatedTarget as Element | null;
+        if (related && related.closest('#ot-input-btn, #ot-input-result')) return;
+        hideInputTranslate();
+      },
+      true,
+    );
+
+    window.addEventListener('scroll', positionInputBtn, true);
+    window.addEventListener('resize', positionInputBtn);
 
     function mountToolbar() {
       if (!sitePolicyLoaded || siteDisabled) return;
       if (document.getElementById('ot-toolbar')) return;
 
-      const container = document.createElement('div');
-      container.id = 'ot-toolbar';
-      container.dataset.haofanUi = 'true';
-      Object.assign(container.style, {
+      const bar = document.createElement('div');
+      bar.id = 'ot-toolbar';
+      bar.dataset.haofanUi = 'true';
+      // 使用内联样式覆盖一切可能的站点 CSS 干扰；挂载到 documentElement，
+      // 避免 body 的 transform 破坏 fixed 定位。
+      Object.assign(bar.style, {
         position: 'fixed',
         right: '20px',
         bottom: '20px',
         zIndex: '2147483647',
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
+        gap: '6px',
+        padding: '5px',
+        borderRadius: '999px',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(18px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1)',
+        border: '1px solid rgba(60,60,67,0.12)',
+        cursor: 'grab',
         userSelect: 'none',
-        touchAction: 'none',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
+        transition: 'box-shadow 0.2s ease',
       });
 
-      const translateBtn = document.createElement('button');
-      translateBtn.type = 'button';
-      translateBtn.id = 'ot-translate-btn';
-      translateBtn.textContent = '译';
-      translateBtn.title = '好翻 · 翻译本页';
-      translateBtn.setAttribute('aria-label', '翻译当前网页');
-      Object.assign(translateBtn.style, {
-        width: '44px',
-        height: '44px',
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'ot-translate-btn';
+      btn.textContent = '\u8BD1'; // "译"
+      btn.title = '好翻 \u00B7 \u7FFB\u8BD1\u672C\u9875'; // "好翻 · 翻译本页"
+      btn.setAttribute('aria-label', '翻译当前网页');
+      Object.assign(btn.style, {
+        width: '40px',
+        height: '40px',
         borderRadius: '50%',
-        background: '#1a73e8',
+        border: 'none',
+        padding: '0',
+        background: 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)',
         color: '#fff',
         fontWeight: '600',
         fontSize: '16px',
+        lineHeight: '1',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
+        boxShadow: '0 3px 10px rgba(0,122,255,0.35)',
+        transition: 'transform 0.15s ease, background 0.2s ease',
+        fontFamily: 'inherit',
+      });
+
+      const gear = document.createElement('button');
+      gear.type = 'button';
+      gear.id = 'ot-settings-btn';
+      gear.textContent = '\u2699\uFE0E'; // ⚙（文本变体，避免 emoji 渲染）
+      gear.title = '快速设置';
+      gear.setAttribute('aria-label', '打开快速设置');
+      Object.assign(gear.style, {
+        width: '36px',
+        height: '36px',
+        borderRadius: '50%',
         border: 'none',
         padding: '0',
+        background: 'transparent',
+        color: '#6e6e73',
+        fontSize: '17px',
         lineHeight: '1',
-        boxShadow: '0 2px 8px rgba(0,113,227,0.35), 0 8px 24px rgba(0,0,0,0.18)',
-        transition: 'transform 0.15s ease, background 0.2s ease',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'background 0.15s ease, color 0.15s ease',
+        fontFamily: 'inherit',
       });
-      translateBtn.addEventListener('mouseenter', () => {
-        translateBtn.style.background = '#1765cc';
-        translateBtn.style.transform = 'translateY(-2px)';
+      gear.addEventListener('mouseenter', () => {
+        gear.style.background = 'rgba(60,64,67,0.08)';
+        gear.style.color = '#1d1d1f';
       });
-      translateBtn.addEventListener('mouseleave', () => {
-        translateBtn.style.background = '#1a73e8';
-        translateBtn.style.transform = 'translateY(0)';
+      gear.addEventListener('mouseleave', () => {
+        gear.style.background = 'transparent';
+        gear.style.color = '#6e6e73';
       });
-      translateBtn.addEventListener('click', () => {
-        if (justDragged) {
-          justDragged = false;
-          return;
-        }
+
+      // 深色模式适配：工具条底色与齿轮颜色跟随系统外观
+      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+      if (prefersDark) {
+        bar.style.setProperty('background', 'rgba(28,28,30,0.92)', 'important');
+        bar.style.setProperty('border-color', 'rgba(84,84,88,0.5)', 'important');
+        gear.style.color = '#aeaeb2';
+      }
+
+      bar.append(btn, gear);
+      try {
+        document.documentElement.appendChild(bar);
+      } catch {
+        (document.body || document.documentElement).appendChild(bar);
+      }
+
+      // 整条工具条可拖动；位移超过阈值视为拖拽，不触发按钮点击。
+      const draggable = makeDraggable(bar, bar, (x, y) => {
+        void toolbarPosItem.setValue({ x, y }).catch(() => {});
+      });
+      const wasDrag = () => draggable.suppressNextClick();
+
+      // 恢复上次拖拽位置
+      void toolbarPosItem
+        .getValue()
+        .then((pos) => {
+          if (!pos || !document.getElementById('ot-toolbar')) return;
+          bar.style.right = 'auto';
+          bar.style.bottom = 'auto';
+          bar.style.left = `${Math.min(Math.max(0, pos.x), Math.max(0, window.innerWidth - bar.offsetWidth))}px`;
+          bar.style.top = `${Math.min(Math.max(0, pos.y), Math.max(0, window.innerHeight - bar.offsetHeight))}px`;
+        })
+        .catch(() => {});
+
+      // 点击委托在整条工具条上：点击容器任意位置（齿轮除外）都触发翻译，
+      // 拖拽位移超过阈值时 suppressNextClick 忽略本次点击。
+      bar.addEventListener('click', (event) => {
+        if (wasDrag()) return;
+        if ((event.target as Element | null)?.closest?.('#ot-settings-btn')) return;
         if (busy) {
           clearTranslations();
           busy = false;
@@ -1668,143 +2442,66 @@ export default defineContentScript({
           translatePage(true);
         }
       });
-
-      const gearBtn = document.createElement('button');
-      gearBtn.type = 'button';
-      gearBtn.id = 'ot-settings-btn';
-      gearBtn.textContent = '⚙';
-      gearBtn.title = '快速设置';
-      gearBtn.setAttribute('aria-label', '快速设置');
-      Object.assign(gearBtn.style, {
-        width: '36px',
-        height: '36px',
-        borderRadius: '50%',
-        background: 'rgba(28,28,30,0.86)',
-        color: '#fff',
-        fontSize: '17px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        border: 'none',
-        padding: '0',
-        lineHeight: '1',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-        transition: 'transform 0.15s ease, background 0.2s ease',
+      gear.addEventListener('click', (event) => {
+        if (wasDrag()) return;
+        event.stopPropagation();
+        const rect = gear.getBoundingClientRect();
+        void openSettingsPanel(rect.left, rect.bottom + 8);
       });
-      gearBtn.addEventListener('mouseenter', () => {
-        gearBtn.style.background = '#000';
-      });
-      gearBtn.addEventListener('mouseleave', () => {
-        gearBtn.style.background = 'rgba(28,28,30,0.86)';
-      });
-      gearBtn.addEventListener('click', () => {
-        if (justDragged) {
-          justDragged = false;
-          return;
-        }
-        toggleSettingsPopover();
-      });
-
-      container.append(gearBtn, translateBtn);
-
-      // 拖拽：按住工具栏（含按钮）即可移动，点击按钮不触发移动。
-      let dragging = false;
-      let startX = 0;
-      let startY = 0;
-      let originLeft = 0;
-      let originTop = 0;
-      container.addEventListener('pointerdown', (e: PointerEvent) => {
-        dragging = true;
-        justDragged = false;
-        const rect = container.getBoundingClientRect();
-        originLeft = rect.left;
-        originTop = rect.top;
-        startX = e.clientX;
-        startY = e.clientY;
-        // 拖拽期间改用 left/top 定位，便于跟随指针。
-        container.style.left = `${rect.left}px`;
-        container.style.top = `${rect.top}px`;
-        container.style.right = 'auto';
-        container.style.bottom = 'auto';
-        try {
-          container.setPointerCapture(e.pointerId);
-        } catch {
-          /* 某些环境不支持指针捕获，拖拽仍可用 */
-        }
-      });
-      container.addEventListener('pointermove', (e: PointerEvent) => {
-        if (!dragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) justDragged = true;
-        const nl = Math.min(window.innerWidth - 40, Math.max(0, originLeft + dx));
-        const nt = Math.min(window.innerHeight - 40, Math.max(0, originTop + dy));
-        container.style.left = `${nl}px`;
-        container.style.top = `${nt}px`;
-      });
-      container.addEventListener('pointerup', (e: PointerEvent) => {
-        if (!dragging) return;
-        dragging = false;
-        try {
-          container.releasePointerCapture(e.pointerId);
-        } catch {
-          /* 忽略 */
-        }
-        if (justDragged) {
-          // 拖拽结束后延迟复位标记，避免误触发按钮点击。
-          setTimeout(() => {
-            justDragged = false;
-          }, 0);
-          const rect = container.getBoundingClientRect();
-          void toolbarPosItem.setValue({
-            right: Math.max(0, window.innerWidth - rect.right),
-            bottom: Math.max(0, window.innerHeight - rect.bottom),
-          });
-        }
-      });
-
-      // 恢复上次拖拽位置（null 表示默认右下角）。
-      void toolbarPosItem.getValue().then((pos) => {
-        if (!pos) return;
-        container.style.right = `${Math.max(0, pos.right)}px`;
-        container.style.bottom = `${Math.max(0, pos.bottom)}px`;
-        container.style.left = 'auto';
-        container.style.top = 'auto';
-      });
-
-      // 挂载到 documentElement（html 节点），避免页面 body 有 transform 时破坏 fixed 定位。
-      try {
-        document.documentElement.appendChild(container);
-      } catch {
-        // 极少数情况下 documentElement 不可写，退回 body
-        (document.body || document.documentElement).appendChild(container);
-      }
     }
 
     function setToolbarLoading(loading: boolean) {
+      const bar = document.getElementById('ot-toolbar');
       const btn = document.getElementById('ot-translate-btn');
+      if (bar) {
+        if (loading) {
+          bar.setAttribute('aria-busy', 'true');
+          bar.setAttribute('aria-label', '取消当前翻译');
+        } else {
+          bar.setAttribute('aria-busy', 'false');
+          bar.setAttribute('aria-label', '翻译当前网页');
+        }
+      }
       if (!btn) return;
       if (loading) {
-        // 加载态同时作为取消按钮。
+        // 加载态：旋转圆圈指示器 + "取消翻译"（点击可取消），状态一目了然。
         btn.setAttribute('aria-busy', 'true');
         btn.setAttribute('aria-label', '取消当前翻译');
-        btn.style.width = 'auto';
-        btn.style.padding = '0 14px';
-        btn.style.borderRadius = '22px';
-        btn.style.fontSize = '13px';
-        btn.style.background = '#8fb8ef';
+        btn.style.setProperty('width', 'auto', 'important');
+        btn.style.setProperty('padding', '0 12px', 'important');
+        btn.style.setProperty('border-radius', '22px', 'important');
+        btn.style.setProperty('font-size', '13px', 'important');
+        btn.style.setProperty('background', '#8fb8ef', 'important');
         btn.style.cursor = 'progress';
-        btn.textContent = '取消翻译';
+        btn.textContent = '';
+        const spinner = document.createElement('span');
+        spinner.className = 'ot-toolbar-spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        // 基础样式内联（不依赖 content.css 注入时机）；旋转动画由 content.css 提供。
+        Object.assign(spinner.style, {
+          display: 'inline-block',
+          width: '14px',
+          height: '14px',
+          marginRight: '6px',
+          flex: '0 0 14px',
+          border: '2px solid rgba(255,255,255,0.45)',
+          borderTopColor: '#fff',
+          borderRadius: '50%',
+        });
+        const label = document.createElement('span');
+        label.textContent = '取消翻译';
+        btn.append(spinner, label);
         btn.title = '取消当前翻译';
       } else {
         btn.setAttribute('aria-busy', 'false');
         btn.setAttribute('aria-label', '翻译当前网页');
-        btn.style.width = '44px';
-        btn.style.padding = '0';
-        btn.style.borderRadius = '50%';
-        btn.style.fontSize = '16px';
-        btn.style.background = '#1a73e8';
+        // 注意：不能 removeProperty——inline 样式里的原始 width 也会被一并删除，
+        // 导致按钮缩回内容宽度（约 25px），工具条整体变窄（历史隐藏 bug）。
+        btn.style.setProperty('width', '40px', 'important');
+        btn.style.setProperty('padding', '0', 'important');
+        btn.style.setProperty('border-radius', '50%', 'important');
+        btn.style.setProperty('font-size', '16px', 'important');
+        btn.style.setProperty('background', 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)', 'important');
         btn.style.cursor = 'pointer';
         btn.textContent = '译';
         btn.title = '好翻 · 翻译本页';

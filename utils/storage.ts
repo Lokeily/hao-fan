@@ -16,8 +16,18 @@ export const disabledSitesItem = storage.defineItem<string[]>('local:disabledSit
   defaultValue: [],
 });
 
-// 悬浮工具栏的拖拽位置（右下角像素偏移），null 表示使用默认右下角。
-export const toolbarPosItem = storage.defineItem<{ right: number; bottom: number } | null>(
+// 自动翻译站点列表（每站记忆"总是自动翻译"偏好，与暂停列表独立）。
+// defaultValue 为 null 表示"用户尚未配置"→ 按默认全开处理（默认自动翻译此站）。
+export const autoSitesItem = storage.defineItem<string[] | null>('local:autoSites', {
+  defaultValue: null,
+});
+
+// 悬浮工具栏与设置面板的拖拽位置（仅存位置，跟随用户习惯）。
+export const toolbarPosItem = storage.defineItem<{ x: number; y: number } | null>(
   'local:toolbarPos',
+  { defaultValue: null },
+);
+export const settingsPanelPosItem = storage.defineItem<{ x: number; y: number } | null>(
+  'local:settingsPanelPos',
   { defaultValue: null },
 );
