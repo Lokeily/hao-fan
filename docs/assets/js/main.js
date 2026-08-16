@@ -353,3 +353,45 @@
     });
   }
 })();
+
+// ---- 第三轮增强：卡片 3D 倾斜 + 双语对照实时切换 ----
+(function () {
+  'use strict';
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var finePointer = window.matchMedia('(pointer: fine)').matches;
+
+  // 1) 卡片 3D 倾斜：指针靠近时朝指针方向轻微抬起，premium 手感
+  if (!reduceMotion && finePointer) {
+    var tilts = document.querySelectorAll('.tilt');
+    Array.prototype.forEach.call(tilts, function (el) {
+      el.addEventListener('pointermove', function (e) {
+        var r = el.getBoundingClientRect();
+        var px = (e.clientX - r.left) / r.width - 0.5;
+        var py = (e.clientY - r.top) / r.height - 0.5;
+        el.style.transform =
+          'perspective(900px) rotateX(' + (-py * 7).toFixed(2) + 'deg) rotateY(' +
+          (px * 9).toFixed(2) + 'deg) translateY(-4px)';
+      });
+      el.addEventListener('pointerleave', function () { el.style.transform = ''; });
+    });
+  }
+
+  // 2) 双语对照实时切换（原文 / 双语 / 仅译文）——对标沉浸式翻译的核心交互
+  var bili = document.querySelector('[data-bili-toggle]');
+  if (bili) {
+    var btns = Array.prototype.slice.call(bili.querySelectorAll('button'));
+    function setMode(mode, btn) {
+      document.body.classList.remove('mode-both', 'mode-original', 'mode-translated');
+      document.body.classList.add('mode-' + mode);
+      btns.forEach(function (b) { b.classList.toggle('active', b === btn); });
+    }
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setMode(btn.getAttribute('data-mode') || 'both', btn);
+      });
+    });
+    // 默认双语
+    setMode('both', btns[0]);
+  }
+})();

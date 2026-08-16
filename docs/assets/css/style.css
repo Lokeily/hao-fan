@@ -1272,15 +1272,14 @@ body.nav-open .nav-toggle span:nth-child(3) {
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ---- Reveal 变体：模糊入、缩放入、左右滑入 ---- */
+/* ---- Reveal 变体：干净淡入上浮（不模糊文字，杜绝动画中文字重影/错乱）---- */
 .reveal--blur {
-  filter: blur(16px);
-  transform: translateY(28px) scale(0.985);
-  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease),
-    filter 0.8s var(--ease);
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
 }
 .reveal--blur.in {
-  filter: blur(0);
+  opacity: 1;
   transform: none;
 }
 .reveal--scale {
@@ -1363,21 +1362,6 @@ body.nav-open .nav-toggle span:nth-child(3) {
   border-left: 3px solid var(--accent);
   position: relative;
 }
-/* 译文上沿一道柔和的高光，暗示「实时生成」 */
-.hero-visual .win-body .tgt::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 6px;
-  background: linear-gradient(100deg, transparent 30%, rgba(0, 113, 227, 0.12) 50%, transparent 70%);
-  background-size: 220% 100%;
-  animation: shimmer 4.5s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes shimmer {
-  0% { background-position: 130% 0; }
-  60%, 100% { background-position: -30% 0; }
-}
 
 /* ---- 双语对照展示区（跟随系统主题，不单独黑场）---- */
 .showcase {
@@ -1457,8 +1441,10 @@ body.nav-open .nav-toggle span:nth-child(3) {
     transition: none;
   }
   .hero-visual-inner { animation: none; }
-  .hero-visual .win-body .tgt::after { animation: none; }
   .marquee-track { animation: none; }
+  .gradient-text { background: none; -webkit-text-fill-color: currentColor; color: var(--accent); }
+  .card, .pillar, .feature { transform: none !important; }
+  .tgt.typing::after { animation: none; }
 }
 
 /* ===================================================================
@@ -1487,19 +1473,33 @@ body.nav-open .nav-toggle span:nth-child(3) {
   backface-visibility: hidden;
 }
 /* 文字层固定独立合成层：祖先做视差/浮动位移时，文字不再逐帧重排而糊掉 */
-.win,
-.win-body {
+.win {
   transform: translateZ(0);
 }
 .win-body {
   white-space: normal;
   word-break: break-word;
 }
-/* 打字机文字：保留空格、长串不溢出、预留一行高度，避免打字时跳动/错行 */
+/* 打字机文字：预留一行高度避免打字时跳动/错行；禁用会打乱排版的空白处理 */
 .tgt[data-typetext] {
-  white-space: pre-wrap;
   word-break: break-word;
   min-height: 1.9em;
+}
+/* 打字机进行时的闪烁光标：用 ::after 渲染，不覆盖文字、不触发重排 */
+.tgt.typing::after {
+  content: "▍";
+  margin-left: 1px;
+  color: var(--accent);
+  animation: caret-blink 1s steps(1) infinite;
+}
+@keyframes caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+/* 数字滚动：等宽数字，避免计数时宽度跳动显得乱 */
+.stat .num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* 服务商跑马灯：间距内置到每项，两段完全等距，translateX(-50%) 无缝循环 */
@@ -1779,4 +1779,129 @@ body.nav-open .nav-toggle span:nth-child(3) {
   .usecase::after,
   .pillar::after,
   .step::after { display: none; }
+}
+
+/* ===================================================================
+   第三轮增强：对标沉浸式翻译官网的「像样」动效
+   1) 英雄标题渐变流光  2) 卡片 3D 倾斜  3) 标题下划线生长
+   4) 双语对照实时切换（原文/双语/仅译文）  5) 导航滚动高亮
+   =================================================================== */
+
+/* 1) 英雄标题渐变流光（对标沉浸式翻译的彩色标题） */
+.gradient-text {
+  background: linear-gradient(100deg, var(--accent) 0%, #5e5ce6 35%, #ff375f 60%, var(--accent) 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradient-flow 8s ease-in-out infinite;
+}
+@keyframes gradient-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 2) 卡片 3D 倾斜（悬停时朝指针轻微抬起，premium 手感） */
+.tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease),
+    border-color 0.35s var(--ease), opacity 0.8s var(--ease);
+  will-change: transform;
+}
+.tilt .ico,
+.tilt h3 {
+  transform: translateZ(28px);
+  transition: transform 0.35s var(--ease);
+}
+
+/* 3) 标题下划线生长（进入视口时由短变长） */
+.underline-grow { position: relative; display: inline-block; }
+.underline-grow::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  height: 3px;
+  width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), #5e5ce6);
+  transform: translateX(-50%);
+  transition: width 0.7s var(--ease);
+  transition-delay: 0.15s;
+}
+.section-head.in .underline-grow::after,
+.underline-grow.in::after { width: 64px; }
+
+/* 4) 双语对照实时切换 */
+.bili-toggle {
+  display: flex;
+  width: fit-content;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin: 0 auto 22px;
+}
+.bili-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.25s var(--ease), color 0.25s var(--ease);
+}
+.bili-toggle button.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.bili-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 切换时整体柔和淡入，避免文字瞬跳 */
+.demo-body .src,
+.demo-body .tgt {
+  transition: opacity 0.35s var(--ease);
+}
+body.mode-original .demo-body .tgt,
+body.mode-translated .demo-body .src {
+  opacity: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+
+/* 5) 导航滚动高亮（当前所在区块对应的导航项） */
+.nav-links a.active {
+  color: var(--accent);
+}
+.nav-links a.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+.nav-links a { position: relative; }
+
+/* 暗色模式：渐变流光与下划线更亮一点 */
+@media (prefers-color-scheme: dark) {
+  .gradient-text {
+    background: linear-gradient(100deg, #2997ff 0%, #5e5ce6 35%, #ff453a 60%, #2997ff 100%);
+    background-size: 220% 100%;
+  }
 }
