@@ -217,7 +217,6 @@ export function buildConfigForm(
   const cacheChk = mount.querySelector('[data-f=cacheEnabled]') as HTMLInputElement;
   const glossaryChk = mount.querySelector('[data-f=glossaryEnabled]') as HTMLInputElement;
   const glossaryInput = mount.querySelector('[data-f=customGlossary]') as HTMLTextAreaElement;
-  const glossaryLimitInput = mount.querySelector('[data-f=glossaryInjectionLimit]') as HTMLInputElement;
   const customVisionChk = mount.querySelector('[data-f=customVision]') as HTMLInputElement;
   const customVisionRow = mount.querySelector('[data-custom-vision]') as HTMLElement;
   const streamingChk = mount.querySelector('[data-f=streaming]') as HTMLInputElement;
@@ -274,10 +273,6 @@ export function buildConfigForm(
     o.value = p.id;
     o.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
     providerSel.appendChild(o);
-    const fo = document.createElement('option');
-    fo.value = p.id;
-    fo.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
-    fallbackProviderSel.appendChild(fo);
   });
   const refreshSelectTitles = () => {
     providerSel.title = providerSel.options[providerSel.selectedIndex]?.textContent || '';
@@ -412,7 +407,6 @@ export function buildConfigForm(
     cfg.cacheEnabled = cacheChk.checked;
     cfg.glossaryEnabled = glossaryChk.checked;
     cfg.customGlossary = glossaryInput.value;
-    cfg.glossaryInjectionLimit = Math.max(0, Math.min(60, Number(glossaryLimitInput.value) || 24));
     cfg.customVision = customVisionChk.checked;
     cfg.streaming = streamingChk.checked;
     cfg.contextAware = contextChk.checked;
@@ -521,12 +515,6 @@ export function buildConfigForm(
     strongModelInput,
   ].forEach((el) => {
     el.addEventListener('input', () => scheduleSave());
-  });
-
-  fallbackProviderSel.addEventListener('change', () => {
-    const p = PROVIDERS.find((x) => x.id === fallbackProviderSel.value);
-    if (p?.baseUrl && !fallbackBaseUrlInput.value.trim()) fallbackBaseUrlInput.value = p.baseUrl;
-    void save();
   });
   window.addEventListener(
     'pagehide',

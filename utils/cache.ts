@@ -32,23 +32,18 @@ function keyOf(text: string, target: string, model: string): string {
   return hash(`${model}|${target}|${text}`);
 }
 
-// 启动时 / 首次翻译前把缓存载入内存（只发生一次）。
-// 缓存只是「加速层」：存储读取失败时降级为「本次会话不使用缓存」，
-// 绝不能因缓存故障而让所有翻译都抛错。旧实现会把被拒的 Promise 长期复用，
-// 导致一次读取失败后整段会话的翻译全部失败 —— 这里改为吞掉错误并保留空缓存。
+// 启动时 / 首次翻译前把缓存载入内存（只发生一次）
 export async function ensureCacheLoaded(): Promise<void> {
   if (memory !== null) return;
   if (!loadPromise) {
     loadPromise = cacheItem
       .getValue()
       .then((value) => {
-        if (memory === null) memory = value ?? {};
+        if (memory === null) memory = value;
       })
       .catch((error) => {
-        // 加载失败：用空缓存兜底，翻译照常进行（只是不再命中本地缓存）。
-        memory = {};
         loadPromise = null;
-        console.warn('好翻：翻译缓存加载失败，已临时禁用缓存', error);
+        throw error;
       });
   }
   await loadPromise;

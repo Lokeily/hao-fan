@@ -11,16 +11,10 @@ import {
   type TranslationContext,
 } from '../utils/translator.ts';
 import { translateImage, type ImageResult } from '../utils/vision.ts';
-import {
-  parseCustomGlossary,
-  relevantTerms,
-  buildGlossaryBlock,
-  mergedMap,
-} from '../utils/glossary.ts';
 import { ensureCacheLoaded } from '../utils/cache.ts';
 import { fetchWithTimeout } from '../utils/requester.ts';
 import { asRecord, readBatch, readJobId, readSingle } from '../utils/messages.ts';
-import { accumulateUsage, addUsageStats, EMPTY_USAGE_TOTALS, type TranslationStats } from '../utils/usage.ts';
+import { accumulateUsage, EMPTY_USAGE_TOTALS, type TranslationStats } from '../utils/usage.ts';
 import { randomId } from '../utils/id.ts';
 import { isSiteDisabled } from '../utils/site-policy.ts';
 import { TranslationJobRegistry } from '../utils/translation-jobs.ts';
@@ -57,9 +51,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   const buf = await blob.arrayBuffer();
   const bytes = new Uint8Array(buf);
   let bin = '';
-  // 16KB 分块：String.fromCharCode.apply 的参数数量在各浏览器有上限（约 65535），
-  // 大图（6MB）场景下 32KB 已逼近边界，降到 16KB 留足余量，避免触发调用栈错误。
-  const chunk = 0x4000;
+  const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
   }
@@ -92,12 +84,10 @@ function cancelTranslationJob(jobId: string): void {
   translationJobs.cancel(jobId);
 }
 
-function recordUsage(stats: TranslationStats, countOperation = true): Promise<void> {
+function recordUsage(stats: TranslationStats): Promise<void> {
   const write = usageWriteQueue.then(async () => {
     const current = await usageItem.getValue();
-    await usageItem.setValue(
-      countOperation ? accumulateUsage(current, stats) : addUsageStats(current, stats),
-    );
+    await usageItem.setValue(accumulateUsage(current, stats));
   });
   usageWriteQueue = write.catch(() => {});
   return write.catch(() => {});
@@ -326,8 +316,7 @@ export default defineBackground(() => {
           customGlossary: '',
         };
         const result = await translateOneDetailed(probeConfig, 'Connection test.');
-        // 测试连接确实消耗 Token，但属于调试动作，不计入「累计翻译次数」。
-        await recordUsage(result.stats, false);
+        await recordUsage(result.stats);
         return { translation: result.translation, stats: result.stats };
       }, sendResponse);
     }
@@ -380,40 +369,6 @@ export default defineBackground(() => {
         return {};
       }, sendResponse);
     }
-  });
-
-  // 流式输出通道：内容脚本通过长连接端口请求「逐字流式翻译」单段文本，
-  // 后台边接收 SSE delta 边回推，前端首段译文即可边生成边渲染（极低首字延迟）。
-  browser.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'haofan-stream') return;
-    const controller = new AbortController();
-    port.onDisconnect.addListener(() => controller.abort());
-    port.onMessage.addListener(async (msg: any) => {
-      if (!msg || msg.type !== 'stream') return;
-      try {
-        const cfg = await getCfg();
-        assertProviderReady(cfg);
-        const t = String(msg.text || '');
-        if (!t) {
-          port.postMessage({ type: 'done', text: '' });
-          return;
-        }
-        const context = msg.pageContext as TranslationContext | undefined;
-        const useGlossary = cfg.glossaryEnabled !== false;
-        const glossary = useGlossary ? parseCustomGlossary(cfg.customGlossary) : {};
-        const merged = useGlossary ? mergedMap(cfg.targetLang, glossary) : {};
-        const block = useGlossary
-          ? buildGlossaryBlock(relevantTerms([t], cfg.targetLang, glossary, merged))
-          : '';
-        const out = await callChatRouted(cfg, t, undefined, block, controller.signal, {
-          context,
-          stream: (delta: string) => port.postMessage({ type: 'delta', text: delta }),
-        });
-        port.postMessage({ type: 'done', text: out.text });
-      } catch (error) {
-        port.postMessage({ type: 'error', message: errorMessage(error) });
-      }
-    });
   });
 
   // MV3 下 service worker 可能被回收重建，菜单会残留，先清空再建避免 duplicate id 报错

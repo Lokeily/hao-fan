@@ -65,12 +65,3 @@ export function accumulateUsage(current: UsageTotals, stats: TranslationStats): 
   next.updatedAt = Date.now();
   return next;
 }
-
-// 与 accumulateUsage 类似，但只累加 Token / 请求数等用量，不增加「翻译操作次数」。
-// 用于「测试连接」：它确实消耗 Token，但不应被计入用户的累计翻译次数。
-export function addUsageStats(current: UsageTotals, stats: TranslationStats): UsageTotals {
-  const next = { ...current };
-  addStats(next, stats);
-  next.updatedAt = Date.now();
-  return next;
-}

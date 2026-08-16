@@ -10,8 +10,6 @@ export interface AppConfig {
   tone: string;
   glossaryEnabled: boolean;
   customGlossary: string;
-  // 术语注入上限：单批翻译注入提示词的术语条数上限（节省 Token 的核心之一，可调节）。
-  glossaryInjectionLimit: number;
   customVision: boolean;
   // ===== 0.1.5 新增能力开关与路由 =====
   streaming: boolean; // SSE 流式输出（首块首字 <1s）
@@ -49,7 +47,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   tone: '自然流畅',
   glossaryEnabled: true,
   customGlossary: '',
-  glossaryInjectionLimit: 24,
   customVision: false,
   streaming: true,
   contextAware: true,
@@ -70,12 +67,8 @@ export function normalizeConfig(stored?: StoredAppConfig | null): AppConfig {
   const { apiKey: legacyApiKey, dualMode: _legacyDualMode, ...values } = stored ?? {};
   const provider = values.provider || DEFAULT_CONFIG.provider;
   const apiKeys = { ...(values.apiKeys || {}) };
-  const rawBaseUrl = (values.baseUrl ?? '').trim();
-  const storedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
-  const migratedBaseUrl = storedBaseUrl && RETIRED_BASE_URLS[provider]?.[storedBaseUrl];
-  // 迁移后的地址优先；其次用用户原始填写（保留写法，含尾斜杠）；为空串（未填写 / 被清空）时
-  // 回退到默认端点，避免把空串当作有效端点，否则 callChat 会因「未配置 API Base URL」令整页失败。
-  const baseUrl = migratedBaseUrl || (rawBaseUrl ? (values.baseUrl ?? '') : DEFAULT_CONFIG.baseUrl);
+  const storedBaseUrl = values.baseUrl?.replace(/\/+$/, '');
+  const baseUrl = (storedBaseUrl && RETIRED_BASE_URLS[provider]?.[storedBaseUrl]) || values.baseUrl;
 
   // 0.1.x 只保存一个 Key；首次读取时归入当时选中的服务商。
   if (legacyApiKey && !apiKeys[provider]) apiKeys[provider] = legacyApiKey;

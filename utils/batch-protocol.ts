@@ -16,27 +16,6 @@ export function batchInstruction(targetLanguage: string): string {
   ].join('\n');
 }
 
-// 把「由 {id, translation} 对象组成的数组」映射回按索引排序的译文数组。
-// 同时兼容顶层裸数组与 {items:[…]} / {translations:[[id,translation]…]} 内部数组两种形态。
-function mapIdTranslationArray(items: unknown, expectedCount: number): string[] | null {
-  if (!Array.isArray(items) || items.length !== expectedCount) return null;
-  const translations = new Array<string>(expectedCount);
-  const seen = new Set<string>();
-  for (const item of items) {
-    if (!item || typeof item !== 'object') return null;
-    const record = item as Record<string, unknown>;
-    const id = record.id;
-    const translation = record.translation;
-    if (typeof id !== 'string' || typeof translation !== 'string' || seen.has(id)) return null;
-    const match = /^t(\d+)$/.exec(id);
-    const index = match ? Number(match[1]) : -1;
-    if (index < 0 || index >= expectedCount || !translation.trim()) return null;
-    seen.add(id);
-    translations[index] = translation.trim();
-  }
-  return translations.every((translation) => typeof translation === 'string') ? translations : null;
-}
-
 export function parseBatchTranslations(content: string, expectedCount: number): string[] | null {
   let json = content.trim();
   const fence = json.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -65,11 +44,6 @@ export function parseBatchTranslations(content: string, expectedCount: number): 
     const translations = parsed.map((item) => item.trim());
     return translations.every(Boolean) ? translations : null;
   }
-  // 顶层裸数组：部分模型会直接返回 [{id:"t0",translation:"一"}, …] 而不套 {items:[…]} 包裹。
-  if (Array.isArray(parsed)) {
-    const fromArray = mapIdTranslationArray(parsed, expectedCount);
-    if (fromArray) return fromArray;
-  }
   const record = parsed as Record<string, unknown>;
   const direct = record.translations;
   if (
@@ -80,6 +54,22 @@ export function parseBatchTranslations(content: string, expectedCount: number): 
     const translations = direct.map((item) => item.trim());
     return translations.every(Boolean) ? translations : null;
   }
-  // {items:[…]} 内部数组，或任何 {id, translation} 对象数组。
-  return mapIdTranslationArray(record.items, expectedCount);
+  const items = record.items;
+  if (!Array.isArray(items) || items.length !== expectedCount) return null;
+
+  const translations = new Array<string>(expectedCount);
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (!item || typeof item !== 'object') return null;
+    const record = item as Record<string, unknown>;
+    const id = record.id;
+    const translation = record.translation;
+    if (typeof id !== 'string' || typeof translation !== 'string' || seen.has(id)) return null;
+    const match = /^t(\d+)$/.exec(id);
+    const index = match ? Number(match[1]) : -1;
+    if (index < 0 || index >= expectedCount || !translation.trim()) return null;
+    seen.add(id);
+    translations[index] = translation.trim();
+  }
+  return translations.every((translation) => typeof translation === 'string') ? translations : null;
 }

@@ -1,15 +1,6 @@
 // 内容脚本的纯 UI 构建辅助（从 entrypoints/content.ts 拆分）。
 // 只负责「用原生 DOM 构造隔离良好的界面元素」，不持有页面翻译状态，
 // 因此可独立维护与测试。
-import { textOfBlock } from './dom.ts';
-
-export interface TranslationNodeOptions {
-  // 译文可直接编辑（hover 即改），修改后回调 source/edited 供术语自学习。
-  editable?: boolean;
-  onEdit?: (source: string, edited: string) => void;
-  // 质量自检标记：'fidelity-corrected' 表示经保真校验并自动校正。
-  note?: string;
-}
 
 // ===== 译文嵌入节点 =====
 // 直接在原文文字下方插入译文节点，形成原文与译文的对照显示，嵌入文档流
@@ -136,36 +127,6 @@ export function createTranslationNode(
     }
     @media (prefers-color-scheme: dark) {
       .text { opacity: 0.9; }
-    }
-    .text[contenteditable="true"] {
-      cursor: text;
-      border-radius: 4px;
-      outline: none;
-      transition: background 0.12s ease, box-shadow 0.12s ease;
-    }
-    .text[contenteditable="true"]:hover {
-      background: rgba(26, 115, 232, 0.10);
-      box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.35);
-    }
-    .text[contenteditable="true"]:focus {
-      background: rgba(26, 115, 232, 0.16);
-      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.55);
-      opacity: 1;
-    }
-    .fidelity-flag {
-      display: inline-block;
-      margin-left: 6px;
-      padding: 0 5px;
-      border-radius: 4px;
-      background: rgba(124, 179, 66, 0.18);
-      color: #2e7d32;
-      font-size: 11px;
-      line-height: 1.6;
-      vertical-align: middle;
-      cursor: help;
-    }
-    @media (prefers-color-scheme: dark) {
-      .fidelity-flag { background: rgba(124, 179, 66, 0.28); color: #a5d6a7; }
     }
   `;
   const text = document.createElement('span');

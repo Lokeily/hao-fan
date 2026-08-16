@@ -29,7 +29,6 @@ import {
   makeDraggable,
   themeColors,
 } from '../utils/content-ui.ts';
-import { buildConfigForm } from '../utils/ui.ts';
 import { mountImageResultOverlay } from '../utils/image-overlay.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
@@ -344,56 +343,10 @@ export default defineContentScript({
       else el.insertAdjacentElement('afterend', node);
     }
 
-    // 术语自学习：用户手动修改译文后，短术语（≤30 字且无句末标点）沉淀进个人术语表，
-    // 其余仅在本会话内记住修正结果。
-    function learnTerm(source: string, edited: string) {
-      sessionTranslations.remember(source, edited);
-      if (source.trim().length <= 30 && !/[。.!?！？\n]/.test(source) && source.trim() !== edited.trim()) {
-        void learnGlossaryTerm(source.trim(), edited.trim());
-      }
-    }
-    async function learnGlossaryTerm(src: string, dst: string) {
-      try {
-        // 净化：剔除换行（避免破坏多行结构）；把源词里的分隔符 = / ＝ 换成 -（解析侧用 = 切分，
-        // 源词含 = 会导致「a=b=c」被错误切分），保证术语库数据不会被污染。
-        const safeSrc = src.replace(/[\r\n]+/g, ' ').replace(/[=＝]/g, '-').trim();
-        const safeDst = dst.replace(/[\r\n]+/g, ' ').trim();
-        if (!safeSrc || !safeDst) return;
-        const cur = (await configItem.getValue()) || configItem.defaultValue;
-        const base = cur.customGlossary ? cur.customGlossary.replace(/\s*$/, '') : '';
-        const next = base ? `${base}\n${safeSrc}=${safeDst}` : `${safeSrc}=${safeDst}`;
-        await configItem.setValue({ ...cur, customGlossary: next });
-        showStatus('已记忆术语 ✓', true);
-      } catch {
-        /* 术语记忆失败不影响正文显示 */
-      }
-    }
-
-    // 上下文感知：取「当前页面标题 + 紧邻前一段译文」，让模型在术语 / 语气上保持一致。
-    function previousTextBlock(el: Element): string | undefined {
-      let sib = el.previousElementSibling;
-      if (!sib) {
-        const parent = el.parentElement;
-        if (parent) sib = parent.previousElementSibling;
-      }
-      if (!sib) return undefined;
-      const txt = textOfBlock(sib).trim();
-      return txt.length > 0 && txt.length <= 120 ? txt : undefined;
-    }
-    function buildPageContext(el?: Element): { title: string; previous?: string } {
-      const ctx: { title: string; previous?: string } = { title: document.title || '' };
-      if (el && el.isConnected) {
-        const prev = previousTextBlock(el);
-        if (prev) ctx.previous = prev;
-      }
-      return ctx;
-    }
-
     function applyTranslation(
       el: Element,
       original: string,
       translation: string,
-      note?: string,
     ): 'inserted' | 'skipped' | 'stale' {
       if (!el.isConnected || textOfBlock(el) !== original) return 'stale';
       if (!translation || translation === original) {
@@ -417,40 +370,47 @@ export default defineContentScript({
       return outcome !== 'stale';
     }
 
-    // 状态提示（"翻译中…" / "已译 X / Y 段"），紧贴悬浮按钮上方；加载态带旋转指示
+    // 状态提示（"翻译中…" / "已翻译 N 段"），紧贴悬浮按钮上方
     let statusEl: HTMLElement | null = null;
-    let statusSpinner: HTMLElement | null = null;
-    let statusText: HTMLElement | null = null;
     let statusTimer: ReturnType<typeof setTimeout> | null = null;
     function progressText(): string {
       return pageTotalFound > 0 ? `${translatedCount}/${pageTotalFound}` : String(translatedCount);
     }
 
     function showStatus(text: string, transient = false) {
-      ensureStatusEl();
-      statusSpinner!.style.display = 'none';
-      statusText!.textContent = text;
-      statusEl!.style.opacity = '1';
+      if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'ot-status';
+        statusEl.setAttribute('role', 'status');
+        statusEl.setAttribute('aria-live', 'polite');
+        Object.assign(statusEl.style, {
+          position: 'fixed',
+          right: '20px',
+          bottom: '74px',
+          zIndex: '2147483646',
+          background: 'rgba(28,28,30,0.86)',
+          color: '#fff',
+          font: '12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          padding: '6px 11px',
+          borderRadius: '8px',
+          pointerEvents: 'none',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+          opacity: '0',
+          transition: 'opacity 0.2s ease',
+          maxWidth: '240px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        });
+        document.documentElement.appendChild(statusEl);
+      }
+      statusEl.textContent = text;
+      statusEl.style.opacity = '1';
       if (statusTimer) clearTimeout(statusTimer);
       if (transient) {
         statusTimer = setTimeout(() => {
           if (statusEl) statusEl.style.opacity = '0';
-        }, 2500);
-      }
-    }
-    // 进度显示：已译 X / Y 段（Y 为本次预计总段数），加载态显示旋转指示
-    function showProgress(loading = false) {
-      ensureStatusEl();
-      const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
-      const total = totalSegCount > 0 ? totalSegCount : translatedCount;
-      statusSpinner!.style.display = loading ? 'inline-block' : 'none';
-      statusText!.textContent = `已译 ${translatedCount} / ${total} 段${savedText}`;
-      statusEl!.style.opacity = '1';
-      if (statusTimer) clearTimeout(statusTimer);
-      if (!loading) {
-        statusTimer = setTimeout(() => {
-          if (statusEl) statusEl.style.opacity = '0';
-        }, 2500);
+        }, 2000);
       }
     }
     function hideStatus() {
@@ -898,12 +858,7 @@ export default defineContentScript({
           if (requestConfigRevision === translationConfigRevision) {
             sessionTranslations.remember(x.text, t || x.text);
           }
-          const outcome = applyTranslation(
-            x.el,
-            x.text,
-            t,
-            Array.isArray(res.notes) ? ((res.notes as (string | null)[])[k] ?? undefined) : undefined,
-          );
+          const outcome = applyTranslation(x.el, x.text, t);
           if (outcome === 'inserted') inserted++;
           else if (outcome === 'stale') {
             const currentText = textOfBlock(x.el);
@@ -932,10 +887,7 @@ export default defineContentScript({
         const message = error instanceof Error ? error.message : '翻译失败';
         showNotice(message, jobId || 'page-translation');
         const canRetry = isRetryableTranslationError(error);
-        // 仅当错误指向「引擎整体不可用」（密钥/权限/端点/模型）才令本页停机；
-        // 空结果、输出截断等可恢复错误只跳过本批，让整页其余内容继续翻译，
-        // 避免一次小失败导致整页静默中断、用户误以为已翻完。
-        if (isPageBlockingError(error) && jobId) blockedPageJobId = jobId;
+        if (!canRetry && jobId) blockedPageJobId = jobId;
         const retryable = canRetry
           ? items.filter((item) => {
               if (!item.el.isConnected) return false;
@@ -957,96 +909,6 @@ export default defineContentScript({
       }
     }
 
-    // 首块流式渲染：首段通过 haofan-stream 长连接端口「逐字流式」翻译，首字即可见；
-    // 其余段落并行走普通批。端口失败 / 空结果 / 超时一律回退到普通 translateChunk，保证不漏译。
-    async function translateFirstChunkStreamed(items: { el: Element; text: string }[], jobId?: string): Promise<boolean> {
-      const head = items[0];
-      const tail = items.slice(1);
-      // 先插入首段的空可编辑节点，流式过程中就地更新其文本，避免空白闪烁。
-      insertTranslation(head.el, '', { editable: true, onEdit: learnTerm });
-      (head.el as HTMLElement).classList.add(PENDING_CLASS);
-      let headDone = false;
-      const finishHead = (translation: string) => {
-        if (headDone) return;
-        headDone = true;
-        (head.el as HTMLElement).classList.remove(PENDING_CLASS);
-        const outcome = applyTranslation(head.el, head.text, translation);
-        if (outcome === 'inserted') translatedCount++;
-        showProgress(true);
-      };
-      const fallbackHead = async () => {
-        if (headDone) return;
-        headDone = true;
-        try {
-          await translateChunk([head], jobId);
-        } catch {
-          /* 失败已由整体 notice 提示，这里不重复抛出 */
-        }
-      };
-      const headPromise = new Promise<void>((resolve) => {
-        let port: ReturnType<typeof runtime.connect> | null = null;
-        let acc = '';
-        let settled = false;
-        const settle = () => {
-          if (settled) return;
-          settled = true;
-          try {
-            port?.disconnect();
-          } catch {
-            /* 端口可能已断开 */
-          }
-          resolve();
-        };
-        try {
-          port = runtime.connect({ name: 'haofan-stream' });
-        } catch {
-          port = null;
-        }
-        if (!port) {
-          void fallbackHead().then(settle);
-          return;
-        }
-        port.onMessage.addListener((msg: any) => {
-          if (!msg || settled) return;
-          if (msg.type === 'delta') {
-            acc += typeof msg.text === 'string' ? msg.text : '';
-            insertTranslation(head.el, acc, { editable: true, onEdit: learnTerm });
-          } else if (msg.type === 'done') {
-            const t = typeof msg.text === 'string' && msg.text ? msg.text : acc;
-            if (t) finishHead(t);
-            else void fallbackHead();
-            settle();
-          } else if (msg.type === 'error') {
-            void fallbackHead();
-            settle();
-          }
-        });
-        // 端口异常断开（如后台 Worker 崩溃重启）时，必须回退普通批翻译首段，
-        // 否则首段节点会停留在空译文且 headDone 永不为真 → 首段永久空白。
-        port.onDisconnect.addListener(() => {
-          void fallbackHead();
-          settle();
-        });
-        port.postMessage({ type: 'stream', text: head.text, pageContext: buildPageContext(head.el) });
-        // 兜底超时：12s 内无完整响应则回退普通批，避免首段永久空白。
-        setTimeout(() => {
-          if (!settled) {
-            void fallbackHead();
-            settle();
-          }
-        }, 12_000);
-      });
-      // 尾段并发批量翻译，不等首段流式结束。
-      let tailFailed = false;
-      if (tail.length > 0) {
-        translateChunk(tail, jobId).catch(() => {
-          tailFailed = true;
-        });
-      }
-      await headPromise;
-      return tailFailed;
-    }
-
     // ===== 整页翻译（沉浸式叠加层：译文贴在原文正下方，不改动原网页）=====
     async function translatePage(initial = true) {
       if (siteDisabled) {
@@ -1066,6 +928,7 @@ export default defineContentScript({
         showStatus('翻译中…');
 
         const visible: TranslationItem[] = [];
+        let deferredCount = 0;
         let foundCount = 0;
         let releaseFirstScan!: () => void;
         let firstScanReleased = false;
@@ -1088,7 +951,7 @@ export default defineContentScript({
               if (isInViewport(el)) visible.push(item);
               else deferred.push(item);
             }
-            observeForLazyTranslation(deferred);
+            deferredCount += observeForLazyTranslation(deferred);
             if (visible.length >= FIRST_CHUNK_ITEMS) releaseFirstScan();
           },
           {
@@ -1107,7 +970,6 @@ export default defineContentScript({
           maxItems: FIRST_CHUNK_ITEMS,
           maxCharacters: FIRST_CHUNK_CHARACTERS,
         });
-        const firstSet = new Set(firstChunk);
         firstChunk.forEach((item) => (item.el as HTMLElement).classList.add(PENDING_CLASS));
         let failures = 0;
         if (firstChunk.length > 0) {
@@ -1125,8 +987,7 @@ export default defineContentScript({
           return;
         }
 
-        // 首块（含已流式渲染的首段）不再二次翻译，仅处理其余可见段落。
-        const remaining = visible.filter((item) => !firstSet.has(item));
+        const remaining = visible.splice(0);
         remaining.forEach((item) => (item.el as HTMLElement).classList.add(PENDING_CLASS));
         const chunks = planTextChunks(remaining, (item) => item.text, {
           maxItems: PAGE_CHUNK_ITEMS,
@@ -1201,7 +1062,7 @@ export default defineContentScript({
         if (
           !root.isConnected ||
           root.closest(
-            '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-settings-popover, #ot-status, .ot-selbtn',
+            '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
           )
         )
           return;
@@ -1263,7 +1124,7 @@ export default defineContentScript({
             const target = m.target as Element;
             if (
               target.closest(
-                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-settings-popover, #ot-status, .ot-selbtn',
+                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
               )
             )
               continue;
@@ -1305,8 +1166,7 @@ export default defineContentScript({
               cls?.contains(PENDING_CLASS) ||
               cls?.contains('ot-img-panel') ||
               cls?.contains('ot-img-seg') ||
-              el.id === 'ot-toolbar' ||
-              el.id === 'ot-settings-popover'
+              el.id === 'ot-toolbar'
             ) {
               return;
             }
@@ -1380,7 +1240,7 @@ export default defineContentScript({
               // 额外保护：跳过我们自己的节点
               if (
                 el.closest(
-                  '.ot-translation, .ot-img-panel, .ot-toolbar, #ot-toolbar, #ot-settings-popover, #ot-status, .ot-selbtn',
+                  '.ot-translation, .ot-img-panel, .ot-toolbar, #ot-toolbar, #ot-status, .ot-selbtn',
                 )
               )
                 continue;
@@ -1464,7 +1324,7 @@ export default defineContentScript({
           : (range.startContainer as Element);
       if (
         !start ||
-        start.closest('#ot-selection-ui, #ot-error-modal, .ot-translation, #ot-toolbar, #ot-settings-popover, #ot-status')
+        start.closest('#ot-selection-ui, #ot-error-modal, .ot-translation, #ot-toolbar, #ot-status')
       ) {
         return null;
       }
@@ -1600,7 +1460,7 @@ export default defineContentScript({
       try {
         const res: any = await sendRuntimeMessage({
           type: 'TRANSLATE_ONE',
-          payload: { text: snapshot.text, jobId, pageContext: { title: document.title } },
+          payload: { text: snapshot.text, jobId },
         });
         if (requestId !== selectionRequestId || host !== selectionHost) return;
         if (!res?.ok) throw new Error(res?.error || '翻译失败');

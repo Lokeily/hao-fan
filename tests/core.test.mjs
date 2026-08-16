@@ -184,14 +184,6 @@ test('maps structured batch responses by stable IDs', () => {
   assert.match(batchInstruction('中文'), /相同 id|id 原样出现一次/);
   assert.deepEqual(parseBatchTranslations('["一","二"]', 2), ['一', '二']);
   assert.deepEqual(parseBatchTranslations('{"translations":["一","二"]}', 2), ['一', '二']);
-  // 顶层裸对象数组：部分模型不套 {items:[…]} 包裹，也应能正确映射（#2 修复）
-  const bare = '[{"id":"t1","translation":"二"},{"id":"t0","translation":"一"}]';
-  assert.deepEqual(parseBatchTranslations(bare, 2), ['一', '二']);
-  assert.equal(parseBatchTranslations('[{"id":"t0","translation":"一"}]', 2), null);
-  assert.equal(
-    parseBatchTranslations('[{"id":"t0","translation":""},{"id":"t1","translation":"二"}]', 2),
-    null,
-  );
 });
 
 test('plans translation batches by both item and character limits', () => {

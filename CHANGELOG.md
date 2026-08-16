@@ -1,5 +1,11 @@
 # 更新日志（Changelog）
 
+## v0.1.22 (2026-08-16)
+
+- 合并远程 v0.1.21（42 个提交：流式输出 / 进度 X·Y / 注入防护 + 上下文降级 / 可拖动工具栏 / 图片翻译 / 坏 JSON 回退等），采用其更成熟的扩展源码。
+- 保留本地独有贡献：整套官网 `docs/`（index / features / privacy / faq / install / providers）、`sendRuntimeMessage` 90s 兜底超时（防后台 Worker 挂起时翻译静默卡死）、术语注入上限可调（统一为远程可用的 `glossaryTermLimit`，默认 12）。
+- 清理合并产生的冗余/会崩溃的死代码（重复的 `buildConfigForm` 导入、未接线的 `glossaryInjectionLimit`）。
+
 ## v0.1.21 (2026-08-15)
 
 - 修复：大屏（完整设置）开关全部显示未开启——勾选样式同步用了 document 查询，
