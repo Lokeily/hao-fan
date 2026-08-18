@@ -40,6 +40,29 @@ import {
   withSiteDisabled,
 } from '../utils/site-policy.ts';
 import { TranslationJobRegistry } from '../utils/translation-jobs.ts';
+import { maskIdentifiers } from '../utils/mask.ts';
+
+test('标识符遮罩：库名/代码标识符被占位符保护且可还原', () => {
+  // 代码形态（camelCase / kebab / 点路径 / 全大写 / 含数字）
+  const code = maskIdentifiers('useState with react-dom and a.b.c and API v2');
+  assert.ok(!code.masked.includes('useState'));
+  assert.ok(!code.masked.includes('react-dom'));
+  assert.ok(!code.masked.includes('a.b.c'));
+  assert.ok(!code.masked.includes('API'));
+  assert.equal(code.restore(code.masked), 'useState with react-dom and a.b.c and API v2');
+
+  // 品牌专名（单大写词，通用正则无法覆盖）
+  const brand = maskIdentifiers('Built with React and Docker on Linux');
+  assert.ok(!brand.masked.includes('React'));
+  assert.ok(!brand.masked.includes('Docker'));
+  assert.ok(!brand.masked.includes('Linux'));
+  assert.equal(brand.restore(brand.masked), 'Built with React and Docker on Linux');
+
+  // 自然语言不受影响：句首普通大写词不遮罩
+  const plain = maskIdentifiers('Hello world and some normal Text');
+  assert.equal(plain.masked, 'Hello world and some normal Text');
+  assert.equal(plain.count, 0);
+});
 
 test('migrates a legacy API key without exposing it to another provider', () => {
   const migrated = normalizeConfig({
@@ -157,10 +180,13 @@ test('validates translation message boundaries', () => {
 });
 
 test('only skips target-language text when local detection is confident', () => {
+  // 已是目标语言 → 本地跳过（0 Token，杜绝「中译中」）。
   assert.equal(localSkipReason('这是一个中文页面', '中文'), 'targetLanguage');
+  assert.equal(localSkipReason('Hello world', 'English'), 'targetLanguage');
+  // 检测到的是其他语言 → 不跳过，送去翻译。
   assert.equal(localSkipReason('これは日本語です', '中文'), null);
   assert.equal(localSkipReason('設定', '中文'), null);
-  assert.equal(localSkipReason('Hello world', 'English'), null);
+  // 显式 source=target 时同样跳过（向后兼容旧签名）。
   assert.equal(localSkipReason('Hello world', 'English', 'English'), 'targetLanguage');
   assert.equal(localSkipReason('123 / 456', '中文'), 'nonLinguistic');
 });

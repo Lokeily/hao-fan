@@ -97,6 +97,13 @@ export function buildConfigForm(
               <option value="简洁精炼">简洁精炼</option>
             </select>
           </label>
+          <label class="ot-field ot-field-wide">翻译模式
+            <span>自动整页对照，或仅手动点击 / 划词翻译（最省 Token）</span>
+            <select data-f="translateMode">
+              <option value="auto">自动整页（推荐）</option>
+              <option value="manual">手动点击 / 划词</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -213,6 +220,7 @@ export function buildConfigForm(
   const sourceSel = mount.querySelector('[data-f=sourceLang]') as HTMLSelectElement;
   const targetSel = mount.querySelector('[data-f=targetLang]') as HTMLSelectElement;
   const toneSel = mount.querySelector('[data-f=tone]') as HTMLSelectElement;
+  const translateModeSel = mount.querySelector('[data-f=translateMode]') as HTMLSelectElement;
   const promptInput = mount.querySelector('[data-f=systemPrompt]') as HTMLTextAreaElement;
   const cacheChk = mount.querySelector('[data-f=cacheEnabled]') as HTMLInputElement;
   const glossaryChk = mount.querySelector('[data-f=glossaryEnabled]') as HTMLInputElement;
@@ -372,6 +380,7 @@ export function buildConfigForm(
     setIfDiff(sourceSel, cfg.sourceLang);
     setIfDiff(targetSel, cfg.targetLang);
     setIfDiff(toneSel, cfg.tone || '自然流畅');
+    setIfDiff(translateModeSel, cfg.translateMode || 'auto');
     setIfDiff(promptInput, cfg.systemPrompt);
     setIfDiff(cacheChk, cfg.cacheEnabled);
     setIfDiff(glossaryChk, cfg.glossaryEnabled !== false);
@@ -403,6 +412,7 @@ export function buildConfigForm(
     cfg.sourceLang = sourceSel.value;
     cfg.targetLang = targetSel.value;
     cfg.tone = toneSel.value;
+    cfg.translateMode = translateModeSel.value === 'manual' ? 'manual' : 'auto';
     cfg.systemPrompt = promptInput.value.trim();
     cfg.cacheEnabled = cacheChk.checked;
     cfg.glossaryEnabled = glossaryChk.checked;
@@ -492,6 +502,7 @@ export function buildConfigForm(
     hoverTranslateChk,
     inputTranslateChk,
     translationStyleSel,
+    translateModeSel,
   ].forEach((el) =>
     el.addEventListener('change', () => {
       save();

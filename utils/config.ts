@@ -21,6 +21,7 @@ export interface AppConfig {
   hoverTranslate: boolean; // 鼠标悬停翻译（hover 段落即译）
   inputTranslate: boolean; // 网页输入框翻译（聚焦时提供翻译按钮）
   translationStyle: string; // 译文显示样式：plain / dashed / underline / highlight
+  translateMode: 'auto' | 'manual'; // 翻译模式：auto=整页自动；manual=仅划词/点击翻译
   fallbackProviders: string[]; // 多引擎故障转移：主引擎 429/5xx 时按顺序切换
   strongProvider: string; // 长文强模型路由：超过阈值改用此服务商
   strongModel: string; // 长文强模型路由：目标模型
@@ -57,6 +58,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   hoverTranslate: true,
   inputTranslate: true,
   translationStyle: 'plain',
+  translateMode: 'auto',
   fallbackProviders: [],
   strongProvider: '',
   strongModel: '',

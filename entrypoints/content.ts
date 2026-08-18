@@ -90,6 +90,7 @@ export default defineContentScript({
     const sessionTranslations = new SessionTranslationCache();
     let translationConfigRevision = 0;
     let currentTranslationStyle = 'plain';
+    let currentTranslateMode: 'auto' | 'manual' = 'auto';
     let hoverTranslateEnabled = true;
     let inputTranslateEnabled = true;
     let noticeHost: HTMLElement | null = null;
@@ -153,6 +154,7 @@ export default defineContentScript({
         translationConfigRevision++;
         sessionTranslations.clear();
         if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+        if (v && (v.translateMode === 'auto' || v.translateMode === 'manual')) currentTranslateMode = v.translateMode;
         hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
         inputTranslateEnabled = v ? v.inputTranslate !== false : true;
         document.querySelectorAll('.ot-translation').forEach((el) => {
@@ -163,6 +165,7 @@ export default defineContentScript({
         .getValue()
         .then((v) => {
           if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+          if (v && (v.translateMode === 'auto' || v.translateMode === 'manual')) currentTranslateMode = v.translateMode;
           hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
           inputTranslateEnabled = v ? v.inputTranslate !== false : true;
         })
@@ -186,6 +189,7 @@ export default defineContentScript({
         if (!v) return;
         hoverTranslateEnabled = v.hoverTranslate !== false;
         inputTranslateEnabled = v.inputTranslate !== false;
+        if (v.translateMode === 'auto' || v.translateMode === 'manual') currentTranslateMode = v.translateMode;
         fullSettingsFormApi?.update(v);
         settingsPanel?.update({
           targetLang: v.targetLang,
@@ -478,162 +482,10 @@ export default defineContentScript({
       return failures;
     }
 
-    // ===== SSE 流式首块：逐段预创建节点，边收边渲染，首字延迟降到首个 token =====
-    let streamPort: ReturnType<typeof runtime.connect> | null = null;
-    function getStreamPort(): ReturnType<typeof runtime.connect> | null {
-      if (streamPort && (streamPort as any).onDisconnect) return streamPort;
-      try {
-        streamPort = runtime.connect({ name: 'haofan-stream' });
-        streamPort.onDisconnect.addListener(() => {
-          streamPort = null;
-        });
-      } catch {
-        streamPort = null;
-      }
-      return streamPort;
-    }
-
     // 滑动窗口上下文：页面标题 + 上一段译文，供后台做上下文感知翻译。
     let lastTranslation = '';
     function pageContext(): { title?: string; prev?: string } {
       return { title: document.title || undefined, prev: lastTranslation || undefined };
-    }
-
-    async function translateChunkStreaming(
-      items: TranslationItem[],
-      jobId: string | undefined,
-      context: { title?: string; prev?: string } | undefined,
-    ): Promise<void> {
-      const port = getStreamPort();
-      if (!port) {
-        await translateChunk(items, jobId, context);
-        return;
-      }
-      if (jobId && activePageJobId !== jobId) return;
-      const requestConfigRevision = translationConfigRevision;
-      let inserted = 0;
-      let idSeq = 0;
-      const streamCallId = `${Date.now().toString(36)}${randomId().slice(0, 4)}`;
-      const done: Promise<void>[] = [];
-      // 流式请求兜底：后台 SW 休眠/扩展重载会断开端口，若不处理，done 将永久挂起，
-      // 导致整页翻译卡死（busy 永远为 true）。断开或超时后立即收尾，
-      // 未完成段落重新进入视口观察队列，由懒翻译/动态扫描补译。
-      const pending: { settle: () => void; el: Element }[] = [];
-      const settleAll = () => {
-        for (const p of pending) {
-          p.settle();
-          p.el.classList.remove(PENDING_CLASS);
-          if (p.el.isConnected) {
-            observeForLazyTranslation([{ el: p.el, text: textOfBlock(p.el) }]);
-          }
-        }
-        pending.length = 0;
-      };
-      port.onDisconnect.addListener(settleAll);
-      for (const item of items) {
-        if (jobId && activePageJobId !== jobId) break;
-        if (!item.el.isConnected) continue;
-        (item.el as HTMLElement).classList.add(PENDING_CLASS);
-        insertTranslation(item.el, '', item.text);
-        const node = translationNodes.get(item.el);
-        const id = `${streamCallId}-s${idSeq++}`;
-        const p = new Promise<void>((resolve) => {
-          const entry = {
-            settle: () => resolve(),
-            el: item.el,
-          };
-          pending.push(entry);
-          // 超时兜底：与后台单次请求超时（20s）对齐，多给 5s 余量。
-          const timer = setTimeout(() => {
-            const idx = pending.indexOf(entry);
-            if (idx >= 0) pending.splice(idx, 1);
-            entry.settle();
-            entry.el.classList.remove(PENDING_CLASS);
-            // 移除"…"占位节点，等待重试
-            const node = translationNodes.get(entry.el);
-            node?.remove();
-            translationNodes.delete(entry.el);
-            if (entry.el.isConnected) {
-              observeForLazyTranslation([{ el: entry.el, text: textOfBlock(entry.el) }]);
-            }
-          }, 25_000);
-          const onMsg = (msg: any) => {
-            if (!msg || msg.id !== id) return;
-            if (typeof msg.delta === 'string' && node?.isConnected) {
-              const text = node.shadowRoot?.querySelector('.text');
-              if (text) {
-                text.textContent = msg.delta;
-                text.classList.remove('is-pending');
-              }
-            }
-            if (msg.done) {
-              clearTimeout(timer);
-              const idx = pending.indexOf(entry);
-              if (idx >= 0) pending.splice(idx, 1);
-              try {
-                port.onMessage.removeListener(onMsg);
-              } catch {
-                /* 端口已断开 */
-              }
-              if (jobId && activePageJobId !== jobId) {
-                resolve();
-                return;
-              }
-              if (msg.error) {
-                // 流式请求失败：告知用户原因，移除占位节点，段落回到懒翻译队列待重试
-                (item.el as HTMLElement).classList.remove(PENDING_CLASS);
-                node?.remove();
-                translationNodes.delete(item.el);
-                showNotice(String(msg.error), jobId || 'page-translation');
-                if (item.el.isConnected) {
-                  observeForLazyTranslation([{ el: item.el, text: textOfBlock(item.el) }]);
-                }
-                resolve();
-                return;
-              }
-              const translation = typeof msg.translation === 'string' ? msg.translation : '';
-              if (node?.isConnected) {
-                const text = node.shadowRoot?.querySelector('.text');
-                if (text) {
-                  text.textContent = translation || '';
-                  text.classList.remove('is-pending');
-                }
-              }
-              if (requestConfigRevision === translationConfigRevision) {
-                if (translation) {
-                  lastTranslation = translation;
-                  sessionTranslations.remember(item.text, translation);
-                  const outcome = applyTranslation(item.el, item.text, translation);
-                  if (outcome === 'inserted') inserted++;
-                  else if (outcome === 'stale') {
-                    const cur = textOfBlock(item.el);
-                    if (cur.length >= 2) observeForLazyTranslation([{ el: item.el, text: cur }]);
-                  }
-                  if (msg.issue && Array.isArray(msg.issue) && msg.issue.length) {
-                    node?.setAttribute('data-quality', 'warn');
-                  }
-                } else {
-                  (item.el as HTMLElement).classList.remove(PENDING_CLASS);
-                }
-              }
-              resolve();
-            }
-          };
-          port.onMessage.addListener(onMsg);
-          port.postMessage({ type: 'translate-one', id, text: item.text, jobId, context });
-        });
-        done.push(p);
-      }
-      await Promise.all(done);
-      try {
-        port.onDisconnect.removeListener(settleAll);
-      } catch {
-        /* 端口已断开 */
-      }
-      if (jobId && activePageJobId === jobId && inserted > 0) {
-        translatedCount += inserted;
-        showStatus(`翻译中… 已译 ${progressText()} 段`);
-      }
     }
 
     function isInViewport(element: Element): boolean {
@@ -918,6 +770,13 @@ export default defineContentScript({
       if (busy) return;
       busy = true;
 
+      // 手动模式：不做整页自动翻译，仅由「点击段落 / 划词」触发（省 Token，且不被无关内容打扰）。
+      if (currentTranslateMode === 'manual') {
+        busy = false;
+        showStatus('手动模式：点击段落或划选文字即可翻译', true);
+        return;
+      }
+
       let jobId: string | null = null;
       try {
         // 先清理旧译文层，防止堆叠
@@ -974,7 +833,9 @@ export default defineContentScript({
         let failures = 0;
         if (firstChunk.length > 0) {
           try {
-            await translateChunkStreaming(firstChunk, jobId, pageContext());
+            // 首屏也走批量（1 个请求），不再逐条流式发请求：把重复的系统提示词
+            // /术语/上下文前缀从「每屏 N 份」降到「1 份」，显著省 Token。
+            await translateChunk(firstChunk, jobId, pageContext());
           } catch {
             failures++;
           }
@@ -1025,6 +886,8 @@ export default defineContentScript({
     // ===== 动态内容自动翻译 =====
     function startDynamicTranslation() {
       if (dynamicActive || !document.body) return;
+      // 手动模式下不自动翻译动态新增内容，保持「按需翻译」。
+      if (currentTranslateMode === 'manual') return;
       dynamicActive = true;
 
       // 动态新增内容同样只注册观察，进入视口前不会调用翻译 API。
@@ -1544,6 +1407,52 @@ export default defineContentScript({
       true,
     );
 
+    // ===== 手动模式：点击段落即翻译该块（不整页自动翻）=====
+    async function manualTranslateBlock(el: Element): Promise<void> {
+      const html = el as HTMLElement;
+      if (
+        html.classList.contains(TRANSLATED_CLASS) ||
+        html.classList.contains(PENDING_CLASS) ||
+        html.classList.contains(OBSERVED_CLASS)
+      )
+        return;
+      if (html.querySelector(':scope > .ot-translation')) return;
+      const text = textOfBlock(el);
+      if (text.length < 2) return;
+      html.classList.add(PENDING_CLASS);
+      try {
+        const r: any = await sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } });
+        if (r?.ok && typeof r.translation === 'string' && r.translation) {
+          sessionTranslations.remember(text, r.translation);
+          applyTranslation(el, text, r.translation);
+        }
+      } catch {
+        /* 翻译失败静默，不阻断交互 */
+      } finally {
+        html.classList.remove(PENDING_CLASS);
+      }
+    }
+
+    // 手动模式下：点击正文段落触发翻译；有划词选区时不干扰选区。
+    document.addEventListener(
+      'click',
+      (e: Event) => {
+        if (currentTranslateMode !== 'manual' || siteDisabled) return;
+        const target = e.target as Element | null;
+        if (!target) return;
+        if (
+          target.closest(
+            '.ot-translation, #ot-toolbar, #ot-status, #ot-settings-panel, #ot-selection-ui, .ot-selbtn',
+          )
+        )
+          return;
+        if (!window.getSelection()?.isCollapsed) return;
+        const el = closestTextBlock(target, true);
+        if (el) void manualTranslateBlock(el);
+      },
+      true,
+    );
+
     // 接收来自 background 的指令
     runtime.onMessage.addListener((msg: any) => {
       if (msg?.type === 'SITE_POLICY_CHANGED' && typeof msg.payload?.disabled === 'boolean') {
@@ -1964,6 +1873,8 @@ export default defineContentScript({
       'mouseover',
       (e) => {
         if (!hoverTranslateEnabled) return;
+        // 手动模式不自动悬停翻译，保持「按需翻译」。
+        if (currentTranslateMode === 'manual') return;
         const target = e.target as Element | null;
         if (!target || !document.body.contains(target)) return;
         if (

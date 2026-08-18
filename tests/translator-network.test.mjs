@@ -289,12 +289,15 @@ test('句子级缓存：文本微变时只重译变化的句子', async () => {
   await server.close();
 });
 
-test('上下文感知：system 提示注入页面标题与前段译文', async () => {
+test('上下文感知：页面上下文注入 user 而非 system（防注入 + 前缀稳定）', async () => {
   const server = await startMockServer();
   server.setHandler((req) => {
     const system = req.body.messages[0].content;
-    assert.match(system, /【语境·页面标题】My Page/);
-    assert.match(system, /【语境·上一段译文】前文/);
+    const user = req.body.messages[1].content;
+    assert.ok(!system.includes('【语境·页面标题】'), '页面来源内容不应进入 system（防注入）');
+    assert.ok(!system.includes('【语境·上一段译文】'));
+    assert.match(user, /【语境·页面标题】My Page/);
+    assert.match(user, /【语境·上一段译文】前文/);
     return { choices: [{ message: { content: '上下文译文' } }], usage: {} };
   });
   const result = await translateOneDetailed(

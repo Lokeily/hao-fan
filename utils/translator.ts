@@ -14,6 +14,7 @@ import {
   buildGlossaryBlock,
   type TermMap,
 } from './glossary.ts';
+import { maskIdentifiers, MASK_GUARD } from './mask.ts';
 
 // 翻译风格 → 追加到系统提示词的一句风格指令，让译文贴合场景（质量目标）。
 const TONE_HINTS: Record<string, string> = {
@@ -256,6 +257,8 @@ async function coreTranslate(
   const ctx = cfg.contextAware ? opts.context : undefined;
   const candidates = buildCandidates(cfg);
   const block = cfg.glossaryEnabled !== false ? opts.glossaryBlock || '' : '';
+  // 预遮罩代码/库名标识符：模型只译自然语言，最终译文由调用方还原（见 utils/mask.ts）。
+  const m = maskIdentifiers(text);
 
   const tryOnce = async (c: AppConfig): Promise<ChatResult> => {
     if (getProvider(c.provider)?.type === 'mt') {
@@ -263,7 +266,7 @@ async function coreTranslate(
       const out = await translateMT(c.provider, text, c, signal);
       return { text: out, promptTokens: 0, completionTokens: 0 };
     }
-    return callChat(c, text, undefined, block, ctx, signal);
+    return callChat(c, m.masked, undefined, block, ctx, signal, m.count);
   };
 
   let lastErr: unknown;
@@ -295,13 +298,14 @@ async function coreTranslate(
       try {
         const corrective = await callChat(
           cfg,
-          text,
+          m.masked,
           `遗漏了关键信息，请原样保留不翻译：${missing.join('，')}`,
           block,
           ctx,
           signal,
+          m.count,
         );
-        translation = corrective.text;
+        translation = m.restore(corrective.text);
         addChatUsage(stats, corrective);
         const stillMissing = auditTranslation(text, translation);
         if (stillMissing.length > 0) {
@@ -499,6 +503,8 @@ export async function translateOneStream(
   const ck = cacheKeyOf(cfg);
   const glossary = customGlossaryOf(cfg);
   const liveContext = cfg.contextAware ? context : undefined;
+  // 预遮罩代码/库名标识符：模型只译自然语言，最终译文再还原（见 utils/mask.ts）。
+  const masked = maskIdentifiers(t);
 
   if (localSkipReason(t, cfg.targetLang, cfg.sourceLang)) {
     stats.localSkipped++;
@@ -545,8 +551,14 @@ export async function translateOneStream(
     try {
       signal?.throwIfAborted();
       full = '';
-      for await (const delta of callChatStream(c, t, block, liveContext, signal, (m) =>
-        Object.assign(meta, m),
+      for await (const delta of callChatStream(
+        c,
+        masked.masked,
+        block,
+        liveContext,
+        signal,
+        (mm) => Object.assign(meta, mm),
+        masked.count,
       )) {
         full += delta;
         onDelta(full);
@@ -564,7 +576,7 @@ export async function translateOneStream(
   stats.promptTokens += meta.promptTokens || 0;
   stats.completionTokens += meta.completionTokens || 0;
 
-  const translation = full.trim();
+  const translation = masked.restore(full.trim());
   let issue: string[] | null = null;
   if (!translation) throw new Error('翻译服务返回了空结果');
   if (cfg.qualityCheck) {
@@ -697,9 +709,10 @@ export async function translateBatchDetailed(
         const block = useGlossary
           ? buildGlossaryBlock(relevantTerms([parts[index]], cfg.targetLang, glossary, cfg.glossaryTermLimit ?? 12))
           : '';
-        const response = await callChat(effectiveCfg, parts[index], undefined, block, liveContext, signal);
+        const m = maskIdentifiers(parts[index]);
+        const response = await callChat(effectiveCfg, m.masked, undefined, block, liveContext, signal, m.count);
         addChatUsage(stats, response);
-        translated[index] = response.text;
+        translated[index] = m.restore(response.text);
       }
     };
     await Promise.all(Array.from({ length: Math.min(3, parts.length) }, () => worker()));
@@ -720,10 +733,12 @@ export async function translateBatchDetailed(
           ? buildGlossaryBlock(relevantTerms([item.text], cfg.targetLang, glossary, cfg.glossaryTermLimit ?? 12))
           : '';
         try {
-          const response = await callChat(effectiveCfg, item.text, undefined, block, liveContext, signal);
+          const m = maskIdentifiers(item.text);
+          const response = await callChat(effectiveCfg, m.masked, undefined, block, liveContext, signal, m.count);
+          const restored = m.restore(response.text);
           addChatUsage(stats, response);
-          const miss = cfg.qualityCheck ? auditTranslation(item.text, response.text) : null;
-          applyResult(item, response.text, miss && miss.length ? miss : null);
+          const miss = cfg.qualityCheck ? auditTranslation(item.text, restored) : null;
+          applyResult(item, restored, miss && miss.length ? miss : null);
         } catch (error) {
           if (!(error instanceof TruncatedOutputError)) throw error;
           stats.requests++;
@@ -739,6 +754,9 @@ export async function translateBatchDetailed(
   let recoveryRequests = 0;
   const translateGroup = async (items: typeof toTranslate, recovery = false): Promise<void> => {
     signal?.throwIfAborted();
+    // 预遮罩各条里的代码/库名标识符，整批送模型，回填空（省 Token + 防乱翻库名）。
+    const maskedItems = items.map((it) => maskIdentifiers(it.text));
+    const anyMasked = maskedItems.some((m) => m.count > 0);
     const block = useGlossary
       ? buildGlossaryBlock(
           relevantTerms(
@@ -749,10 +767,18 @@ export async function translateBatchDetailed(
           ),
         )
       : '';
-    const input = JSON.stringify({ items: createBatchItems(items.map((item) => item.text)) });
+    const input = JSON.stringify({ items: createBatchItems(maskedItems.map((m) => m.masked)) });
     let response: ChatResult;
     try {
-      response = await callChat(effectiveCfg, input, batchInstruction(cfg.targetLang), block, liveContext, signal);
+      response = await callChat(
+        effectiveCfg,
+        input,
+        batchInstruction(cfg.targetLang),
+        block,
+        liveContext,
+        signal,
+        anyMasked ? 1 : 0,
+      );
       addChatUsage(stats, response);
     } catch (error) {
       if (!(error instanceof TruncatedOutputError)) throw error;
@@ -769,8 +795,9 @@ export async function translateBatchDetailed(
     const parts = parseBatchTranslations(response.text, items.length);
     if (parts) {
       items.forEach((item, index) => {
-        const miss = cfg.qualityCheck ? auditTranslation(item.text, parts[index]) : null;
-        applyResult(item, parts[index], miss && miss.length ? miss : null);
+        const translated = parts[index] ? maskedItems[index].restore(parts[index]) : parts[index];
+        const miss = cfg.qualityCheck ? auditTranslation(item.text, translated) : null;
+        applyResult(item, translated, miss && miss.length ? miss : null);
       });
       return;
     }
@@ -959,12 +986,13 @@ async function callChat(
   glossaryBlock?: string,
   context?: TranslationContext,
   signal?: AbortSignal,
+  maskCount = 0,
 ): Promise<ChatResult> {
   const candidates = buildCandidates(cfg);
   let lastErr: unknown;
   for (const c of candidates) {
     try {
-      return await callChatOnce(c, text, extraInstruction, glossaryBlock, context, signal);
+      return await callChatOnce(c, text, extraInstruction, glossaryBlock, context, signal, maskCount);
     } catch (error) {
       if (signal?.aborted) throw error;
       if (!isFailoverError(error)) throw error;
@@ -981,6 +1009,7 @@ async function callChatOnce(
   glossaryBlock?: string,
   context?: TranslationContext,
   signal?: AbortSignal,
+  maskCount = 0,
 ): Promise<ChatResult> {
   const base = (cfg.baseUrl || '').replace(/\/+$/, '');
   if (!base) throw new Error('未配置 API Base URL');
@@ -988,15 +1017,28 @@ async function callChatOnce(
   const url = `${base}/chat/completions`;
   const baseSystem =
     cfg.systemPrompt?.trim() || defaultSystem(cfg.targetLang, cfg.sourceLang, cfg.tone);
-  const structuredHint = extraInstruction
-    ? '\n\n对于结构化批量请求，必须严格遵循用户要求的 JSON 输出格式。'
-    : '';
+  // 防注入 + 前缀缓存：system 只保留「稳定指令 + 术语表」，不再夹带页面来源的
+  // 上下文（标题/前文译文）。上下文属于页面数据，放进 user 侧，避免页面内容
+  // 以「指令」身份进入 system，也保证 baseSystem + INJECTION_GUARD 前缀稳定。
   const system =
-    baseSystem + (glossaryBlock || '') + contextBlock(context) + structuredHint + '\n\n' + INJECTION_GUARD;
+    baseSystem +
+    (glossaryBlock || '') +
+    (maskCount > 0 ? '\n\n' + MASK_GUARD : '') +
+    '\n\n' +
+    INJECTION_GUARD;
+  const structuredHint = extraInstruction
+    ? '对于结构化批量请求，必须严格遵循用户要求的 JSON 输出格式。'
+    : '';
   // 用边界包裹待译文本，明确它只是数据而非指令（防 Prompt Injection）。
-  const userContent = extraInstruction
-    ? `${extraInstruction}\n\n${DATA_BOUNDARY_START}\n${text}\n${DATA_BOUNDARY_END}`
-    : `${DATA_BOUNDARY_START}\n${text}\n${DATA_BOUNDARY_END}`;
+  // 注意：text 已由调用方完成标识符预遮罩（见 utils/mask.ts），这里不再遮罩，
+  // 否则批量 JSON 里的 id 字段（t0/t1）会被占位符破坏协议。
+  const ctxBlock = contextBlock(context);
+  const userContent =
+    (ctxBlock ? ctxBlock + '\n\n' : '') +
+    (extraInstruction
+      ? extraInstruction + (structuredHint ? '\n\n' + structuredHint : '') + '\n\n'
+      : '') +
+    `${DATA_BOUNDARY_START}\n${text}\n${DATA_BOUNDARY_END}`;
   const body = JSON.stringify({
     model: cfg.model,
     messages: [
@@ -1038,12 +1080,13 @@ async function* callChatStream(
   context: TranslationContext | undefined,
   signal: AbortSignal | undefined,
   onMeta: (meta: StreamMeta) => void,
+  maskCount = 0,
 ): AsyncGenerator<string, void, unknown> {
   const candidates = buildCandidates(cfg);
   let lastErr: unknown;
   for (const c of candidates) {
     try {
-      yield* callChatStreamOnce(c, text, glossaryBlock, context, signal, onMeta);
+      yield* callChatStreamOnce(c, text, glossaryBlock, context, signal, onMeta, maskCount);
       return;
     } catch (error) {
       if (signal?.aborted) throw error;
@@ -1061,6 +1104,7 @@ async function* callChatStreamOnce(
   context: TranslationContext | undefined,
   signal: AbortSignal | undefined,
   onMeta: (meta: StreamMeta) => void,
+  maskCount = 0,
 ): AsyncGenerator<string, void, unknown> {
   const base = (cfg.baseUrl || '').replace(/\/+$/, '');
   if (!base) throw new Error('未配置 API Base URL');
@@ -1068,9 +1112,12 @@ async function* callChatStreamOnce(
   const url = `${base}/chat/completions`;
   const baseSystem =
     cfg.systemPrompt?.trim() || defaultSystem(cfg.targetLang, cfg.sourceLang, cfg.tone);
+  // 调用方已完成标识符预遮罩，仅当存在占位符时提示模型原样保留。
+  // 与 callChatOnce 一致：页面来源的上下文放 user 侧，不进 system（防注入 + 前缀稳定）。
   const system =
-    baseSystem + (glossaryBlock || '') + contextBlock(context) + '\n\n' + INJECTION_GUARD;
-  const userContent = `${DATA_BOUNDARY_START}\n${text}\n${DATA_BOUNDARY_END}`;
+    baseSystem + (glossaryBlock || '') + (maskCount > 0 ? '\n\n' + MASK_GUARD : '') + '\n\n' + INJECTION_GUARD;
+  const ctxBlock = contextBlock(context);
+  const userContent = `${ctxBlock ? ctxBlock + '\n\n' : ''}${DATA_BOUNDARY_START}\n${text}\n${DATA_BOUNDARY_END}`;
   const body = JSON.stringify({
     model: cfg.model,
     messages: [
