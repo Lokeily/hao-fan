@@ -2,6 +2,10 @@
 (function () {
   'use strict';
 
+  // 标记 JS 已激活：CSS 据此才隐藏 .reveal 初始态。
+  // 若脚本未加载/出错，内容默认可见，杜绝「整块空白/文字不可见」的动画事故。
+  document.documentElement.classList.add('js');
+
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---- 导航栏滚动状态 + 顶部进度条 ----
@@ -44,6 +48,16 @@
     revealEls.forEach(function (el) { io.observe(el); });
   }
 
+  // 兜底：若 IntersectionObserver 因故未触发（极旧环境、容器异常、脚本中断），
+  // 页面 load 后延时强制显示所有 .reveal，确保绝无内容永久隐藏。
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      document.querySelectorAll('.reveal:not(.in)').forEach(function (el) {
+        el.classList.add('in');
+      });
+    }, 2600);
+  });
+
   // ---- 当前页导航高亮（按文件名匹配）----
   var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-links a'));
   if (navLinks.length) {
@@ -75,54 +89,46 @@
   }
 })();
 
-// ---- 自动同步最新 Release：版本号 + 下载链接 ----
-// 页面加载时调用 GitHub API 获取最新发布，动态更新下载按钮的版本号文本，
-// 并按浏览器类型指向对应安装包（Chrome/Edge → chrome 包，Firefox → firefox 包）。
-// 即使脚本失败，按钮仍指向 releases/latest（GitHub 永远跳到最新版），版本号显示兜底值。
+// ---- 自动同步最新版本号：跟随 GitHub 仓库 ----
+// 主数据源：raw.githubusercontent.com 上的 package.json（Fastly CDN，带 CORS、
+//   国内可稳定访问、且不受 GitHub API 60次/小时限流影响）。
+// 次数据源：GitHub Release API（境外可用，作为兜底）。
+// 按钮链接本身始终指向 releases/latest（GitHub 自动跳转到最新版），无需脚本干预；
+// 即使两个数据源都失败，也显示 FALLBACK_VERSION，不会出现错误编号。
 (function () {
   'use strict';
 
   var REPO = 'Lokeily/hao-fan';
-  var FALLBACK_VERSION = 'v0.1.20'; // 与当前真实发布一致，作为脚本失效时的兜底
+  var FALLBACK_VERSION = 'v0.1.23'; // 与当前真实发布一致，作为脚本失效时的兜底
+  var RAW_URL = 'https://raw.githubusercontent.com/' + REPO + '/main/package.json';
+  var API_URL = 'https://api.github.com/repos/' + REPO + '/releases/latest';
   var versionEls = document.querySelectorAll('.js-latest-version');
-  var downloadEls = document.querySelectorAll('a.js-download');
 
-  // 兜底：先填已知版本；链接本身已指向 releases/latest，永远是最新
+  // 兜底：先填已知版本（GitHub 发新版后即被下面的逻辑覆盖）
   versionEls.forEach(function (el) { el.textContent = FALLBACK_VERSION; });
+
+  function applyVersion(v) {
+    if (!v) return;
+    var tag = String(v).indexOf('v') === 0 ? v : 'v' + v;
+    versionEls.forEach(function (el) { el.textContent = tag; });
+  }
 
   if (!window.fetch) return; // 极老浏览器：保持兜底
 
-  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', {
-    headers: { 'Accept': 'application/vnd.github+json' }
-  })
-    .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-    .then(function (data) {
-      var tag = data.tag_name || FALLBACK_VERSION;
-      // 1) 更新所有版本号文本
-      versionEls.forEach(function (el) { el.textContent = tag; });
+  function tryRaw() {
+    return fetch(RAW_URL, { cache: 'no-cache' })
+      .then(function (r) { if (!r.ok) throw new Error('raw ' + r.status); return r.json(); })
+      .then(function (data) { if (data && data.version) { applyVersion(data.version); return true; } throw new Error('no version'); });
+  }
+  function tryApi() {
+    return fetch(API_URL, { headers: { 'Accept': 'application/vnd.github+json' }, cache: 'no-cache' })
+      .then(function (r) { if (!r.ok) throw new Error('api ' + r.status); return r.json(); })
+      .then(function (data) { if (data && data.tag_name) applyVersion(data.tag_name); })
+      .catch(function () { /* 全部失败：保留兜底 */ });
+  }
 
-      // 2) 按浏览器选择对应安装包
-      var ua = navigator.userAgent || '';
-      var want = /Firefox\//i.test(ua) ? 'firefox' : 'chrome';
-      var assets = data.assets || [];
-      var picked = null;
-      for (var i = 0; i < assets.length; i++) {
-        var n = (assets[i].name || '').toLowerCase();
-        if (n.indexOf(want) !== -1 && /\.zip$/.test(n)) { picked = assets[i]; break; }
-      }
-      if (!picked) {
-        for (var j = 0; j < assets.length; j++) {
-          if (/\.zip$/.test(assets[j].name || '')) { picked = assets[j]; break; }
-        }
-      }
-      var url = picked
-        ? picked.browser_download_url
-        : (data.html_url || 'https://github.com/' + REPO + '/releases/latest');
-      downloadEls.forEach(function (a) { a.setAttribute('href', url); });
-    })
-    .catch(function () {
-      // 网络/限流失败：保留兜底（releases/latest + 当前版本号）
-    });
+  // 先试国内可达的 raw 源，失败再试 API
+  tryRaw().catch(tryApi).catch(function () {});
 })();
 
 // ---- 内容动画：数字滚动 / 错落进场 / 打字机演示 / 回到顶部 ----
@@ -202,7 +208,7 @@
         io2.unobserve(el);
       });
     }, { threshold: 0.4 });
-    document.querySelectorAll('.stat .num[data-count], .tgt[data-typetext]').forEach(function (el) {
+    document.querySelectorAll('.stat .num[data-count], .tgt[data-typetext]:not([data-loop])').forEach(function (el) {
       io2.observe(el);
     });
   } else {
@@ -362,6 +368,7 @@
   var finePointer = window.matchMedia('(pointer: fine)').matches;
 
   // 1) 卡片 3D 倾斜：指针靠近时朝指针方向轻微抬起，premium 手感
+  //    幅度克制（±5°），且内部文字不再 translateZ，旋转时不会分层重影/糊字。
   if (!reduceMotion && finePointer) {
     var tilts = document.querySelectorAll('.tilt');
     Array.prototype.forEach.call(tilts, function (el) {
@@ -370,8 +377,8 @@
         var px = (e.clientX - r.left) / r.width - 0.5;
         var py = (e.clientY - r.top) / r.height - 0.5;
         el.style.transform =
-          'perspective(900px) rotateX(' + (-py * 7).toFixed(2) + 'deg) rotateY(' +
-          (px * 9).toFixed(2) + 'deg) translateY(-4px)';
+          'perspective(1000px) rotateX(' + (-py * 5).toFixed(2) + 'deg) rotateY(' +
+          (px * 6).toFixed(2) + 'deg)';
       });
       el.addEventListener('pointerleave', function () { el.style.transform = ''; });
     });
@@ -395,3 +402,85 @@
     setMode('both', btns[0]);
   }
 })();
+
+// ---- 第四轮增强：展示区演示持续流式重播 + 引擎轮换（直观呈现翻译能力）----
+(function () {
+  'use strict';
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var demo = document.querySelector('.showcase .demo');
+  if (!demo) return;
+  var tgts = Array.prototype.slice.call(demo.querySelectorAll('.tgt[data-typetext][data-loop]'));
+  var engineEl = document.querySelector('.js-engine');
+  if (!tgts.length) return;
+
+  var engines = ['DeepSeek', 'Google 翻译', '智谱 GLM', '腾讯混元', '通义千问', 'Kimi'];
+  var ei = 0;
+  function setEngine() {
+    if (engineEl) engineEl.textContent = engines[ei % engines.length];
+  }
+
+  function typeEl(el, text, done) {
+    el.classList.add('typing', 'thinking');
+    el.textContent = '';
+    setTimeout(function () {
+      el.classList.remove('thinking');
+      var i = 0;
+      (function step() {
+        el.textContent = text.slice(0, i);
+        if (i <= text.length) {
+          i++;
+          setTimeout(step, 34);
+        } else {
+          el.classList.remove('typing');
+          if (done) done();
+        }
+      })();
+    }, 440);
+  }
+
+  function clearAll() {
+    tgts.forEach(function (t) {
+      t.textContent = '';
+      t.classList.remove('typing', 'thinking');
+    });
+  }
+
+  function cycle() {
+    setEngine();
+    ei++;
+    var idx = 0;
+    function next() {
+      if (idx >= tgts.length) {
+        setTimeout(function () {
+          clearAll();
+          setTimeout(cycle, 1700);
+        }, 2300);
+        return;
+      }
+      var t = tgts[idx++];
+      typeEl(t, t.getAttribute('data-typetext'), next);
+    }
+    next();
+  }
+
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          io.disconnect();
+          if (reduceMotion) {
+            tgts.forEach(function (t) { t.textContent = t.getAttribute('data-typetext'); });
+            if (engineEl) engineEl.textContent = engines[0];
+          } else {
+            cycle();
+          }
+        }
+      });
+    }, { threshold: 0.35 });
+    io.observe(demo);
+  } else {
+    tgts.forEach(function (t) { t.textContent = t.getAttribute('data-typetext'); });
+    if (engineEl) engineEl.textContent = engines[0];
+  }
+}());

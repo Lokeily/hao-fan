@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>常见问题 · 好翻</title>
     <meta name="description" content="好翻（Open Translator CN）常见问题：是否免费、是否收集数据、是否需要 API Key、支持哪些浏览器与服务、Firefox 限制、API Key 安全等。" />
-    <link rel="icon" type="image/png" href="assets/img/icon-48.png" />
+    <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
+    <link rel="apple-touch-icon" href="assets/img/icon-128.png" />
+    <script>document.documentElement.classList.add('js');</script>
     <link rel="stylesheet" href="assets/css/style.css" />
   </head>
   <body>
@@ -26,7 +28,9 @@
             <a href="providers.html">翻译服务</a>
             <a href="install.html">安装指南</a>
             <a href="faq.html" class="active">常见问题</a>
+            <a href="changelog.html">更新日志</a>
             <a href="privacy.html">隐私政策</a>
+            <a href="terms.html">服务条款</a>
             <a
               class="nav-github"
               href="https://github.com/Lokeily/hao-fan"
@@ -109,7 +113,7 @@
           </details>
           <details class="faq reveal" data-cat="config">
             <summary>支持哪些翻译服务？</summary>
-            <p>内置 12+ 家 AI 服务商（DeepSeek、OpenAI、Google Gemini、OpenRouter、智谱 GLM、腾讯混元、通义千问、Kimi、百川智能、豆包、Ollama 本地模型等）与 3 家传统机器翻译（Google 翻译免 Key、DeepL、Microsoft 翻译），也支持任意 OpenAI 兼容接口。详见<a href="providers.html">翻译服务</a>页。</p>
+            <p>内置 12 家 AI 服务商（DeepSeek、OpenAI、Google Gemini、OpenRouter、智谱 GLM、腾讯混元、通义千问、Kimi、百川智能、豆包、Ollama 本地模型等）与 3 家传统机器翻译（Google 翻译免 Key、DeepL、Microsoft 翻译），也支持任意 OpenAI 兼容接口。详见<a href="providers.html">翻译服务</a>页。</p>
           </details>
           <details class="faq reveal" data-cat="platform">
             <summary>为什么 Firefox 安装后重启浏览器，扩展就不见了？</summary>
@@ -155,30 +159,71 @@
             <summary>译文不对，能自己改吗？</summary>
             <p>可以。鼠标悬停（hover）在任意译文上即可直接编辑；你的修改会被记录下来，扩展还会自动抽取其中的术语，沉淀进你的个人术语表。随着使用，遇到同类表述会越来越贴合你的习惯。</p>
           </details>
+          <details class="faq reveal" data-cat="config">
+            <summary>翻译提示 401 / 403 或「额度不足」怎么办？</summary>
+            <p>先检查：设置里填的 API Key 是否有效、有没有多复制了空格或换行、对应服务商账户是否有余额或免费额度。401 / 403 通常是 Key 无效或权限不足；「额度不足」是服务商账户问题，去对应平台充值或换 Key 即可。也可在设置里开启「备用引擎故障转移」，主引擎报错时自动切到备用引擎一次。</p>
+          </details>
+          <details class="faq reveal" data-cat="config">
+            <summary>怎么切换或添加服务商 / 模型？</summary>
+            <p>打开设置 → 从服务商下拉里选内置的 12 家之一即可；想用列表外的模型，选「任意 OpenAI 兼容接口」并填入 Base URL 与模型名。具体用哪个模型（如 deepseek-chat、gpt-4o）也在设置里选。改完即时生效，无需重载扩展。</p>
+          </details>
+          <details class="faq reveal" data-cat="feature">
+            <summary>术语表在哪看？怎么用？</summary>
+            <p>悬停任意译文即可直接修改，好翻会自动把其中的术语抽出来，沉淀进你的个人术语表；在设置的术语表区域可以查看、编辑、删除已沉淀的术语。开启后，遇到相同表述会优先沿用你的译法，越翻越贴合习惯。术语注入上限（0–60）也能在设置里调整。</p>
+          </details>
+          <details class="faq reveal" data-cat="trouble">
+            <summary>划词翻译没出现 / 不工作？</summary>
+            <p>先确认扩展已启用、且当前网站没有被「暂停翻译」。划词翻译依赖选中文字后弹出的圆形按钮，部分网页（如 PDF 阅读器、Canvas 画布）无法选中文本，自然没有浮层；这种情况改用右下角「译」按钮或右键菜单翻译整页。若完全不弹出，尝试重载扩展与页面。</p>
+          </details>
+          <details class="faq reveal" data-cat="privacy">
+            <summary>可以完全离线翻译吗？</summary>
+            <p>可以。在设置里选择 Ollama 等本地模型，翻译请求只在你本机处理，完全不出网络，适合对数据最敏感的场景。本地模型的能力取决于你部署的模型大小——轻量模型速度快，但译文质量可能不及云端大模型。</p>
+          </details>
+          <details class="faq reveal" data-cat="privacy">
+            <summary>翻译内容会被翻译服务商保存吗？</summary>
+            <p>翻译内容由你选择的第三方服务商处理，是否保存、保存多久、是否用于模型训练，由该服务商的条款与隐私政策决定，好翻无法替它们承诺。因此建议：① 重要或敏感内容优先选用你信任的服务商；② 数据最敏感的场景用 Ollama 本地模型，内容完全不出本机。</p>
+          </details>
+          <details class="faq reveal" data-cat="config">
+            <summary>术语表和设置能跨设备同步吗？</summary>
+            <p>不能。好翻没有账号体系，术语表、译文编辑记录与所有设置都只保存在当前设备的浏览器本地（<code>storage.local</code>），不会上传云端，因此也不支持多设备同步。这也是「本地优先、数据主权在你手里」的一部分——想在新设备上复用，需要重新配置。</p>
+          </details>
+          <details class="faq reveal" data-cat="feature">
+            <summary>为什么有的译文带「已校正」标记？</summary>
+            <p>那是「翻译质量自检」在起作用：译文生成后，好翻会校验原文中的数字、网址、邮箱、占位符与代码符号有没有被漏掉或改坏；一旦发现缺失，会自动追加保真指令重译一次，并在界面上标记「已校正」，提醒你这段译文被额外修正过。</p>
+          </details>
+          <details class="faq reveal" data-cat="feature">
+            <summary>好翻和沉浸式翻译等同类工具有什么区别？</summary>
+            <p>两者都做「原文 + 译文」的沉浸式对照阅读，但定位不同。好翻强调：免 Key 就能体验（Google 翻译免 Key 通道）、本地优先（无账号、无遥测、数据不出浏览器）、可接任意 OpenAI 兼容接口与本地模型（Ollama）、译文可编辑 + 术语自学习、全程开源（MIT）。沉浸式翻译是成熟的商业产品，功能面更广（PDF、视频、更多第三方集成等）。选哪个取决于你更看重「数据自主与可定制」，还是「开箱即用的完整生态」。</p>
+          </details>
+          <details class="faq reveal" data-cat="platform">
+            <summary>会上架哪些应用商店？</summary>
+            <p>计划上架 Chrome Web Store、Edge 加载项商店与 Firefox AMO，提交清单已整理在仓库 <a href="https://github.com/Lokeily/hao-fan/blob/main/docs/STORE_SUBMISSION.md" target="_blank" rel="noopener">docs/STORE_SUBMISSION.md</a>。上架并签名后即可在商店一键安装、自动更新；在上架完成前，请按<a href="install.html">安装指南</a>手动加载。</p>
+          </details>
+          <details class="faq reveal" data-cat="trouble">
+            <summary>遇到问题或想提建议，去哪反馈？</summary>
+            <p>欢迎到 <a href="https://github.com/Lokeily/hao-fan/issues" target="_blank" rel="noopener">GitHub Issues</a> 反馈：描述复现步骤、浏览器版本与所选服务商，我们会在能力范围内尽快处理。功能建议、翻译质量案例（附原文与译文对照）也很有价值，能帮我们定位是提示词、引擎还是渲染层的问题。</p>
+          </details>
         </div>
         <div class="center-cta reveal">
-          <a class="btn btn-primary js-download" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载扩展（<span class="js-latest-version">v0.1.20</span>）</a>
+          <a class="btn btn-primary js-download" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载扩展（<span class="js-latest-version">v0.1.23</span>）</a>
           <a class="btn btn-ghost" href="install.html">查看安装指南</a>
         </div>
       </div>
     </section>
 
-    <footer>
+        <footer>
       <div class="footer-inner">
-        <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
+        <div>© 2026 好翻（Open Translator CN）· 基于 <a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT 许可证</a> 开源</div>
         <div class="footer-links">
           <a href="index.html">首页</a>
           <a href="features.html">功能特性</a>
           <a href="providers.html">翻译服务</a>
           <a href="install.html">安装指南</a>
+          <a href="faq.html" class="active">常见问题</a>
+          <a href="changelog.html">更新日志</a>
           <a href="privacy.html">隐私政策</a>
-          <a
-            class="footer-github"
-            href="https://github.com/Lokeily/hao-fan"
-            target="_blank"
-            rel="noopener"
-            aria-label="在 GitHub 上查看好翻"
-          >
+          <a href="terms.html">服务条款</a>
+          <a class="footer-github" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener" aria-label="在 GitHub 上查看好翻">
             <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
             GitHub
           </a>

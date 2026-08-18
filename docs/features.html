@@ -4,8 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>功能特性 · 好翻</title>
-    <meta name="description" content="好翻（Open Translator CN）的全部功能特性：沉浸式双语对照、流式输出、上下文感知、划词翻译、译文可编辑、多引擎路由、节省 Token 等共 17 项。" />
-    <link rel="icon" type="image/png" href="assets/img/icon-48.png" />
+    <meta
+      name="description"
+      content="好翻（Open Translator CN）的全部功能特性：从沉浸式双语对照、流式输出、上下文感知，到翻译质量自检、多引擎路由、节省 Token 等共 17 项，并附工作原理说明。全部来自 README，均为已发布功能。"
+    />
+    <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
+    <link rel="apple-touch-icon" href="assets/img/icon-128.png" />
+    <script>document.documentElement.classList.add('js');</script>
     <link rel="stylesheet" href="assets/css/style.css" />
   </head>
   <body>
@@ -26,7 +31,9 @@
             <a href="providers.html">翻译服务</a>
             <a href="install.html">安装指南</a>
             <a href="faq.html">常见问题</a>
+            <a href="changelog.html">更新日志</a>
             <a href="privacy.html">隐私政策</a>
+            <a href="terms.html">服务条款</a>
             <a
               class="nav-github"
               href="https://github.com/Lokeily/hao-fan"
@@ -54,9 +61,12 @@
         <span class="sep">/</span>
         <span>功能特性</span>
       </div>
-      <div class="eyebrow">全部已实现的能⼒</div>
+      <div class="eyebrow">已经发布的全部能力</div>
       <h1>功能特性</h1>
-      <p>本页把能力按使用场景拆成五组：双语对照与流式输出、上下文感知与质量自检、划词与译文可编辑、性能与多引擎路由、设置与快捷键——全部来自项目 README，均为已发布功能。</p>
+      <p>
+        好翻做的事其实很纯粹：<strong>保留网页原文，把译文自然地嵌在原文下方，让你边读边对照</strong>。它不替换你眼前的页面，而是把翻译揉进你本来就有的阅读动作里。下面把这件事拆开讲——先说它「怎么做到」，再按五个主题列出
+        <strong>17 项</strong>已经写进代码、随每个版本一起发布的真实功能。
+      </p>
     </header>
 
     <section class="block" style="padding-top:48px;padding-bottom:8px;">
@@ -104,45 +114,138 @@
       </div>
     </section>
 
-    <section class="block">
+    <!-- ===== 工作原理 ===== -->
+    <section class="block" id="how">
       <div class="container">
-        <div style="max-width:820px;margin:0 auto 40px;text-align:center;color:var(--text-soft);font-size:16px;line-height:1.75;">这些能力都不是演示稿里的「规划」，而是已经写进代码、随每个版本一起发布的真实功能。下面按五组细分：① 双语对照与流式输出　② 上下文感知与质量自检　③ 划词翻译与译文可编辑　④ 性能优化与多引擎路由　⑤ 设置项与快捷键——方便你对号入座。</div>
-        <div class="features" data-stagger>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div><h3>沉浸式双语对照</h3><p>原文保留，译文显示在原文下方，随页面滚动自然跟随。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h7l-1 7 9-11h-7l1-7Z"/></svg></div><h3>流式输出</h3><p>首段边生成边显示，首字延迟低至毫秒级（基线实测约 90ms）。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>上下文感知翻译</h3><p>结合页面标题与前段译文，长文代词指代与术语更连贯。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>翻译质量自检</h3><p>数字 / URL / 代码 token 保真校验，缺失自动校正并标记提示。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>可见区域优先</h3><p>先翻译当前屏幕内容，滚动时继续翻译新出现的内容。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>动态内容翻译</h3><p>弹窗、菜单、无限滚动等异步加载的内容自动补译。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v11H7l-3 3V4Z"/></svg></div><h3>划词翻译</h3><p>选中文字即译，独立浮窗展示，不改变原网页。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 16l4-8 3 5 3-7 4 10"/></svg></div><h3>译文可编辑 · 术语自学习</h3><p>hover 译文即可修改，自动抽取术语沉淀进个人术语表。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 14l4-4 3 3 4-5 4 4"/></svg></div><h3>图片翻译</h3><p>网页图片与本地图片 OCR + 翻译（需支持视觉的模型）。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9h3v6M14 9h2v6"/></svg></div><h3>按网站暂停</h3><p>一键暂停当前网站、清理译文，无需刷新即可恢复。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div><h3>多引擎路由</h3><p>备用引擎故障转移（限流/报错自动切换）+ 长文强模型路由。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h3>节省 Token</h3><p>句子级缓存、重复文本合并、术语库命中零请求、目标语言跳过、术语注入上限可调。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14M5 9l-1-3h16l-1 3M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 13h6"/></svg></div><h3>可拖动工具栏</h3><p>「译 + 设置」悬浮按钮组可拖到任意位置，位置自动记忆。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></div><h3>页面内快速设置</h3><p>齿轮按钮弹出悬浮设置窗：语言 / 引擎 / 暂停本站即改即生效。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg></div><h3>翻译进度显示</h3><p>状态条实时显示已译 X/Y 段，加载态带旋转指示。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg></div><h3>键盘快捷键</h3><p>Alt+T 直接翻译当前网页（浏览器设置页可自定义）。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-8 8H6v-6l8-8Z"/><path d="M9 9h2M12 6v2"/></svg></div><h3>自定义能力</h3><p>服务商、模型、Base URL、提示词、术语表、翻译风格均可配置。</p></div>
+        <div class="section-head reveal reveal--blur">
+          <h2><span class="underline-grow">它怎么做到「对照不卡、译文不乱」</span></h2>
+          <p>好翻不是把整页丢给翻译接口那么简单。下面六点，是它「读着顺、翻得准、还不泄密」的底层支撑，每一项都对应仓库里的具体实现。</p>
         </div>
-        <div class="center-cta reveal">
-          <a class="btn btn-primary js-download" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载扩展（<span class="js-latest-version">v0.1.20</span>）</a>
-          <a class="btn btn-ghost" href="install.html">查看安装指南</a>
+        <div class="features" data-stagger>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5M3 18l9 5 9-5"/></svg></div>
+            <h3>双层架构</h3>
+            <p>内容脚本负责页面注入与渲染，后台 Service Worker 负责密钥管理与翻译调用，二者通过消息与持久端口通信，贴合 Manifest V3 的生命周期约束。</p>
+          </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h12M4 6h16M4 18h10"/><path d="M16 9l3 3-3 3"/></svg></div>
+            <h3>流式回填</h3>
+            <p>长文本经 SSE 长连接返回，首段边生成边回填到对应节点，逐字浮现；你不必等整段翻译完才开始读。</p>
+          </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <h3>注入防护</h3>
+            <p>网页标题、前文等不可信内容，被显式降级为「数据而非指令」，追加到用户消息末尾，而不是塞进系统提示词，降低恶意页面操纵译文的风险。</p>
+          </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a9 9 0 0 0-9 9c0 5 3 8 9 9 6-1 9-4 9-9a9 9 0 0 0-9-9Z"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <h3>译后自检</h3>
+            <p>译文生成后会校验原文中的数字、网址、邮箱、占位符与代码 token 是否完整保留；一旦缺失，自动追加保真指令重试校正，并在界面上标记「已校正」。</p>
+          </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+            <h3>省 Token 策略</h3>
+            <p>句子级缓存、重复文本合并、术语库命中零请求、目标语言跳过、术语注入上限可调——多层叠加，显著降低调用成本与等待。</p>
+          </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <h3>稳健渲染</h3>
+            <p>用 MutationObserver 主动排除自身注入节点以防递归；译文统一用 <code style="font-size:13px;">textContent</code> 注入防 XSS；后台断连时回退首段，避免页面空白。</p>
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- ===== 组一：对照与阅读体验 ===== -->
+    <section class="block" id="reading">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2><span class="underline-grow">对照与阅读体验</span></h2>
+          <p>这一类解决一个最朴素的问题：怎么让你「读得下去、又看得回原文」。它们决定了好翻用起来是不是顺手。</p>
+        </div>
+        <div class="features" data-stagger>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div><h3>沉浸式双语对照</h3><p>译文以一段段对照的方式嵌在原文下方，你既能读译文，也随时能回看原文。普通排版、Flex、Grid 布局都做了适配，不会出现重叠或错位。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h7l-1 7 9-11h-7l1-7Z"/></svg></div><h3>流式输出</h3><p>长文经 SSE 长连接流式返回，首段边生成边显示，首字延迟低至毫秒级（基线实测约 90ms）。不用盯着空白等整段翻译完。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>上下文感知翻译</h3><p>好翻会把当前页面标题、紧邻的前一段译文作为上下文传给模型，长文中「他 / 她 / 它」「这个 / 那个」的指代更连贯，术语也更统一。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div><h3>可见区域优先</h3><p>不一次性翻译整页。先翻你正在看的屏幕内容，向下滚动时再翻译新进入视口的部分，首屏更快出结果，长文也不卡。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>动态内容翻译</h3><p>网页里的弹窗、下拉菜单、无限滚动加载的新内容，好翻都会自动重新扫描并补译，单页应用（SPA）也不在话下。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 组二：翻译质量 ===== -->
+    <section class="block" id="quality" style="background:var(--bg-soft);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2><span class="underline-grow">翻译质量</span></h2>
+          <p>机翻最怕「数字翻错、网址丢一半、术语前后不一」。好翻把这类细节当成一等公民来对待。</p>
+        </div>
+        <div class="features" data-stagger>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>翻译质量自检</h3><p>译文生成后会自动检查：数字、网址、邮箱、占位符、代码符号有没有被漏掉或改坏。发现缺失就追加保真指令重译一次，并在界面上标记「已校正」。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 16l4-8 3 5 3-7 4 10"/></svg></div><h3>译文可编辑 · 术语自学习</h3><p>鼠标悬停任意译文就能直接改；好翻还会自动把里面的术语抽出来，沉淀进你的个人术语表。术语越用越贴合你的用语习惯。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v11H7l-3 3V4Z"/></svg></div><h3>划词翻译</h3><p>在网页上选中任意词或句子，旁边立刻出现翻译浮层；原网页一字不动，查词、查句都顺手。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 组三：性能与引擎 ===== -->
+    <section class="block" id="engine">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2><span class="underline-grow">性能与引擎</span></h2>
+          <p>翻译的「快慢」和「贵不贵」，很大程度取决于引擎怎么调度。好翻把调度权交给你。</p>
+        </div>
+        <div class="features" data-stagger>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h3>多引擎路由</h3><p>主引擎限流、报错（如 401 / 403 / 额度）时，自动切到备用引擎一次；单段超过约 1800 字，自动改用你设定的「长文强模型」。设置里都能配。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h3>节省 Token</h3><p>多层省钱：句子级缓存命中 0 消耗、重复文本合并、术语库命中零请求、目标语言直接跳过、术语注入上限可调（0–60，默认 24）。省钱又提速。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 14l4-4 3 3 4-5 4 4"/></svg></div><h3>图片翻译</h3><p>右键网页图片、或上传本地图片，好翻会用支持视觉的模型做 OCR 识别并翻译，结果以覆盖层或独立结果页呈现（需视觉模型）。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 组四：便捷与交互 ===== -->
+    <section class="block" id="interaction" style="background:var(--bg-soft);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2><span class="underline-grow">便捷与交互</span></h2>
+          <p>好的翻译器应该「待在角落、随叫随到」。这些能力让你几乎感觉不到它的存在，却又处处用得上。</p>
+        </div>
+        <div class="features" data-stagger>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9h3v6M14 9h2v6"/></svg></div><h3>按网站暂停</h3><p>在某个网站不需要翻译时，一键暂停并清理译文；想恢复时也不用刷新页面，状态即时切换。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14M5 9l-1-3h16l-1 3M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 13h6"/></svg></div><h3>可拖动工具栏</h3><p>网页右下角的「译 + 设置」悬浮按钮组可以拖到屏幕任意位置，位置会自动记住，下次打开还在。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></div><h3>页面内快速设置</h3><p>不用离开网页，点一下齿轮就弹出设置浮层：改语言、换引擎、暂停当前网站，改动即时落盘生效。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg></div><h3>翻译进度显示</h3><p>翻译进行时有状态条实时显示「已译 N / 共 M 段」，并带旋转加载指示，长文翻译不再「不知道进行到哪了」。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg></div><h3>键盘快捷键</h3><p>按下 <code style="font-size:13px;">Alt+T</code> 直接翻译当前网页；快捷键也能在浏览器设置页里自定义成你顺手的键位。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 组五：自由配置 ===== -->
+    <section class="block" id="custom">
+      <div class="container">
+        <div class="section-head reveal reveal--blur">
+          <h2><span class="underline-grow">自由配置</span></h2>
+          <p>好翻的默认参数已经够用，但它不替你做主。几乎所有环节都能按你的需求调整。</p>
+        </div>
+        <div class="features" data-stagger>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-8 8H6v-6l8-8Z"/><path d="M9 9h2M12 6v2"/></svg></div><h3>自定义能力</h3><p>服务商、模型、Base URL、系统提示词、术语表、翻译风格……几乎所有环节都能配置，即存即用。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></div><h3>任意 OpenAI 兼容接口</h3><p>除了内置的 12 家服务，你也可以填任意兼容 OpenAI 协议的端点与 Base URL，接上你自己的网关或私有部署。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10"/><path d="M2 17h20M7 21h10"/></svg></div><h3>本地模型（Ollama）</h3><p>把翻译留在你自己的机器上：接入 Ollama 等本地模型，敏感内容完全不出本机，适合对数据最在意的场景。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 深度看两个能力 ===== -->
     <section class="block" style="background:var(--bg-soft);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
       <div class="container">
         <div class="section-head reveal reveal--blur">
           <h2>不只是「翻译」，更是「读得懂」</h2>
-          <p>几个最能体现好翻差异化的能力，用真实的网页样貌给你看。</p>
+          <p>两个最能体现好翻差异化的能力，用真实的网页样貌给你看。</p>
         </div>
         <div class="split reveal reveal--left">
           <div class="split-text">
             <h3>沉浸式对照，不是整页替换</h3>
-            <p>译文嵌在原文下方，而不是把整页换成看不惯的译文。你始终知道「原文说了什么」，遇到存疑的翻译也能立刻回看原文。</p>
+            <p>译文嵌在原文下方，而不是把整页换成看不惯的译文。你始终知道「原文说了什么」，遇到存疑的翻译也能立刻回看原文。代码、变量名、公式这些不该翻的东西，好翻会原样保留。</p>
           </div>
           <div class="split-media">
             <div class="win">
@@ -157,11 +260,11 @@
         <div class="split reverse reveal reveal--right" style="margin-top:48px;">
           <div class="split-text">
             <h3>译文可改，术语自学习</h3>
-            <p>鼠标悬停任意译文即可直接修改；好翻会自动抽取其中的术语，沉淀进你的个人术语表。术语越用越贴合你的用语习惯。</p>
+            <p>鼠标悬停任意译文即可直接修改；好翻会自动抽取其中的术语，沉淀进你的个人术语表。术语越用越贴合你的用语习惯——团队的黑话、行业的标准译法，都能慢慢「教会」它。</p>
           </div>
           <div class="split-media">
             <div class="win">
-              <div class="win-bar"><span></span><span></span><span></span><span class="win-url">术语表 · 已沉淀 248 条</span></div>
+              <div class="win-bar"><span></span><span></span><span></span><span class="win-url">术语表 · 已沉淀术语</span></div>
               <div class="win-body">
                 <p class="src">inference latency → 推理延迟</p>
                 <p class="src">fine-tuning → 微调</p>
@@ -173,22 +276,28 @@
       </div>
     </section>
 
-    <footer>
+    <section class="block">
+      <div class="container" style="text-align:center;">
+        <div class="center-cta reveal">
+          <a class="btn btn-primary js-download" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载扩展（<span class="js-latest-version">v0.1.23</span>）</a>
+          <a class="btn btn-ghost" href="providers.html">看看支持哪些服务 →</a>
+        </div>
+      </div>
+    </section>
+
+        <footer>
       <div class="footer-inner">
-        <div>© 2026 好翻（Open Translator CN）· 基于 MIT 许可证开源</div>
+        <div>© 2026 好翻（Open Translator CN）· 基于 <a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT 许可证</a> 开源</div>
         <div class="footer-links">
           <a href="index.html">首页</a>
+          <a href="features.html" class="active">功能特性</a>
           <a href="providers.html">翻译服务</a>
           <a href="install.html">安装指南</a>
           <a href="faq.html">常见问题</a>
+          <a href="changelog.html">更新日志</a>
           <a href="privacy.html">隐私政策</a>
-          <a
-            class="footer-github"
-            href="https://github.com/Lokeily/hao-fan"
-            target="_blank"
-            rel="noopener"
-            aria-label="在 GitHub 上查看好翻"
-          >
+          <a href="terms.html">服务条款</a>
+          <a class="footer-github" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener" aria-label="在 GitHub 上查看好翻">
             <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
             GitHub
           </a>
