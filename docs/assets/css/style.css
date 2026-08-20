@@ -1443,7 +1443,8 @@ body.nav-open .nav-toggle span:nth-child(3) {
   border: 1px solid var(--border);
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   text-align: left;
 }
 .win-bar {
@@ -1459,10 +1460,12 @@ body.nav-open .nav-toggle span:nth-child(3) {
   height: 11px;
   border-radius: 50%;
   background: #d2d2d7;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.55);
 }
-.win-bar span:nth-child(1) { background: #ff5f57; }
-.win-bar span:nth-child(2) { background: #febc2e; }
-.win-bar span:nth-child(3) { background: #28c840; }
+.win-bar span:nth-child(1) { background: radial-gradient(circle at 35% 28%, #ff8f88, #ff5f57); }
+.win-bar span:nth-child(2) { background: radial-gradient(circle at 35% 28%, #ffd87a, #febc2e); }
+.win-bar span:nth-child(3) { background: radial-gradient(circle at 35% 28%, #62e673, #28c840); }
 .win-url {
   margin-left: 12px;
   font-size: 13px;
@@ -1471,6 +1474,20 @@ body.nav-open .nav-toggle span:nth-child(3) {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 4px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.win-url::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green, #28c840);
+  box-shadow: 0 0 0 0 rgba(40, 200, 64, 0.5);
+  animation: url-live 2.6s ease-out infinite;
 }
 .win-body {
   padding: 26px 30px;
@@ -1630,6 +1647,8 @@ section[id],
   .gradient-text { background: none; -webkit-text-fill-color: currentColor; color: var(--accent); }
   .card, .pillar, .feature { transform: none !important; }
   .tgt.typing::after { animation: none; }
+  .win-url::before { animation: none; }
+  .live-dot { animation: none; }
 }
 
 /* ===================================================================
@@ -1680,6 +1699,12 @@ section[id],
 @keyframes caret-blink {
   0%, 50% { opacity: 1; }
   50.01%, 100% { opacity: 0; }
+}
+/* 地址栏「安全 / 实时」呼吸点：纯装饰，不影响文字 */
+@keyframes url-live {
+  0% { box-shadow: 0 0 0 0 rgba(40, 200, 64, 0.45); }
+  70% { box-shadow: 0 0 0 5px rgba(40, 200, 64, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(40, 200, 64, 0); }
 }
 /* 数字滚动：等宽数字，避免计数时宽度跳动显得乱 */
 .stat .num {

@@ -439,23 +439,15 @@
     }, 440);
   }
 
-  function clearAll() {
-    tgts.forEach(function (t) {
-      t.textContent = '';
-      t.classList.remove('typing', 'thinking');
-    });
-  }
-
   function cycle() {
     setEngine();
     ei++;
     var idx = 0;
     function next() {
       if (idx >= tgts.length) {
-        setTimeout(function () {
-          clearAll();
-          setTimeout(cycle, 1700);
-        }, 2300);
+        // 一轮打完：保留已显示译文，停顿后从首行就地重打，
+        // 窗口始终有可见译文，绝不出现整片空白被误读为「文字消失」
+        setTimeout(cycle, 2200);
         return;
       }
       var t = tgts[idx++];
@@ -483,4 +475,16 @@
     tgts.forEach(function (t) { t.textContent = t.getAttribute('data-typetext'); });
     if (engineEl) engineEl.textContent = engines[0];
   }
+}());
+
+/* 给 macOS 窗口的红黄绿按钮加语义化 tooltip（关闭/最小化/缩放），仅增强可访问性 */
+(function () {
+  'use strict';
+  var labels = ['关闭', '最小化', '缩放'];
+  document.querySelectorAll('.win-bar').forEach(function (bar) {
+    var spans = bar.querySelectorAll('span');
+    for (var i = 0; i < spans.length && i < 3; i++) {
+      spans[i].title = labels[i];
+    }
+  });
 }());
