@@ -179,16 +179,19 @@
           <h2><span class="underline-grow">⚙️ 加载后常见问题</span></h2>
           <p>手动加载偶尔会踩几个小坑，先对照排查，多半能立刻解决。</p>
         </div>
-        <div class="prov-grid" data-stagger>
-          <div class="prov-group reveal">
+        <div class="features" data-stagger>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M9 14l2 2 4-4"/></svg></div>
             <h3>选错目录</h3>
             <p>「加载已解压的扩展程序」时，务必选择<strong>直接包含 <code>manifest.json</code></strong> 的文件夹。如果选了外层解压目录，扩展会报错或不显示图标。</p>
           </div>
-          <div class="prov-group reveal">
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg></div>
             <h3>Firefox 重启后消失</h3>
             <p>这是 Firefox 对未签名扩展的限制（临时载入会在重启后被清除），不是扩展问题。等 AMO 上架签名后即可常驻，期间重启后重新载入一次即可。</p>
           </div>
-          <div class="prov-group reveal">
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/></svg></div>
             <h3>图标是灰的 / 点不动</h3>
             <p>确认开发者模式已开启，且扩展未被浏览器自动禁用；若被禁用，在扩展管理页手动「启用」即可。也别忘了先在设置里配置好服务商与 Key。</p>
           </div>

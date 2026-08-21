@@ -62,7 +62,7 @@
       </div>
       <div class="eyebrow">用你自己的账号与额度</div>
       <h1>🌐 <span class="grad">支持的翻译服务</span></h1>
-      <p>本页分四块讲清楚：内置 AI 服务（国内大模型 / 国际与聚合）、传统机器翻译、本地模型，以及如何接入任意 OpenAI 兼容接口。所有 Key 只存在你本地，直连服务商不经中转。</p>
+      <p>好翻翻译不靠自己的服务器，而是把选择权交给你：内置 <strong>12 家 AI 大模型</strong>与 <strong>3 家传统翻译</strong>预设，也支持任意 OpenAI 兼容接口与本地模型。本页讲清每家服务怎么选、Key 怎么配——所有密钥只存在你本地，翻译请求直连服务商、不经任何中转。</p>
     </header>
 
     <section class="block" style="padding-top:48px;padding-bottom:8px;">
@@ -120,10 +120,11 @@
           <h2><span class="underline-grow">🤖 AI 服务</span></h2>
           <p>内置 12 家 AI 服务商预设，覆盖国内外主流大模型；除此之外，你还能填入<strong>任意兼容 OpenAI 协议的接口</strong>，接上自己的网关或私有部署。下面是各家的定位，方便你按需取用。</p>
         </div>
-        <div class="prov-grid" data-stagger>
-          <div class="prov-group reveal">
+        <div class="features features--two" data-stagger>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.4 2.4M15.3 15.3l2.4 2.4M17.7 6.3l-2.4 2.4M8.7 15.3l-2.4 2.4"/><circle cx="12" cy="12" r="4.2"/></svg></div>
             <h3>国内大模型</h3>
-            <p style="color:var(--text-soft);font-size:14px;margin-bottom:12px;line-height:1.6;">中文语感好、国内网络稳定、价格普遍友好。想用国产大模型又不想折腾，从这里挑一个填 Key 即可。</p>
+            <p>中文语感好、国内网络稳定、价格普遍友好。想用国产大模型又不想折腾，从这里挑一个填 Key 即可。</p>
             <div class="prov-chips">
               <span class="prov">DeepSeek</span>
               <span class="prov">智谱 GLM</span>
@@ -134,9 +135,10 @@
               <span class="prov">豆包</span>
             </div>
           </div>
-          <div class="prov-group reveal">
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></div>
             <h3>国际与聚合</h3>
-            <p style="color:var(--text-soft);font-size:14px;margin-bottom:12px;line-height:1.6;">面向多语种、长上下文与最强通用能力；OpenRouter 还能在一个额度下切换上百家模型。需要本地优先可走 Ollama。</p>
+            <p>面向多语种、长上下文与最强通用能力；OpenRouter 还能在一个额度下切换上百家模型。需要本地优先可走 Ollama。</p>
             <div class="prov-chips">
               <span class="prov">OpenAI</span>
               <span class="prov">Google Gemini</span>
@@ -159,17 +161,19 @@
           <h2><span class="underline-grow">🔤 传统机器翻译</span></h2>
           <p>不想折腾 API Key？下面这些也能直接用。</p>
         </div>
-        <div class="prov-grid" data-stagger>
-          <div class="prov-group reveal">
+        <div class="features features--two" data-stagger>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></div>
             <h3>免 Key 体验</h3>
-            <p style="color:var(--text-soft);font-size:14px;margin-bottom:12px;line-height:1.6;">零配置上手：装上扩展、选它就直接能翻，适合先看看好翻长什么样。</p>
+            <p>零配置上手：装上扩展、选它就直接能翻，适合先看看好翻长什么样。</p>
             <div class="prov-chips">
               <span class="prov">Google 翻译（免 Key）</span>
             </div>
           </div>
-          <div class="prov-group reveal">
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-9.6 9.6"/><circle cx="7.5" cy="16.5" r="5.5"/><path d="M15.5 8.5l3 3"/></svg></div>
             <h3>需 Key 的传统服务</h3>
-            <p style="color:var(--text-soft);font-size:14px;margin-bottom:12px;line-height:1.6;">老牌机器翻译，对常见语种稳定、便宜；DeepL 的译文常被评价更自然，Microsoft 翻译覆盖语种广。</p>
+            <p>老牌机器翻译，对常见语种稳定、便宜；DeepL 的译文常被评价更自然，Microsoft 翻译覆盖语种广。</p>
             <div class="prov-chips">
               <span class="prov">DeepL</span>
               <span class="prov">Microsoft 翻译</span>
