@@ -2274,3 +2274,141 @@ button:focus-visible,
 @media (max-width: 560px) {
   .ver-date { display: block; margin: 2px 0 0; }
 }
+
+/* ===================================================================
+   对标沉浸式翻译官网：浏览器安装入口行 + 用户口碑评价卡
+   沿用既有设计令牌与玻璃质感，复用 .reveal 兜底，不引入文字错乱
+   =================================================================== */
+
+/* ---- 浏览器安装入口行（英雄区主按钮下方，对标 IT 的浏览器选择）---- */
+.install-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+.install-row-label {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin-right: 2px;
+}
+.install-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-soft);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  transition: transform 0.25s var(--ease), border-color 0.25s var(--ease),
+    color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.install-chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.18);
+}
+
+/* ---- 用户口碑评价卡（对标 IT「好评如潮」）---- */
+.quotes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 8px;
+}
+@media (max-width: 880px) {
+  .quotes { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .quotes { grid-template-columns: 1fr; }
+}
+.quote {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 26px 24px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 14px 34px -14px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 var(--surface-hi);
+  -webkit-backdrop-filter: saturate(160%) blur(var(--glass-blur));
+  backdrop-filter: saturate(160%) blur(var(--glass-blur));
+  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease),
+    border-color 0.3s var(--ease);
+}
+.quote:hover {
+  transform: translateY(-5px);
+  border-color: rgba(0, 113, 227, 0.22);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05),
+    0 22px 48px -18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 var(--surface-hi);
+}
+.quote blockquote {
+  position: relative;
+  margin: 0;
+  padding-top: 6px;
+  padding-left: 4px;
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--text);
+}
+.quote blockquote::before {
+  content: "\201C";
+  position: absolute;
+  top: -0.34em;
+  left: -0.04em;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 42px;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.22;
+  pointer-events: none;
+}
+.quote figcaption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+}
+.quote .avatar {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 20px;
+}
+.quote .who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.32;
+}
+.quote .who b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.quote .who small {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+/* 评价卡文字层固定合成层，杜绝滚动进场时的重影/错乱 */
+.quote {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  backface-visibility: hidden;
+}
