@@ -1076,6 +1076,7 @@ body.nav-open .nav-toggle span:nth-child(3) {
 .hero h1,
 .hero p.sub,
 .hero-actions,
+.hero .install-row,
 .hero-badges,
 .hero-note {
   opacity: 0;
@@ -1085,8 +1086,9 @@ body.nav-open .nav-toggle span:nth-child(3) {
 .hero h1 { animation-delay: 0.16s; }
 .hero p.sub { animation-delay: 0.30s; }
 .hero-actions { animation-delay: 0.44s; }
-.hero-badges { animation-delay: 0.58s; }
-.hero-note { animation-delay: 0.70s; }
+.hero .install-row { animation-delay: 0.58s; }
+.hero-badges { animation-delay: 0.70s; }
+.hero-note { animation-delay: 0.82s; }
 
 /* Hero 光球缓慢漂浮 */
 @keyframes orb-float {
@@ -2411,4 +2413,64 @@ button:focus-visible,
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   backface-visibility: hidden;
+}
+
+/* ===================================================================
+   对标沉浸式翻译「好评如潮」：用户好评自动滚动带
+   纯 CSS translateX 横向循环，文字层不做 transform，杜绝错乱；
+   边缘渐隐遮罩营造高级感，hover 暂停，reduced-motion 关闭。
+   =================================================================== */
+.praise-marquee {
+  overflow: hidden;
+  margin: 30px 0 34px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+}
+.praise-track {
+  display: flex;
+  gap: 16px;
+  width: max-content;
+  animation: praise 42s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.praise-marquee:hover .praise-track { animation-play-state: paused; }
+.praise {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 340px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: inset 0 1px 0 var(--surface-hi), 0 10px 26px -16px rgba(0, 0, 0, 0.18);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.praise .star {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: -1px;
+}
+@keyframes praise {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .praise-track { animation: none; flex-wrap: wrap; justify-content: center; }
+}
+
+/* 卡片图标悬停辉光：仅作用于图标容器，文字层完全不动，绝不糊字 */
+.card:hover .ico,
+.pillar:hover .ico,
+.usecase:hover .ico,
+.step:hover .ico {
+  box-shadow: 0 12px 26px -10px rgba(0, 113, 227, 0.55);
 }
