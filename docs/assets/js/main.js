@@ -353,18 +353,28 @@
 
   // 1) 卡片 3D 倾斜：指针靠近时朝指针方向轻微抬起，premium 手感
   //    幅度克制（±5°），且内部文字不再 translateZ，旋转时不会分层重影/糊字。
+  //    用 requestAnimationFrame 合并高频 pointermove，避免每次移动都触发 layout。
   if (!reduceMotion && finePointer) {
     var tilts = document.querySelectorAll('.tilt');
     Array.prototype.forEach.call(tilts, function (el) {
+      var rafId = 0;
       el.addEventListener('pointermove', function (e) {
-        var r = el.getBoundingClientRect();
-        var px = (e.clientX - r.left) / r.width - 0.5;
-        var py = (e.clientY - r.top) / r.height - 0.5;
-        el.style.transform =
-          'perspective(1000px) rotateX(' + (-py * 5).toFixed(2) + 'deg) rotateY(' +
-          (px * 6).toFixed(2) + 'deg)';
+        if (rafId) return;
+        rafId = window.requestAnimationFrame(function () {
+          rafId = 0;
+          var r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          var px = (e.clientX - r.left) / r.width - 0.5;
+          var py = (e.clientY - r.top) / r.height - 0.5;
+          el.style.transform =
+            'perspective(1000px) rotateX(' + (-py * 5).toFixed(2) + 'deg) rotateY(' +
+            (px * 6).toFixed(2) + 'deg)';
+        });
       });
-      el.addEventListener('pointerleave', function () { el.style.transform = ''; });
+      el.addEventListener('pointerleave', function () {
+        if (rafId) { window.cancelAnimationFrame(rafId); rafId = 0; }
+        el.style.transform = '';
+      });
     });
   }
 
