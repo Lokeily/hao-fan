@@ -2378,3 +2378,117 @@ button:focus-visible,
 .step:hover .ico {
   box-shadow: 0 12px 26px -10px rgba(0, 113, 227, 0.55);
 }
+
+/* ===================================================================
+   第三轮：对标沉浸式翻译官网「精髓感」升级（保留蓝色风格）
+   标题气势 / 眉标节奏 / 统计数字带 / 好评瀑布流 / CTA 强化
+   全部复用既有动画安全机制（.reveal + reduced-motion 兜底），
+   严禁 background-clip:text 透明文字，杜绝文字消失/错乱
+   =================================================================== */
+
+/* 1) section 眉标：IT 式小字标签，给每个板块加「节奏感」 */
+.section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+.section-eyebrow::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex: none;
+}
+.section-head .section-eyebrow { margin-bottom: 8px; }
+
+/* 2) 英雄区标题：更大、更自信（对标 IT「一键读懂全世界」的气势） */
+.hero h1 {
+  font-size: clamp(44px, 7vw, 80px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+}
+.page-hero h1 { font-size: clamp(34px, 5.5vw, 56px); }
+
+/* 3) hero / 子页 hero 的 eyebrow 变胶囊徽章（IT 式小标识） */
+.hero .eyebrow,
+.page-hero .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 113, 227, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-bottom: 26px;
+}
+
+/* 4) 统计数字带：一体化玻璃面板 + 大数字（对标 IT「2000万+」气势） */
+.stats {
+  gap: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+  -webkit-backdrop-filter: saturate(160%) blur(var(--glass-blur));
+  backdrop-filter: saturate(160%) blur(var(--glass-blur));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 18px 44px -20px rgba(0, 113, 227, 0.16),
+    inset 0 1px 0 var(--surface-hi);
+}
+.stat {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 42px 16px;
+}
+.stat + .stat { border-left: 1px solid var(--hairline); }
+.stat .num {
+  font-size: clamp(42px, 6vw, 60px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.stat .label { margin-top: 12px; font-size: 14px; letter-spacing: 0.02em; }
+@media (max-width: 760px) {
+  .stat:nth-child(n+3) { border-top: 1px solid var(--hairline); }
+  .stat:nth-child(3) { border-left: 0; }
+}
+
+/* 5) 好评瀑布流：CSS 多列，像 IT「好评如潮」参差排布 */
+.quotes {
+  display: block;
+  columns: 3;
+  column-gap: 22px;
+  margin-top: 8px;
+}
+@media (max-width: 880px) { .quotes { columns: 2; } }
+@media (max-width: 560px) { .quotes { columns: 1; } }
+.quote {
+  break-inside: avoid;
+  margin-bottom: 22px;
+}
+
+/* 6) 主 CTA 更大、更醒目（hero 下载按钮） */
+.hero-actions .btn-primary {
+  padding: 15px 32px;
+  font-size: 17px;
+  box-shadow: 0 10px 30px -12px rgba(0, 113, 227, 0.55);
+}
+.hero-actions .btn-ghost { padding: 15px 26px; font-size: 16px; }
+
+/* 7) 演示窗投影强化：提升「真实产品」质感 */
+.demo,
+.hero-visual-inner {
+  box-shadow: 0 30px 80px -30px rgba(0, 113, 227, 0.28);
+}
