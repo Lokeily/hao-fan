@@ -62,7 +62,7 @@
       </div>
       <div class="eyebrow">⚡ 手动加载，三分钟搞定</div>
       <h1>📦 <span class="grad">安装指南</span></h1>
-      <p>本页按浏览器分步说明：先下载安装包，再看 Chrome / Edge 与 Firefox 各自的加载方式，最后说明商店上架后的自动更新。手动加载约三分钟，无需命令行。</p>
+      <p>手动加载约三分钟、无需命令行：先下载安装包，再按浏览器（Chrome / Edge / Firefox）加载，最后配好翻译服务就能开翻。商店上架后即可获得自动更新，不用再手动折腾。</p>
     </header>
 
     <section class="block" style="padding-top:48px;padding-bottom:8px;">
@@ -116,23 +116,23 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">开始安装</p>
           <h2><span class="underline-grow">📥 下载与加载</span></h2>
-          <p>第一步：拿到安装包；第二步：按浏览器加载。</p>
+          <p>一共三步：拿到安装包 → 按浏览器加载 → 回到网页开翻。</p>
         </div>
         <div class="steps" data-stagger>
           <div class="step tilt reveal">
             <div class="num">1</div>
             <h3>下载安装包</h3>
-            <p>打开 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">Releases</a>，下载对应浏览器的 ZIP 并解压。</p>
+            <p>打开 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">Releases</a> 页面，下载对应浏览器的 ZIP 压缩包并解压到本地。</p>
           </div>
           <div class="step tilt reveal" id="chrome">
             <div class="num">2</div>
             <h3>Chrome / Edge</h3>
-            <p>访问 <code>chrome://extensions</code>（Edge 为 <code>edge://extensions</code>）→ 开启「开发者模式」→「加载已解压的扩展程序」→ 选择解压后<strong>直接包含 <code>manifest.json</code></strong> 的目录。</p>
+            <p>访问 <code>chrome://extensions</code>（Edge 为 <code>edge://extensions</code>）→ 打开右上角「开发者模式」→ 点「加载已解压的扩展程序」→ 选择解压后<strong>直接包含 <code>manifest.json</code></strong> 的那个文件夹。</p>
           </div>
           <div class="step tilt reveal" id="firefox">
             <div class="num">3</div>
             <h3>🦊 Firefox</h3>
-            <p>访问 <code>about:debugging#/runtime/this-firefox</code> →「临时载入附加组件」→ 选择解压目录中的 <code>manifest.json</code>。Firefox 未签名扩展在浏览器重启后会消失，属浏览器限制。</p>
+            <p>访问 <code>about:debugging#/runtime/this-firefox</code> → 点「临时载入附加组件」→ 选择解压目录中的 <code>manifest.json</code>。注意：Firefox 未签名扩展在浏览器重启后会消失，这是浏览器限制。</p>
           </div>
         </div>
         <p class="prov-note reveal">
@@ -146,7 +146,7 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">三分钟上手</p>
           <h2><span class="underline-grow">🚀 快速开始</span></h2>
-          <p>三步开始你的第一段对照翻译。</p>
+          <p>装好了？三步走完，第一段对照翻译就出来了。</p>
         </div>
         <div class="steps" data-stagger>
           <div class="step tilt reveal">
@@ -157,15 +157,15 @@
           <div class="step tilt reveal">
             <div class="num">2</div>
             <h3>配置服务商</h3>
-            <p>选择服务商，填写 API Key，设置目标语言，点击「测试连接」确认可用。</p>
+            <p>选择服务商，填写 API Key，设置目标语言，点「测试连接」确认可用。</p>
           </div>
           <div class="step tilt reveal">
             <div class="num">3</div>
             <h3>开始翻译</h3>
-            <p>回到网页，点击右下角蓝色「译」按钮开始翻译；翻译中再次点击可取消。</p>
+            <p>回到网页，点右下角蓝色「译」按钮开始翻译；翻译中再点一次可取消。</p>
           </div>
         </div>
-        <p class="prov-note reveal">想先体验？在设置中选择「Google 翻译」即可免 Key 使用。</p>
+        <p class="prov-note reveal">想先体验？在设置中选择「Google 翻译」即可免 Key 使用，装完就能翻。</p>
         <div class="center-cta reveal">
           <a class="btn btn-ghost" href="providers.html">了解如何配置 API Key →</a>
         </div>
@@ -177,7 +177,7 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">遇到问题</p>
           <h2><span class="underline-grow">⚙️ 加载后常见问题</span></h2>
-          <p>手动加载偶尔会踩几个小坑，先对照排查，多半能立刻解决。</p>
+          <p>手动加载偶尔会踩几个小坑。先对照下面三条排查，多半能立刻解决。</p>
         </div>
         <div class="features" data-stagger>
           <div class="card tilt reveal">
@@ -195,6 +195,11 @@
             <h3>图标是灰的 / 点不动</h3>
             <p>确认开发者模式已开启，且扩展未被浏览器自动禁用；若被禁用，在扩展管理页手动「启用」即可。也别忘了先在设置里配置好服务商与 Key。</p>
           </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6M10 9v6M14 9v6M18 9v6M3 12h18M7 3l-2 4M17 3l2 4"/></svg></div>
+            <h3>点了「译」却没反应</h3>
+            <p>多半是没配置好服务商：先到设置里确认已选择服务商、填好 Key 且「测试连接」通过（免 Key 就选 Google 翻译）。还不行就刷新一下页面再试。</p>
+          </div>
         </div>
       </div>
     </section>
@@ -204,7 +209,7 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">下一步</p>
           <h2><span class="underline-grow">👉 装好后，下一步做什么</span></h2>
-          <p>扩展加载成功只是开始。按顺序走完下面两步，你就能翻出第一段对照译文。</p>
+          <p>扩展加载成功只是开始。怎么确认装好了？——工具栏出现「好翻」图标、网页右下角出现蓝色「译」按钮，就是装好了。接着走完下面两步，就能翻出第一段对照译文。</p>
         </div>
         <div class="steps" data-stagger>
           <div class="step tilt reveal">
@@ -232,16 +237,20 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">商店版</p>
           <h2><span class="underline-grow">🏪 商店上架</span></h2>
-          <p>更省心的安装方式正在路上。</p>
+          <p>更省心的安装方式正在路上，先了解现状：</p>
         </div>
-        <p class="reveal prov-note" style="text-align:center; max-width:760px; margin:0 auto;">
-          Chrome Web Store / Edge / Firefox AMO 的提交清单已整理在仓库
-          <a href="https://github.com/Lokeily/hao-fan/blob/main/docs/STORE_SUBMISSION.md" target="_blank" rel="noopener">docs/STORE_SUBMISSION.md</a>。
-          上架后即可在商店内一键安装并获得自动更新，无需再手动覆盖安装。
-        </p>
-        <p class="reveal prov-note" style="text-align:center; max-width:760px; margin:0 auto;">
-          在商店上架前，手动加载版不会自动更新：想升级时，到 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">Releases</a> 下载新版 ZIP，解压后在同一目录「覆盖加载」即可（Chrome / Edge 在扩展管理页点「刷新」图标，Firefox 重新「临时载入」）。
-        </p>
+        <div class="features features--two" data-stagger>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 7v5l3 2"/></svg></div>
+            <h3>商店版（进行中）</h3>
+            <p>Chrome Web Store / Edge / Firefox AMO 的提交清单已整理在仓库 <a href="https://github.com/Lokeily/hao-fan/blob/main/docs/STORE_SUBMISSION.md" target="_blank" rel="noopener">docs/STORE_SUBMISSION.md</a>。上架后即可在商店内一键安装并获得自动更新。</p>
+          </div>
+          <div class="card tilt reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg></div>
+            <h3>手动版（现在）</h3>
+            <p>上架前手动加载版不会自动更新：升级时到 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">Releases</a> 下载新版 ZIP，解压后在原目录「覆盖加载」即可（Chrome / Edge 点扩展页「刷新」图标，Firefox 重新「临时载入」）。</p>
+          </div>
+        </div>
         <div class="center-cta reveal">
           <a class="btn btn-primary js-download" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">下载扩展（<span class="js-latest-version">v0.1.23</span>）</a>
         </div>
