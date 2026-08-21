@@ -288,7 +288,7 @@
   }
 })();
 
-// ---- 第二轮增强：卡片光标聚光 / 隐私目录高亮 / FAQ 筛选 ----
+// ---- 第二轮增强：卡片光标聚光 / 隐私目录高亮 / 文档目录高亮 ----
 (function () {
   'use strict';
 
@@ -342,22 +342,6 @@
     });
   }
 
-  // 3) FAQ 分类筛选
-  var faqFilter = document.querySelector('[data-faq-filter]');
-  if (faqFilter) {
-    var items = Array.prototype.slice.call(document.querySelectorAll('.faq-list .faq'));
-    faqFilter.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-cat]');
-      if (!btn) return;
-      faqFilter.querySelectorAll('[data-cat]').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      var cat = btn.getAttribute('data-cat');
-      items.forEach(function (it) {
-        var cats = (it.getAttribute('data-cat') || '').split(' ');
-        it.style.display = (cat === 'all' || cats.indexOf(cat) !== -1) ? '' : 'none';
-      });
-    });
-  }
 })();
 
 // ---- 第三轮增强：卡片 3D 倾斜 + 双语对照实时切换 ----
