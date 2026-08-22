@@ -42,6 +42,18 @@ export interface MaskedText {
   count: number;
 }
 
+/**
+ * 流式增量还原：增量文本可能刚好切在占位符中间（已收到 OPEN+数字、还没收到 CLOSE），
+ * 直接 restore 会把私有区字符漏到界面上。这里先裁掉尾部未闭合的占位符再还原，
+ * 下一个增量补齐后自然会重新出现，不影响最终结果。
+ */
+export function restorePartial(masked: MaskedText, partial: string): string {
+  const open = partial.lastIndexOf(OPEN);
+  const close = partial.lastIndexOf(CLOSE);
+  const safe = open > close ? partial.slice(0, open) : partial;
+  return masked.restore(safe);
+}
+
 export function maskIdentifiers(text: string): MaskedText {
   const map: string[] = [];
   const push = (m: string) => {

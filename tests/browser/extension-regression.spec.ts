@@ -404,11 +404,10 @@ test('full settings panel opens as an in-page panel with the settings form', asy
 
 test('auto-translate site: page loads and starts translating automatically', async ({ page }) => {
   await page.goto('/tests/browser/selection-regression.html');
-  // 预置"自动翻译此站"偏好后刷新
+  // 预置"自动翻译此站"偏好后刷新（config 用 mock 预置的带 Key 配置，代表已配置用户）
   await page.evaluate(async () => {
     await (window as any).chrome.storage.local.set({
       autoSites: [location.host],
-      config: undefined,
     });
   });
   await page.reload();
@@ -419,6 +418,38 @@ test('auto-translate site: page loads and starts translating automatically', asy
     .toBeGreaterThan(0);
   await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
   await expect(page.locator('.ot-translation').first()).toBeVisible();
+});
+
+test('no API key: translation is gated by the setup guide and sends no requests', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 手动模式 + 无 Key（显式覆盖 mock 预置的带 Key 配置）后刷新
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({
+      config: {
+        provider: 'deepseek',
+        apiKeys: {},
+        model: 'deepseek-chat',
+        sourceLang: '自动检测',
+        targetLang: '中文',
+        translateMode: 'manual',
+      },
+    });
+  });
+  await page.reload();
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  // 手动点段落：被拦下 → 弹引导卡，不发任何请求
+  await page.locator('#selection-source').click();
+  await expect(page.locator('#ot-error-modal')).toBeVisible();
+  await expect(page.locator('#ot-error-modal')).toContainText('还差一步就能开始翻译');
+  await expect.poll(async () => Number(await page.locator('html').getAttribute('data-translation-calls'))).toBe(0);
+  // 关闭引导卡（全屏模态会挡住后续点击），再验证整页翻译同样被拦下
+  await page.locator('#ot-error-modal').getByRole('button', { name: '我知道了' }).click();
+  await expect(page.locator('#ot-error-modal')).toHaveCount(0);
+  await toolbar.click();
+  await expect(page.locator('#ot-error-modal')).toBeVisible();
+  await expect(page.locator('#ot-error-modal')).toContainText('还差一步就能开始翻译');
+  await expect.poll(async () => Number(await page.locator('html').getAttribute('data-translation-calls'))).toBe(0);
 });
 
 test('settings panel follows dark color scheme with readable text', async ({ page }) => {

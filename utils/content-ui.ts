@@ -195,6 +195,8 @@ export function createNoticeHost(
   title: string,
   message: string,
   onAcknowledge: () => void,
+  // 可选主操作（如「打开设置」）：不传时与原来完全一致，只有「我知道了」。
+  action?: { label: string; onAction: () => void },
 ): HTMLElement {
   const host = document.createElement('div');
   host.id = 'ot-error-modal';
@@ -238,7 +240,7 @@ export function createNoticeHost(
     }
     h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 650; letter-spacing: 0; }
     p { margin: 10px 0 20px; color: #5f6368; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
-    .actions { display: flex; justify-content: flex-end; }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; }
     button {
       box-sizing: border-box;
       min-height: 36px;
@@ -254,6 +256,8 @@ export function createNoticeHost(
     }
     button:hover { background: #0069d9; }
     button:focus-visible { outline: 3px solid rgba(0, 122, 255, 0.35); outline-offset: 2px; }
+    button.secondary { background: rgba(120, 120, 128, 0.16); color: #1d1d1f; }
+    button.secondary:hover { background: rgba(120, 120, 128, 0.26); }
     @media (prefers-color-scheme: dark) {
       .dialog {
         border-color: rgba(84, 84, 88, 0.4);
@@ -261,6 +265,8 @@ export function createNoticeHost(
         color: #f5f5f7;
       }
       p { color: #aeaeb2; }
+      button.secondary { background: rgba(120, 120, 128, 0.32); color: #f5f5f7; }
+      button.secondary:hover { background: rgba(120, 120, 128, 0.44); }
     }
   `;
   const backdrop = document.createElement('div');
@@ -283,11 +289,20 @@ export function createNoticeHost(
   acknowledge.type = 'button';
   acknowledge.textContent = '我知道了';
   acknowledge.addEventListener('click', onAcknowledge);
+  let primary: HTMLButtonElement | null = null;
+  if (action) {
+    acknowledge.classList.add('secondary');
+    primary = document.createElement('button');
+    primary.type = 'button';
+    primary.textContent = action.label;
+    primary.addEventListener('click', action.onAction);
+  }
   actions.appendChild(acknowledge);
+  if (primary) actions.appendChild(primary);
   dialog.append(heading, body, actions);
   backdrop.appendChild(dialog);
   shadow.append(style, backdrop);
-  acknowledge.focus({ preventScroll: true });
+  (primary ?? acknowledge).focus({ preventScroll: true });
   return host;
 }
 

@@ -22,6 +22,12 @@ export const autoSitesItem = storage.defineItem<string[] | null>('local:autoSite
   defaultValue: null,
 });
 
+// 首次使用引导：还没填 API Key 时提示一次「去设置」，提示过就不再打扰。
+// 用户后来清空 Key 也不会二次弹窗——工具栏与设置面板里始终能重新进入设置。
+export const setupNoticeShownItem = storage.defineItem<boolean>('local:setupNoticeShown', {
+  defaultValue: false,
+});
+
 // 悬浮工具栏与设置面板的拖拽位置（仅存位置，跟随用户习惯）。
 export const toolbarPosItem = storage.defineItem<{ x: number; y: number } | null>(
   'local:toolbarPos',

@@ -14,7 +14,7 @@ import {
   buildGlossaryBlock,
   type TermMap,
 } from './glossary.ts';
-import { maskIdentifiers, MASK_GUARD } from './mask.ts';
+import { maskIdentifiers, restorePartial, MASK_GUARD } from './mask.ts';
 
 // 翻译风格 → 追加到系统提示词的一句风格指令，让译文贴合场景（质量目标）。
 const TONE_HINTS: Record<string, string> = {
@@ -444,29 +444,48 @@ async function translateSentences(
     missingIndexes.push(i);
   });
 
-  // ② 仅重译缺失的句子（其余直接复用缓存）
+  // ② 仅重译缺失的句子，并且合并成一次批量请求。
+  //    逐句串行会把 system 提示词 + 术语表 + 上下文前缀重复发 N 遍：
+  //    5 句改一句时，串行是 5 次请求 5 份前缀，合并后是 1 次请求 1 份前缀。
+  let issue: string[] | null = null;
   if (missingIndexes.length > 0) {
-    const block =
-      cfg.glossaryEnabled !== false
-        ? buildGlossaryBlock(relevantTerms(missingIndexes.map((i) => sentences[i].content), cfg.targetLang, glossary, cfg.glossaryTermLimit ?? 12))
-        : '';
-    for (const i of missingIndexes) {
-      signal?.throwIfAborted();
-      const core = await coreTranslate(cfg, sentences[i].content, signal, {
-        context,
-        glossaryBlock: block,
-      });
-      stats.requests += core.stats.requests;
-      stats.promptTokens += core.stats.promptTokens;
-      stats.completionTokens += core.stats.completionTokens;
-      stats.qualityIssues += core.stats.qualityIssues;
-      const piece = core.text + sentences[i].delim;
-      translated[i] = piece;
-      if (cfg.cacheEnabled) setCachedSync(normalizeSentence(sentences[i].content), cfg.targetLang, sCk, core.text);
-    }
+    signal?.throwIfAborted();
+    const batch = await translateBatchDetailed(
+      cfg,
+      missingIndexes.map((i) => sentences[i].content),
+      signal,
+      context,
+    );
+    mergeSubStats(stats, batch.stats);
+    const missingTokens = new Set<string>();
+    missingIndexes.forEach((sentenceIndex, batchIndex) => {
+      const sentence = sentences[sentenceIndex];
+      const piece = batch.translations[batchIndex] || sentence.content;
+      translated[sentenceIndex] = piece + sentence.delim;
+      if (cfg.cacheEnabled) {
+        setCachedSync(normalizeSentence(sentence.content), cfg.targetLang, sCk, piece);
+      }
+      // 句子路径此前直接丢弃了 issue，质量自检的告警到不了界面；这里汇总回传。
+      batch.issues?.[batchIndex]?.forEach((token) => missingTokens.add(token));
+    });
+    if (missingTokens.size > 0) issue = Array.from(missingTokens);
   }
 
-  return { translation: translated.join(''), stats };
+  return { translation: translated.join(''), stats, issue };
+}
+
+// 把子调用（批量翻译）的用量合并回父统计。
+// sentSegments / sentCharacters 不叠加：父级已按「整段一条」记过，再加会重复计数。
+function mergeSubStats(target: TranslationStats, source: TranslationStats): void {
+  target.localSkipped += source.localSkipped;
+  target.cacheHits += source.cacheHits;
+  target.glossaryHits += source.glossaryHits;
+  target.duplicateHits += source.duplicateHits;
+  target.estimatedTokensSaved += source.estimatedTokensSaved;
+  target.promptTokens += source.promptTokens;
+  target.completionTokens += source.completionTokens;
+  target.requests += source.requests;
+  target.qualityIssues += source.qualityIssues;
 }
 
 export async function translateOne(
@@ -561,7 +580,8 @@ export async function translateOneStream(
         masked.count,
       )) {
         full += delta;
-        onDelta(full);
+        // 增量也要还原占位符，否则界面上会先闪出遮罩字符再被最终译文替换。
+        onDelta(restorePartial(masked, full));
       }
       ok = true;
       break;
@@ -751,8 +771,11 @@ export async function translateBatchDetailed(
     await Promise.all(Array.from({ length: Math.min(2, items.length) }, () => worker()));
   };
 
-  let recoveryRequests = 0;
-  const translateGroup = async (items: typeof toTranslate, recovery = false): Promise<void> => {
+  // splitsLeft 控制「坏 JSON 拆半恢复」的最大层级深度：每向下拆一层减 1，
+  // 归零即停止拆分、改走逐条兜底（必然终止，不会死循环）。
+  // 此前用 recovery=true 布尔标志，会把所有子组直接强制逐条、使 MAX_BATCH_RECOVERY_REQUESTS 形同虚设；
+  // 现在该常量真正生效：值 = 允许的最大拆分层数。
+  const translateGroup = async (items: typeof toTranslate, splitsLeft = MAX_BATCH_RECOVERY_REQUESTS): Promise<void> => {
     signal?.throwIfAborted();
     // 预遮罩各条里的代码/库名标识符，整批送模型，回填空（省 Token + 防乱翻库名）。
     const maskedItems = items.map((it) => maskIdentifiers(it.text));
@@ -802,25 +825,25 @@ export async function translateBatchDetailed(
       return;
     }
     if (items.length === 1) {
-      if (recovery) {
-        // 从大批次拆出的单项仍未遵循 JSON 协议时，改走普通单句提示；
+      if (splitsLeft === MAX_BATCH_RECOVERY_REQUESTS) {
+        // 顶层单条目：兼容模型常直接返回纯文本，复用响应避免重复请求（省 Token）。
+        applyResult(items[0], response.text);
+      } else {
+        // 拆分得到的单条目仍不遵循 JSON 协议：改走普通单句提示，
         // 避免把模型的解释、拒答或格式错误原样显示成译文。
         await translateItemsIndividually(items);
-      } else {
-        // 原本就是单项的批次常被兼容模型直接返回纯文本，复用响应避免重复请求。
-        applyResult(items[0], response.text);
       }
       return;
     }
-    if (recovery || recoveryRequests + 2 > MAX_BATCH_RECOVERY_REQUESTS) {
+    if (splitsLeft <= 0) {
+      // 恢复预算耗尽：逐条兜底翻译，递归必然终止（不会死循环）。
       await translateItemsIndividually(items);
       return;
     }
-    recoveryRequests += 2;
     const middle = Math.ceil(items.length / 2);
     await Promise.all([
-      translateGroup(items.slice(0, middle), true),
-      translateGroup(items.slice(middle), true),
+      translateGroup(items.slice(0, middle), splitsLeft - 1),
+      translateGroup(items.slice(middle), splitsLeft - 1),
     ]);
   };
 
@@ -850,7 +873,9 @@ async function translateMT(
   if (providerId === 'google') {
     // 注意：以下为非官方免费端点（client=gtx），无 SLA，可能被限流或临时停用。
     // 它作为「免 Key 体验通道」保留，但稳定性不保证；正式使用建议配置需 Key 的翻译服务。
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
+    // baseUrl 可覆盖（测试用 mock 端点；生产默认就是 translate.googleapis.com）。
+    const base = (cfg.baseUrl?.replace(/\/+$/, '') || 'https://translate.googleapis.com') + '/translate_a/single';
+    const url = `${base}?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
     const res = await fetchWithTimeout(url, { signal }, 20000);
     if (!res.ok) {
       throw new Error(

@@ -41,7 +41,7 @@ async function startMockServer() {
   const server = createServer(async (req, res) => {
     let raw = '';
     for await (const chunk of req) raw += chunk;
-    const recorded = { url: req.url || '', body: raw ? JSON.parse(raw) : null };
+    const recorded = { url: req.url || '', body: raw ? JSON.parse(raw) : null, headers: req.headers };
     requests.push(recorded);
     const result = handler(recorded);
     if (typeof result === 'number') {
@@ -375,13 +375,37 @@ test('403 无权限给出账户指引', async () => {
   await server.close();
 });
 
-test('句子缓存：英文缩写（U.S. / Dr.）不被拆散', async () => {
+test('句子缓存：英文缩写（U.S. / Dr.）不被拆散，且缺失句子合并为一次请求', async () => {
   const server = await startMockServer();
-  server.setHandler(() => ({ choices: [{ message: { content: '译文' } }], usage: {} }));
+  let sentItems = null;
+  server.setHandler((req) => {
+    sentItems = req.body.messages[1].content.match(/"id":"t\d+","text":"[^"]*"/g);
+    return batchOk(['a', 'b']);
+  });
   const cfg = cfgFor(server.port, { sentenceCache: true });
   await translateOneDetailed(cfg, 'U.S. Army moved. Dr. Smith agreed.');
-  // 缩写受保护时只有 2 句；若被拆散会变成 4+ 次请求
-  assert.equal(server.requests.length, 2, '缩写不应被拆成单字母句子');
+  // 缩写受保护时只有 2 句；若被拆散会变成 4+ 条 item
+  assert.equal(sentItems?.length, 2, '缩写不应被拆成单字母句子');
+  // 句子缓存 miss 合并成一次批量请求（原先逐句串行：2 句 = 2 次请求、2 份提示词前缀）
+  assert.equal(server.requests.length, 1, '缺失句子应合并为一次请求');
+  await server.close();
+});
+
+test('句子缓存：仅一句变化时只把该句送进批量请求', async () => {
+  const server = await startMockServer();
+  const cfg = cfgFor(server.port, { sentenceCache: true });
+  server.setHandler(() => batchOk(['a', 'b']));
+  await translateOneDetailed(cfg, 'Alpha runs fast. Beta walks slow.');
+  // 第二次只改后半句：前半句命中句子缓存，批量请求里应只剩 1 条 item
+  let sentItems = null;
+  server.setHandler((req) => {
+    sentItems = req.body.messages[1].content.match(/"id":"t\d+","text":"[^"]*"/g);
+    return batchOk(['only']);
+  });
+  const before = server.requests.length;
+  await translateOneDetailed(cfg, 'Alpha runs fast. Beta walks quickly.');
+  assert.equal(sentItems?.length, 1, '命中缓存的句子不应再送进请求');
+  assert.equal(server.requests.length - before, 1, '只需一次请求');
   await server.close();
 });
 
@@ -417,6 +441,78 @@ test('术语注入默认上限 12：长术语列表被截断以节省 Token', as
 test('cleanSecret 拒绝含非 ASCII 字符的 Key', () => {
   assert.throws(() => cleanSecret('sk-abc\u3000def'), /非 ASCII/);
   assert.equal(cleanSecret('  sk-abc123  '), 'sk-abc123');
+});
+
+test('Google 免 Key 引擎：请求格式与响应解析正确', async () => {
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    assert.ok(req.url.includes('/translate_a/single'), '应请求 translate_a/single');
+    assert.ok(req.url.includes('client=gtx'), '应带 gtx 参数');
+    assert.ok(req.url.includes('sl=en') && req.url.includes('tl=zh'), '语言参数应正确');
+    assert.ok(req.url.includes(encodeURIComponent('Two-factor authentication')), '原文应 URL 编码');
+    // google 官方返回格式：[[["译文","原文",null,null,10]],null,"en"]
+    return [[['双重身份验证', 'Two-factor authentication', null, null, 10]], null, 'en'];
+  });
+  const result = await translateOneDetailed(cfgFor(server.port, { provider: 'google' }), 'Two-factor authentication');
+  assert.equal(result.translation, '双重身份验证');
+  assert.equal(server.requests.length, 1);
+  await server.close();
+});
+
+test('DeepL 引擎：Authorization 头与响应解析正确', async () => {
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    assert.ok(req.url.includes('/v2/translate'));
+    assert.equal(req.body.target_lang, 'ZH', '目标语言应为 ZH');
+    assert.deepEqual(req.body.text, ['Hello world']);
+    assert.equal(req.headers?.['authorization'], 'DeepL-Auth-Key test-key-123', '应带 DeepL Key 头');
+    return { translations: [{ text: '你好，世界' }] };
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { provider: 'deepl', apiKeys: { deepl: 'test-key-123' } }),
+    'Hello world',
+  );
+  assert.equal(result.translation, '你好，世界');
+  await server.close();
+});
+
+test('Microsoft 引擎：订阅 Key 头与响应解析正确', async () => {
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    assert.ok(req.url.includes('/translate?api-version=3.0'));
+    assert.equal(req.headers?.['ocp-apim-subscription-key'], 'test-key-123', '应带订阅 Key 头');
+    assert.deepEqual(req.body, [{ Text: 'Hello world' }]);
+    return [{ translations: [{ text: '你好，世界' }] }];
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { provider: 'microsoft', apiKeys: { microsoft: 'test-key-123' } }),
+    'Hello world',
+  );
+  assert.equal(result.translation, '你好，世界');
+  await server.close();
+});
+
+test('批量坏 JSON 恢复受 MAX_BATCH_RECOVERY_REQUESTS 约束（不无限拆分）', async () => {
+  // 验证此前「recovery=true 使常量形同虚设」的缺陷已修复：
+  // 4 条目的批次始终返回坏 JSON，恢复应受预算（默认 2 层）约束，
+  // 组请求数 = 1(顶层) + 2(第一层拆半) + 4(第二层拆半) = 7，而非旧实现的 3。
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    const user = req.body.messages[1].content;
+    const isGroup = /items 每段 text/.test(user);
+    if (isGroup) {
+      // 组请求一律返回不遵循协议的纯文本
+      return { choices: [{ message: { content: '这不是 JSON' } }], usage: {} };
+    }
+    // 逐条兜底：返回对应译文
+    return { choices: [{ message: { content: '逐条译文' } }], usage: {} };
+  });
+  const result = await translateBatchDetailed(cfgFor(server.port), ['A', 'B', 'C', 'D']);
+  assert.equal(result.translations.length, 4);
+  assert.ok(result.translations.every((t) => t === '逐条译文'), '全部应逐条兜底成功');
+  const groupRequests = server.requests.filter((r) => /items 每段 text/.test(r.body.messages[1].content));
+  assert.equal(groupRequests.length, 7, '恢复深度应受 MAX_BATCH_RECOVERY_REQUESTS(=2) 约束，恰为 7 次组请求');
+  await server.close();
 });
 
 test.after(async () => {

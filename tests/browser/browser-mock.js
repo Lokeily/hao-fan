@@ -29,6 +29,20 @@
     disabledSites: disabledFromQuery ? [location.host] : [],
     // 测试环境默认不自动翻译（生产默认全开）；auto-translate 用例自行设置
     autoSites: [],
+    // 测试环境代表「已配置好 API Key 的普通用户」：后台 mock 始终能返回译文，
+    // 而 v0.1.23 起无 Key 时整页翻译会被引导卡拦下（不发请求）。预置 Key 让
+    // 依赖整页翻译的回归用例继续按原语义运行；专门测引导的用例会显式清空 config。
+    config: {
+      provider: 'deepseek',
+      apiKeys: { deepseek: 'test-key-for-browser-regression' },
+      model: 'deepseek-chat',
+      sourceLang: '自动检测',
+      targetLang: '中文',
+      cacheEnabled: true,
+      streaming: true,
+      qualityCheck: true,
+      translateMode: 'auto',
+    },
   };
   const memRead = (key) => {
     try {

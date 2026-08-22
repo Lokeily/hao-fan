@@ -18,6 +18,7 @@ import {
   autoSitesItem,
   toolbarPosItem,
   settingsPanelPosItem,
+  setupNoticeShownItem,
 } from '../utils/storage.ts';
 import {
   createTranslationNode,
@@ -34,7 +35,7 @@ import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-po
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
 import { randomId } from '../utils/id.ts';
 import { isSiteDisabled, withSiteDisabled } from '../utils/site-policy.ts';
-import { normalizeConfig } from '../utils/config.ts';
+import { normalizeConfig, getProviderApiKey, type AppConfig } from '../utils/config.ts';
 import { buildConfigForm } from '../utils/ui.ts';
 // 设置页样式直接打包进内容脚本（?raw），完整设置面板无需 fetch 扩展资源。
 import fullSettingsCss from '../styles/options.css?raw';
@@ -93,6 +94,10 @@ export default defineContentScript({
     let currentTranslateMode: 'auto' | 'manual' = 'auto';
     let hoverTranslateEnabled = true;
     let inputTranslateEnabled = true;
+    // 流式开关（设置页「边生成边显示」）：关掉后单条交互直接走普通请求，不再开长连接。
+    let streamingEnabled = true;
+    // 因缺少 API Key 被拦下过：等用户填好 Key 立刻自动接着翻，不用再点一次。
+    let awaitingSetup = false;
     let noticeHost: HTMLElement | null = null;
     const noticeCycles = new NoticeCycleGate();
     let blockedPageJobId: string | null = null;
@@ -157,6 +162,7 @@ export default defineContentScript({
         if (v && (v.translateMode === 'auto' || v.translateMode === 'manual')) currentTranslateMode = v.translateMode;
         hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
         inputTranslateEnabled = v ? v.inputTranslate !== false : true;
+        streamingEnabled = v ? v.streaming !== false : true;
         document.querySelectorAll('.ot-translation').forEach((el) => {
           (el as HTMLElement).dataset.style = currentTranslationStyle;
         });
@@ -168,6 +174,7 @@ export default defineContentScript({
           if (v && (v.translateMode === 'auto' || v.translateMode === 'manual')) currentTranslateMode = v.translateMode;
           hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
           inputTranslateEnabled = v ? v.inputTranslate !== false : true;
+          streamingEnabled = v ? v.streaming !== false : true;
         })
         .catch(() => {});
       // 双向同步：设置变化时刷新已打开的大面板与快速设置面板，保证两边状态一致。
@@ -189,6 +196,13 @@ export default defineContentScript({
         if (!v) return;
         hoverTranslateEnabled = v.hoverTranslate !== false;
         inputTranslateEnabled = v.inputTranslate !== false;
+        streamingEnabled = v.streaming !== false;
+        // 刚在页内设置面板里填好 Key：直接接着把这页翻完，不用再点一次按钮。
+        if (awaitingSetup && !providerNeedsSetup(normalizeConfig(v))) {
+          awaitingSetup = false;
+          closeNotice();
+          if (!siteDisabled && !document.querySelector('.ot-translation')) void translatePage(true);
+        }
         if (v.translateMode === 'auto' || v.translateMode === 'manual') currentTranslateMode = v.translateMode;
         fullSettingsFormApi?.update(v);
         settingsPanel?.update({
@@ -238,6 +252,173 @@ export default defineContentScript({
       }
     }
 
+    // ===== 流式单条翻译（长连接端口）=====
+    // MV3 的 sendMessage 只能一次性回结果，要「边生成边显示」必须走长连接：
+    // 内容脚本连上后台 haofan-stream 端口 → 发 {type:'translate-one'} →
+    // 后台逐帧回 {id,delta}（delta 是累计译文，直接覆盖显示即可）→ 结束回 {id,done,translation}。
+    // 只用于「用户正在等」的单条交互（划词 / 悬停 / 点击段落 / 输入框）；
+    // 整页翻译仍走 TRANSLATE_BATCH 一次请求译 N 段，比逐条流式省得多，不改。
+    const STREAM_IDLE_TIMEOUT_MS = 15_000;
+    type StreamResult = { translation: string; issue: string[] | null; savedTokens: number };
+    type StreamPort = ReturnType<typeof runtime.connect>;
+    type StreamWaiter = {
+      port: StreamPort;
+      onDelta: (partial: string) => void;
+      resolve: (value: StreamResult) => void;
+      reject: (error: Error) => void;
+      timer: ReturnType<typeof setTimeout> | null;
+    };
+    let streamPort: StreamPort | null = null;
+    let streamUnavailable = false;
+    const streamWaiters = new Map<string, StreamWaiter>();
+
+    // 空闲超时而非总超时：只要还在往外吐字就不算卡住，长文也能正常译完。
+    function armStreamTimer(id: string, waiter: StreamWaiter) {
+      if (waiter.timer) clearTimeout(waiter.timer);
+      waiter.timer = setTimeout(() => {
+        if (streamWaiters.delete(id)) waiter.reject(new Error('流式翻译响应超时'));
+      }, STREAM_IDLE_TIMEOUT_MS);
+    }
+
+    function rejectPortWaiters(port: StreamPort, reason: string) {
+      streamWaiters.forEach((waiter, id) => {
+        if (waiter.port !== port) return;
+        streamWaiters.delete(id);
+        if (waiter.timer) clearTimeout(waiter.timer);
+        waiter.reject(new Error(reason));
+      });
+    }
+
+    function handleStreamMessage(raw: unknown) {
+      const msg = raw as
+        | {
+            id?: unknown;
+            delta?: unknown;
+            done?: unknown;
+            translation?: unknown;
+            issue?: unknown;
+            error?: unknown;
+            stats?: { estimatedTokensSaved?: unknown };
+          }
+        | null
+        | undefined;
+      if (!msg || typeof msg.id !== 'string') return;
+      const waiter = streamWaiters.get(msg.id);
+      if (!waiter) return;
+      if (!msg.done) {
+        if (typeof msg.delta !== 'string') return;
+        armStreamTimer(msg.id, waiter);
+        try {
+          waiter.onDelta(msg.delta);
+        } catch {
+          /* 渲染增量失败不能中断整条流式请求 */
+        }
+        return;
+      }
+      if (waiter.timer) clearTimeout(waiter.timer);
+      streamWaiters.delete(msg.id);
+      if (typeof msg.error === 'string' && msg.error) {
+        waiter.reject(new Error(msg.error));
+        return;
+      }
+      waiter.resolve({
+        translation: typeof msg.translation === 'string' ? msg.translation : '',
+        issue: Array.isArray(msg.issue) ? (msg.issue as string[]) : null,
+        savedTokens: Math.max(0, Number(msg.stats?.estimatedTokensSaved) || 0),
+      });
+    }
+
+    function getStreamPort(): StreamPort | null {
+      if (streamUnavailable) return null;
+      if (streamPort) return streamPort;
+      try {
+        const port = (runtime as any).connect?.({ name: 'haofan-stream' }) as StreamPort | undefined;
+        if (!port) {
+          streamUnavailable = true;
+          return null;
+        }
+        port.onMessage.addListener(handleStreamMessage);
+        port.onDisconnect.addListener(() => {
+          // 后台 Service Worker 被回收或扩展重载都会断开：置空后下次自动重连，
+          // 断开时未完成的请求交由各调用方的普通请求回退兜底。
+          if (streamPort === port) streamPort = null;
+          rejectPortWaiters(port, '流式连接已断开');
+        });
+        streamPort = port;
+        return port;
+      } catch {
+        // connect 抛错基本意味着扩展已更新 / 后台不可达，本页面不再重试端口。
+        streamUnavailable = true;
+        return null;
+      }
+    }
+
+    // 返回 null 表示流式当前不可用（开关关闭或端口连不上），调用方应走普通请求。
+    function streamTranslateOne(
+      text: string,
+      onDelta: (partial: string) => void,
+      options?: { jobId?: string; context?: { title?: string; prev?: string } },
+    ): Promise<StreamResult> | null {
+      if (!streamingEnabled) return null;
+      const port = getStreamPort();
+      if (!port) return null;
+      const id = randomId();
+      return new Promise<StreamResult>((resolve, reject) => {
+        const waiter: StreamWaiter = { port, onDelta, resolve, reject, timer: null };
+        streamWaiters.set(id, waiter);
+        armStreamTimer(id, waiter);
+        try {
+          port.postMessage({
+            type: 'translate-one',
+            id,
+            text,
+            jobId: options?.jobId,
+            context: options?.context,
+          });
+        } catch (error) {
+          if (waiter.timer) clearTimeout(waiter.timer);
+          streamWaiters.delete(id);
+          if (streamPort === port) streamPort = null;
+          reject(error instanceof Error ? error : new Error('流式请求发送失败'));
+        }
+      });
+    }
+
+    // 单条翻译统一入口：能流式就流式（首字更快），流式不可用 / 超时 / 出错立即回退普通请求，
+    // 回退后的最终译文会覆盖已经显示的增量，用户看不到中间失败。
+    async function translateOneText(
+      text: string,
+      options?: {
+        jobId?: string;
+        context?: { title?: string; prev?: string };
+        onDelta?: (partial: string) => void;
+      },
+    ): Promise<StreamResult> {
+      if (options?.onDelta) {
+        const streamed = streamTranslateOne(text, options.onDelta, options);
+        if (streamed) {
+          try {
+            const result = await streamed;
+            if (result.translation) return result;
+          } catch {
+            /* 落到下面的普通请求 */
+          }
+        }
+      }
+      const res: any = await sendRuntimeMessage({
+        type: 'TRANSLATE_ONE',
+        payload: { text, jobId: options?.jobId, context: options?.context },
+      });
+      if (!res?.ok) throw new Error(res?.error || '翻译失败');
+      const translation = typeof res.translation === 'string' ? res.translation : '';
+      if (!translation) throw new Error('翻译服务返回了空结果');
+      return {
+        translation,
+        issue: Array.isArray(res.issue) ? (res.issue as string[]) : null,
+        savedTokens: Math.max(0, Number(res.stats?.estimatedTokensSaved) || 0),
+      };
+    }
+
     function noticeTitle(message: string): string {
       if (/API Key|未配置|设置页/.test(message)) return '需要完成设置';
       if (/扩展已更新|刷新当前网页/.test(message)) return '请刷新网页';
@@ -256,6 +437,66 @@ export default defineContentScript({
 
       noticeHost = createNoticeHost(title, message, closeNotice);
       document.documentElement.appendChild(noticeHost);
+    }
+
+    // ===== 首次使用引导 =====
+    // 没填 API Key 时，原来的表现是：整页照常发请求 → 每个批次都失败 → 弹「请先在设置页填写
+    // API Key」+ 状态栏报「N 个批次失败」。对新用户既劝退又浪费请求。
+    // 现在改成：不发任何请求，直接给一张能一键进设置的引导卡，并且只打扰一次。
+    function providerNeedsSetup(cfg: AppConfig): boolean {
+      const provider = PROVIDERS.find((p) => p.id === cfg.provider);
+      if (!provider) return true;
+      if (!provider.needsKey) return false;
+      return !getProviderApiKey(cfg).trim();
+    }
+
+    async function needsSetupNow(): Promise<boolean> {
+      try {
+        return providerNeedsSetup(normalizeConfig(await configItem.getValue()));
+      } catch {
+        // 读不到配置就不拦，交给原有的后台报错路径，避免误判导致无法翻译。
+        return false;
+      }
+    }
+
+    // 强制展示（用户主动点翻译）时忽略「只提示一次」，否则点了没反应更困惑。
+    function showSetupGuide(force = false) {
+      const open = () => {
+        closeNotice();
+        openFullSettingsPanel();
+      };
+      const render = () => {
+        closeNotice();
+        noticeHost = createNoticeHost(
+          '还差一步就能开始翻译',
+          '好翻直接调用你自己的大模型账号，不经过任何中转服务器。填入 API Key 后即可翻译本页；Key 只保存在本机浏览器里。',
+          closeNotice,
+          { label: '打开设置', onAction: open },
+        );
+        document.documentElement.appendChild(noticeHost);
+      };
+      if (force) {
+        render();
+        return;
+      }
+      void setupNoticeShownItem
+        .getValue()
+        .then((shown) => {
+          if (shown) return;
+          render();
+          return setupNoticeShownItem.setValue(true);
+        })
+        .catch(() => {
+          /* 存储不可用时不弹引导，避免每页反复打扰 */
+        });
+    }
+
+    // 统一的无 Key 闸门：整页与单条交互（划词/悬停/点段落/输入框）共用。
+    // 返回 true 表示已被拦下（引导卡已展示），调用方应直接返回、不再发任何请求。
+    async function guardSetupGate(userInitiated = false): Promise<boolean> {
+      if (!(await needsSetupNow())) return false;
+      showSetupGuide(userInitiated);
+      return true;
     }
     // 译文可编辑 → 术语自动学习：把原文与用户修改后的译文发给后台抽取术语并沉淀。
     function handleTranslationEdit(el: Element, newTranslation: string) {
@@ -345,6 +586,13 @@ export default defineContentScript({
       }
       if (parentCreatesLayout || ownFloat !== 'none' || columnAncestor) el.appendChild(node);
       else el.insertAdjacentElement('afterend', node);
+    }
+
+    // 流式中途失败时撤掉半截译文：宁可什么都不显示，也不留一句没译完的话在页面上。
+    function dropTranslationNode(el: Element) {
+      const node = translationNodes.get(el);
+      node?.remove();
+      translationNodes.delete(el);
     }
 
     function applyTranslation(
@@ -762,13 +1010,22 @@ export default defineContentScript({
     }
 
     // ===== 整页翻译（沉浸式叠加层：译文贴在原文正下方，不改动原网页）=====
-    async function translatePage(initial = true) {
+    async function translatePage(initial = true, userInitiated = false) {
       if (siteDisabled) {
         showSitePausedNotice();
         return;
       }
       if (busy) return;
       busy = true;
+
+      // 引擎/Key 还没配好：一个请求都不发，直接给引导。
+      // 用户主动点翻译时强制展示（点了没反应更困惑），自动翻译时只打扰一次。
+      if (await needsSetupNow()) {
+        busy = false;
+        awaitingSetup = true;
+        showSetupGuide(userInitiated);
+        return;
+      }
 
       // 手动模式：不做整页自动翻译，仅由「点击段落 / 划词」触发（省 Token，且不被无关内容打扰）。
       if (currentTranslateMode === 'manual') {
@@ -958,9 +1215,90 @@ export default defineContentScript({
         });
       };
 
+      // ===== 动态重译节流 =====
+      // 时钟、股价、倒计时、直播人数这类元素每秒都在改文字。原来只要 characterData 一变
+      // 就立刻 release + 重译，等于每秒烧一次 Token。这里两道闸：
+      //   ① 只有数字/空白在变 → 直接把译文里的数字就地换掉，0 请求；
+      //   ② 其余变化 → 每个元素 8 秒内最多重译一次，冷却期内的抖动合并成一次。
+      const RETRANSLATE_COOLDOWN_MS = 8_000;
+      const lastRetranslateAt = new WeakMap<Element, number>();
+      const cooldownQueue = new Set<Element>();
+      let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
+
+      // 抹掉数字与数字周边符号后的「文字骨架」：骨架相同即认为句子没变，只是数值在动。
+      const digitSkeleton = (text: string) =>
+        text
+          .replace(/[\d\s.,:%+\-/]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      // 把译文里的旧数字按出现顺序替换成新数字。任何一处对不上就整体放弃，
+      // 宁可继续显示旧译文，也绝不拼出错误的数字。
+      const patchTranslationNumbers = (
+        node: HTMLSpanElement,
+        prev: string,
+        next: string,
+      ): boolean => {
+        const before = prev.match(/\d+/g) || [];
+        const after = next.match(/\d+/g) || [];
+        if (before.length !== after.length) return false;
+        if (before.length === 0) {
+          node.dataset.source = next;
+          return true;
+        }
+        const textEl = node.shadowRoot?.querySelector('.text');
+        const current = textEl?.textContent || '';
+        if (!current) return false;
+        let cursor = 0;
+        let out = '';
+        for (let i = 0; i < before.length; i++) {
+          const at = current.indexOf(before[i], cursor);
+          if (at < 0) return false;
+          out += current.slice(cursor, at) + after[i];
+          cursor = at + before[i].length;
+        }
+        out += current.slice(cursor);
+        textEl!.textContent = out;
+        node.dataset.translation = out;
+        node.dataset.source = next;
+        return true;
+      };
+
+      const flushCooldownQueue = () => {
+        cooldownTimer = null;
+        const pending = Array.from(cooldownQueue);
+        cooldownQueue.clear();
+        pending.forEach((anchor) => {
+          if (anchor.isConnected) refreshChangedText(anchor);
+        });
+      };
+
+      const queueAfterCooldown = (anchor: Element, waitMs: number) => {
+        cooldownQueue.add(anchor);
+        if (cooldownTimer) return;
+        cooldownTimer = setTimeout(flushCooldownQueue, Math.max(200, waitMs));
+      };
+
       const refreshChangedText = (element: Element) => {
         const anchor = closestTextBlock(element, true);
         if (!anchor) return;
+        const node = translationNodes.get(anchor);
+        const prev = node?.dataset.source || '';
+        const next = textOfBlock(anchor);
+        if (prev && prev === next) return;
+        // ① 只有数字在动：就地改数，不发请求。
+        if (node?.isConnected && prev && next && digitSkeleton(prev) === digitSkeleton(next)) {
+          if (patchTranslationNumbers(node, prev, next)) return;
+        }
+        // ② 冷却：同一元素 8 秒内的反复变化只在冷却结束后按「最终文本」译一次。
+        const now = Date.now();
+        const last = lastRetranslateAt.get(anchor) ?? 0;
+        const elapsed = now - last;
+        if (elapsed < RETRANSLATE_COOLDOWN_MS) {
+          queueAfterCooldown(anchor, RETRANSLATE_COOLDOWN_MS - elapsed);
+          return;
+        }
+        lastRetranslateAt.set(anchor, now);
         release(anchor);
         scheduleRoot(anchor);
       };
@@ -1304,11 +1642,25 @@ export default defineContentScript({
       positionSelectionUi(host, snapshot.rect, true);
     }
 
+    // 流式增量只改结果文字，不重建整个面板——重建会让原文与复制按钮跟着闪。
+    function updateSelectionResultText(host: HTMLDivElement, partial: string) {
+      if (!partial) return;
+      const result = host.shadowRoot?.querySelector('.result');
+      if (!result) return;
+      result.classList.remove('loading');
+      result.textContent = partial;
+    }
+
     async function translateSelectionInPopover(
       snapshot: SelectionSnapshot,
       host: HTMLDivElement,
       operationId = `selection-${randomId()}`,
     ) {
+      // 未配置 Key：不发起请求，直接给引导（用户主动点译 → 强制展示）。
+      if (await guardSetupGate(true)) {
+        hideSelectionUi();
+        return;
+      }
       selectionPinned = true;
       renderSelectionPanel(host, snapshot);
       const requestId = ++selectionRequestId;
@@ -1321,13 +1673,15 @@ export default defineContentScript({
       const jobId = randomId();
       activeSelectionJobId = jobId;
       try {
-        const res: any = await sendRuntimeMessage({
-          type: 'TRANSLATE_ONE',
-          payload: { text: snapshot.text, jobId },
+        const res = await translateOneText(snapshot.text, {
+          jobId,
+          onDelta: (partial) => {
+            if (requestId !== selectionRequestId || host !== selectionHost) return;
+            updateSelectionResultText(host, partial);
+          },
         });
         if (requestId !== selectionRequestId || host !== selectionHost) return;
-        if (!res?.ok) throw new Error(res?.error || '翻译失败');
-        const translation = typeof res.translation === 'string' ? res.translation : '';
+        const translation = res.translation;
         if (!translation) throw new Error('未返回有效译文');
         if (requestConfigRevision === translationConfigRevision) {
           sessionTranslations.remember(snapshot.text, translation);
@@ -1409,6 +1763,8 @@ export default defineContentScript({
 
     // ===== 手动模式：点击段落即翻译该块（不整页自动翻）=====
     async function manualTranslateBlock(el: Element): Promise<void> {
+      // 未配置 Key：不发起请求，直接给引导。
+      if (await guardSetupGate(true)) return;
       const html = el as HTMLElement;
       if (
         html.classList.contains(TRANSLATED_CLASS) ||
@@ -1420,14 +1776,22 @@ export default defineContentScript({
       const text = textOfBlock(el);
       if (text.length < 2) return;
       html.classList.add(PENDING_CLASS);
+      let streamedPartial = false;
       try {
-        const r: any = await sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } });
-        if (r?.ok && typeof r.translation === 'string' && r.translation) {
-          sessionTranslations.remember(text, r.translation);
-          applyTranslation(el, text, r.translation);
-        }
+        const r = await translateOneText(text, {
+          onDelta: (partial) => {
+            // 增量先占位显示，最终译文到达后由 applyTranslation 覆盖并标记完成。
+            if (!partial || !el.isConnected) return;
+            streamedPartial = true;
+            insertTranslation(el, partial, text);
+          },
+        });
+        sessionTranslations.remember(text, r.translation);
+        applyTranslation(el, text, r.translation);
+        estimatedTokensSaved += r.savedTokens;
       } catch {
-        /* 翻译失败静默，不阻断交互 */
+        /* 翻译失败静默，不阻断交互；但半截译文必须撤掉 */
+        if (streamedPartial) dropTranslationNode(el);
       } finally {
         html.classList.remove(PENDING_CLASS);
       }
@@ -1460,7 +1824,7 @@ export default defineContentScript({
         setSiteDisabledState(msg.payload.disabled);
       } else if (msg?.type === 'TRANSLATE_PAGE') {
         void sitePolicyReady.then(() =>
-          siteDisabled ? showSitePausedNotice() : translatePage(true),
+          siteDisabled ? showSitePausedNotice() : translatePage(true, true),
         );
       } else if (msg?.type === 'SHOW_IMAGE_RESULT') {
         if (siteDisabled) showSitePausedNotice();
@@ -1832,7 +2196,9 @@ export default defineContentScript({
       hoverEl = null;
     }
 
-    function showHoverBubbleFor(el: Element) {
+    async function showHoverBubbleFor(el: Element) {
+      // 未配置 Key：不发起请求（悬停属被动触发，引导只弹一次）。
+      if (await guardSetupGate()) return;
       if (hoverPinned) return;
       hideHoverBubble();
       hoverEl = el;
@@ -1854,18 +2220,22 @@ export default defineContentScript({
         hoverBubble.setTranslation(cached);
         return;
       }
-      void sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } })
-        .then((r: any) => {
+      void translateOneText(text, {
+        onDelta: (partial) => {
+          if (!hoverBubble || hoverEl !== el || !partial) return;
+          hoverBubble.setTranslation(partial);
+        },
+      })
+        .then((r) => {
           if (!hoverBubble || hoverEl !== el) return;
-          if (r?.ok && typeof r.translation === 'string' && r.translation) {
-            hoverBubble.setTranslation(r.translation);
-            sessionTranslations.remember(text, r.translation);
-          } else {
-            hoverBubble.setTranslation(r?.error || '翻译失败');
-          }
+          hoverBubble.setTranslation(r.translation);
+          sessionTranslations.remember(text, r.translation);
+          estimatedTokensSaved += r.savedTokens;
         })
-        .catch(() => {
-          if (hoverBubble && hoverEl === el) hoverBubble.setTranslation('翻译失败');
+        .catch((error) => {
+          if (hoverBubble && hoverEl === el) {
+            hoverBubble.setTranslation(error instanceof Error ? error.message : '翻译失败');
+          }
         });
     }
 
@@ -1974,6 +2344,8 @@ export default defineContentScript({
     }
 
     async function translateInputContent() {
+      // 未配置 Key：不发起请求，直接给引导。
+      if (await guardSetupGate(true)) return;
       if (!inputTarget) return;
       const text = inputTarget.value.trim();
       if (!text) return;
@@ -2006,9 +2378,14 @@ export default defineContentScript({
       host.style.setProperty('left', `${Math.min(Math.max(8, r.left), window.innerWidth - 328)}px`, 'important');
       host.style.setProperty('top', `${Math.max(8, r.bottom + 6)}px`, 'important');
       try {
-        const res: any = await sendRuntimeMessage({ type: 'TRANSLATE_ONE', payload: { text } });
-        if (!inputResultHost) return;
-        if (res?.ok && typeof res.translation === 'string' && res.translation) {
+        const res = await translateOneText(text, {
+          onDelta: (partial) => {
+            if (inputResultHost !== host || !partial) return;
+            host.textContent = partial;
+          },
+        });
+        if (inputResultHost !== host) return;
+        {
           host.textContent = res.translation;
           const copy = document.createElement('button');
           copy.type = 'button';
@@ -2035,11 +2412,11 @@ export default defineContentScript({
             }
           });
           host.appendChild(copy);
-        } else {
-          host.textContent = res?.error || '翻译失败';
         }
-      } catch {
-        if (inputResultHost) host.textContent = '翻译失败';
+      } catch (error) {
+        if (inputResultHost === host) {
+          host.textContent = error instanceof Error ? error.message : '翻译失败';
+        }
       }
     }
 
@@ -2210,7 +2587,7 @@ export default defineContentScript({
           // 已有译文 → 收起（清理译文与标记）
           clearTranslations();
         } else {
-          translatePage(true);
+          translatePage(true, true);
         }
       });
       gear.addEventListener('click', (event) => {

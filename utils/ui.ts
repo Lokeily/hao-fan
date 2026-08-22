@@ -395,6 +395,18 @@ export function buildConfigForm(
     setIfDiff(hoverTranslateChk, cfg.hoverTranslate !== false);
     setIfDiff(inputTranslateChk, cfg.inputTranslate !== false);
     setIfDiff(translationStyleSel, cfg.translationStyle || 'plain');
+    // 高级字段也必须回填：此前只写不读，打开设置页会显示空值，
+    // 用户改其它项保存时会把多引擎配置静默清空（数据丢失 bug）。
+    setIfDiff(fallbackInput, (cfg.fallbackProviders || []).join(', '));
+    const strongValue = cfg.strongProvider || '';
+    setIfDiff(
+      strongProviderSel,
+      strongValue && Array.from(strongProviderSel.options).some((o) => o.value === strongValue)
+        ? strongValue
+        : '',
+    );
+    setIfDiff(strongModelInput, cfg.strongModel || '');
+    setIfDiff(strongThresholdInput, String(cfg.strongThreshold ?? 1200));
     syncCheckState();
     refreshSelectTitles();
   }

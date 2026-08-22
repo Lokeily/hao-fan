@@ -190,7 +190,14 @@ function setupStreamingPort() {
         if (!cfg.streaming) {
           const r = await translateOneDetailed(cfg, text, signal, context);
           await recordUsage(r.stats);
-          if (!cancelled) port.postMessage({ id, done: true, translation: r.translation, issue: r.issue ?? null });
+          if (!cancelled)
+            port.postMessage({
+              id,
+              done: true,
+              translation: r.translation,
+              issue: r.issue ?? null,
+              stats: { estimatedTokensSaved: r.stats.estimatedTokensSaved },
+            });
           return;
         }
         await translateOneStream(cfg, text, {
@@ -202,7 +209,13 @@ function setupStreamingPort() {
           onDone: (r) => {
             if (!cancelled) {
               void recordUsage(r.stats);
-              port.postMessage({ id, done: true, translation: r.translation, issue: r.issue ?? null });
+              port.postMessage({
+                id,
+                done: true,
+                translation: r.translation,
+                issue: r.issue ?? null,
+                stats: { estimatedTokensSaved: r.stats.estimatedTokensSaved },
+              });
             }
           },
         });
