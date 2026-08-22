@@ -23,8 +23,9 @@
       if (progress) {
         var doc = document.documentElement;
         var max = doc.scrollHeight - doc.clientHeight;
-        var pct = max > 0 ? (y / max) * 100 : 0;
-        progress.style.width = pct + '%';
+        var pct = max > 0 ? (y / max) : 0;
+        // transform: scaleX 为合成属性，避免每帧改 width 触发重排
+        progress.style.transform = 'scaleX(' + pct.toFixed(4) + ')';
       }
       ticking = false;
     });
@@ -481,4 +482,26 @@
       spans[i].title = labels[i];
     }
   });
+}());
+
+/* ---- 视口感知动画暂停（性能优化）----
+   无限循环动画（aurora / marquee / praise）离屏时暂停，
+   进入视口才恢复——滚动与后台不再白白消耗 GPU/主线程，
+   从根源上消除长页面与多页面的卡顿感。 */
+(function () {
+  'use strict';
+  if (!('IntersectionObserver' in window)) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  var targets = document.querySelectorAll('.hero-aurora, .page-aurora, .marquee-track, .praise-track');
+  if (!targets.length) return;
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      // 进入视口恢复，离屏暂停；带一点提前量（rootMargin 上下 10%）避免边界抖动
+      entry.target.style.animationPlayState = entry.isIntersecting ? 'running' : 'paused';
+    });
+  }, { rootMargin: '10% 0px 10% 0px', threshold: 0 });
+
+  targets.forEach(function (el) { io.observe(el); });
 }());
