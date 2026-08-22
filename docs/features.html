@@ -6,12 +6,12 @@
     <title>功能特性 · 好翻（Open Translator CN）</title>
     <meta
       name="description"
-      content="好翻（Open Translator CN）的全部功能特性：从沉浸式双语对照、流式输出、上下文感知、智能语言检测、代码与库名保护，到翻译质量自检、多引擎路由、节省 Token 等共 20 项，并附工作原理说明。全部来自 README，均为已发布功能。"
+      content="好翻（Open Translator CN）的全部功能特性：沉浸式双语对照、流式输出、上下文感知、划词与悬停翻译、智能语言检测、代码与库名保护、自动翻译本站、多引擎路由等共 19 项，并附工作原理说明。全部来自 README，均为已发布功能。"
     />
     <meta property="og:title" content="功能特性 · 好翻（Open Translator CN）" />
     <meta
       property="og:description"
-      content="好翻的全部功能特性：沉浸式双语对照、流式输出、上下文感知、智能语言检测、代码与库名保护、多引擎路由等共 20 项，均为已发布功能。"
+      content="好翻的全部功能特性：沉浸式双语对照、流式输出、上下文感知、划词与悬停翻译、智能语言检测、代码与库名保护、自动翻译本站等共 19 项，均为已发布功能。"
     />
     <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
     <link rel="apple-touch-icon" href="assets/img/icon-128.png" />
@@ -67,7 +67,7 @@
       <h1>✨ <span class="grad">功能特性</span></h1>
       <p>
         好翻做的事其实很纯粹：<strong>把译文自然地嵌进原文里，让你边读边对照</strong>。它不替换你眼前的页面，而是把翻译揉进你本来就有的阅读动作里。下面把这件事拆开讲——先说它「怎么做到」，再按五个主题列出
-        <strong>20 项</strong>已经写进代码、随每个版本一起发布的真实功能。
+        <strong>19 项</strong>已经写进代码、随每个版本一起发布的真实功能。
       </p>
     </header>
 
@@ -97,7 +97,7 @@
       <div class="container">
         <div class="stats reveal">
           <div class="stat">
-            <div class="num" data-count="20">20</div>
+            <div class="num" data-count="19">19</div>
             <div class="label">项已实现功能</div>
           </div>
           <div class="stat">
@@ -122,38 +122,38 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">工作原理</p>
           <h2><span class="underline-grow">🧩 它怎么做到「对照不卡、译文不乱」</span></h2>
-          <p>好翻不是把整页丢给翻译接口那么简单。下面七点，是它「读着顺、翻得准、还不泄密」的底层支撑——每一项都能在开源仓库里找到对应实现，绝不含糊。</p>
+          <p>好翻不是把整页丢给翻译接口那么简单。一条译文的生产流水线是：<strong>标识符遮罩 → 提示词组装 → 引擎路由 → 请求 / 流式 → 译后自检 → 还原占位符 → 渲染 → 缓存</strong>。下面几点，是它「读着顺、翻得准、还不泄密」的底层支撑，每一项都能在开源仓库里找到对应实现。</p>
         </div>
         <div class="features" data-stagger>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5M3 18l9 5 9-5"/></svg></div>
-            <h3>双层架构</h3>
-            <p>内容脚本负责页面注入与渲染，后台 Service Worker 负责密钥管理与翻译调用，二者通过消息与持久端口通信，贴合 Manifest V3 的生命周期约束。</p>
+            <h3>分层架构</h3>
+            <p>内容脚本负责页面提取与渲染，后台 Service Worker 负责密钥管理与翻译调用，设置界面、协议层、核心翻译、渲染层各司其职——完全贴合 Manifest V3 生命周期。</p>
           </div>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h12M4 6h16M4 18h10"/><path d="M16 9l3 3-3 3"/></svg></div>
             <h3>流式回填</h3>
-            <p>长文本经 SSE 长连接返回，首段边生成边回填到对应节点，逐字浮现；你不必等整段翻译完才开始读。</p>
+            <p>划词、悬停、点段落、输入框等单条翻译走 SSE 长连接逐字回填，首字即显；端口异常自动回退普通请求，不漏译不卡死。</p>
           </div>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></div>
             <h3>注入防护</h3>
-            <p>网页标题、前文等不可信内容，被显式降级为「数据而非指令」，追加到用户消息末尾，而不是塞进系统提示词，降低恶意页面操纵译文的风险。</p>
+            <p>网页标题、前文等不可信内容，被显式降级为「数据而非指令」追加到用户消息末尾，而不是塞进系统提示词——恶意页面无法操纵你的译文。</p>
           </div>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a9 9 0 0 0-9 9c0 5 3 8 9 9 6-1 9-4 9-9a9 9 0 0 0-9-9Z"/><path d="M9 12l2 2 4-4"/></svg></div>
             <h3>译后自检</h3>
-            <p>译文生成后会校验原文中的数字、网址、邮箱、占位符与代码 token 是否完整保留；一旦缺失，自动追加保真指令重试校正，并在界面上标记「已校正」。</p>
+            <p>译文生成后校验原文中的数字、网址、邮箱、占位符与代码 token 是否完整保留；一旦缺失，自动校正重试一次，仍缺失则保留首版并标记提示。</p>
           </div>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
-            <h3>省 Token 策略</h3>
-            <p>句子级缓存、重复文本合并、术语库命中零请求、目标语言跳过、术语注入上限可调——多层叠加，显著降低调用成本与等待。</p>
+            <h3>省 Token 经济性</h3>
+            <p>句子级缓存按句归一化、缺失句合并为一次批量请求、30 天 LRU 整段缓存、术语库命中零请求、智能语言跳过、8 秒动态节流、术语注入上限可调——省成了体系。</p>
           </div>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
             <h3>稳健渲染</h3>
-            <p>用 MutationObserver 主动排除自身注入节点以防递归；译文统一用 <code style="font-size:13px;">textContent</code> 注入防 XSS；后台断连时回退首段，避免页面空白。</p>
+            <p>译文以 Shadow DOM 隔离宿主样式，统一用 <code style="font-size:13px;">textContent</code> 注入从根上排除 XSS；MutationObserver 排除自身节点防递归，断连自动回退不空白。</p>
           </div>
           <div class="card tilt reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-1 3h3l-1 3M14 9l-1 3h3l-1 3M4 6l1 12M16 6l1 12M10 5l4-2M12 8v-2"/></svg></div>
@@ -173,11 +173,11 @@
           <p>这一类解决一个最朴素的问题：怎么让你「读得下去、又看得回原文」。读起来顺不顺、翻完还能不能对上原文，都取决于这几项。</p>
         </div>
         <div class="features" data-stagger>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div><h3>沉浸式双语对照</h3><p>译文以一段段对照的方式嵌在原文下方：读译文不费力，回看原文不费劲。普通排版、Flex、Grid 布局都做了适配，不会重叠错位。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h7l-1 7 9-11h-7l1-7Z"/></svg></div><h3>流式输出</h3><p>长文经 SSE 长连接流式返回，首段边生成边显示，首字延迟低至毫秒级（基线实测约 90ms）。不用盯着空白等整段翻译完。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>上下文感知翻译</h3><p>好翻会把页面标题和紧邻的前一段译文一起传给模型，长文里「他 / 她 / 它」「这个 / 那个」指代更连贯，术语也更统一。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4-1.4-6-1v13c2 .6 4 .6 6-1 2 1.6 4 1.6 6 1V5c-2 .4-4 .4-6-1Z"/><path d="M12 6v13"/></svg></div><h3>沉浸式双语对照</h3><p>译文以独立节点渲染在原文下方（Shadow DOM 隔离站点样式），随页面滚动自然跟随。普通排版、Flex、Grid、双栏、多列布局都做了适配，不会重叠错位。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h7l-1 7 9-11h-7l1-7Z"/></svg></div><h3>流式输出</h3><p>划词、悬停、点段落、输入框等单条翻译走长连接流式回填，首字即显（基线实测约 90ms）；端口异常自动回退普通请求，不漏译。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>上下文感知翻译</h3><p>好翻结合页面标题与前段译文构造滑动窗口，长文里「他 / 她 / 它」「这个 / 那个」指代更连贯，跨段术语也更统一。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div><h3>可见区域优先</h3><p>不一次性翻译整页：先翻你正在看的屏幕内容，向下滚动时再翻新进入视口的部分。首屏更快出结果，长文也不卡。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>动态内容翻译</h3><p>网页里的弹窗、下拉菜单、无限滚动加载的新内容，好翻都会自动重新扫描并补译，单页应用（SPA）也不在话下。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>动态内容翻译</h3><p>弹窗、菜单、无限滚动等异步加载的内容自动补译；8 秒冷却合并抖动，仅数字变化就地更新——行情、时钟类元素不会反复消耗 Token。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/><path d="M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20"/></svg></div><h3>智能语言检测</h3><p>按段落逐段检测语种：已经是目标语言的段落直接本地跳过，消耗 0 Token——绝不会出现「中译中」，翻译更省也更安静。</p></div>
         </div>
       </div>
@@ -195,6 +195,7 @@
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>翻译质量自检</h3><p>译文生成后会自动检查：数字、网址、邮箱、占位符、代码符号有没有被漏掉或改坏。发现缺失就追加保真指令重译一次，并在界面上标记「已校正」。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 16l4-8 3 5 3-7 4 10"/></svg></div><h3>译文可编辑 · 术语自学习</h3><p>鼠标悬停任意译文就能直接改；好翻还会自动把里面的术语抽出来，沉淀进你的个人术语表。术语越用越贴合你的用语习惯。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v11H7l-3 3V4Z"/></svg></div><h3>划词翻译</h3><p>在网页上选中任意词或句子，旁边立刻出现翻译浮层；原网页一字不动，查词、查句都顺手。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l3-3 3 3 3-3 3 3"/><path d="M3 17l3-3 3 3 3-3 3 3"/></svg></div><h3>悬停翻译</h3><p>鼠标悬停段落约 500ms 即显示译文气泡，可固定或取消；命中会话缓存零请求。快速瞄一眼外文段落，不必整页开译。</p></div>
         </div>
       </div>
     </section>
@@ -209,7 +210,7 @@
         </div>
         <div class="features" data-stagger>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h3>多引擎路由</h3><p>主引擎限流、报错（如 401 / 403 / 额度）时，自动切到备用引擎一次；单段超过约 1800 字，自动改用你设定的「长文强模型」。设置里都能配。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>节省 Token</h3><p>多层省钱：句子级缓存命中 0 消耗、重复文本合并、术语库命中零请求、目标语言直接跳过、术语注入上限可调（0–60，默认 24）。省钱又提速。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 4l3 3-3 3M20 20l-3-3 3-3"/></svg></div><h3>节省 Token</h3><p>省成了体系：句子级缓存按句归一化、缺失句合并为一次批量请求、30 天整段缓存、术语库命中零请求、目标语言本地跳过、8 秒动态节流、术语注入上限可调（0–24，默认 12）。省钱又提速。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 14l4-4 3 3 4-5 4 4"/></svg></div><h3>图片翻译</h3><p>右键网页图片、或上传本地图片，好翻会用支持视觉的模型做 OCR 识别并翻译，结果以覆盖层或独立结果页呈现（需视觉模型）。</p></div>
         </div>
       </div>
@@ -224,12 +225,12 @@
           <p>好的翻译器应该「待在角落、随叫随到」。这些能力让你几乎感觉不到它的存在，却又处处用得上——装上就是顺手。</p>
         </div>
         <div class="features" data-stagger>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9h3v6M14 9h2v6"/></svg></div><h3>按网站暂停</h3><p>在某个网站不需要翻译时，一键暂停并清理译文；想恢复时也不用刷新页面，状态即时切换。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V6a3 3 0 0 1 6 0v5"/><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M12 14v3"/></svg></div><h3>按网站暂停 / 自动翻译</h3><p>某个网站不需要翻译时，一键暂停并清理译文；也可以记住「总是自动翻译本站」偏好，下次打开页面直接开译。状态即时切换，无需刷新。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14M5 9l-1-3h16l-1 3M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 13h6"/></svg></div><h3>可拖动工具栏</h3><p>网页右下角的「译 + 设置」悬浮按钮组可以拖到屏幕任意位置，位置会自动记住，下次打开还在。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></div><h3>页面内快速设置</h3><p>不用离开网页，点一下齿轮就弹出设置浮层：改语言、换引擎、暂停当前网站，改动即时落盘生效。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg></div><h3>翻译进度显示</h3><p>翻译进行时有状态条实时显示「已译 N / 共 M 段」，并带旋转加载指示，长文翻译不再「不知道进行到哪了」。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg></div><h3>键盘快捷键</h3><p>按下 <code style="font-size:13px;">Alt+T</code> 直接翻译当前网页；快捷键也能在浏览器设置页里自定义成你顺手的键位。</p></div>
-          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9h3v6M14 9h2v6"/></svg></div><h3>手动翻译模式</h3><p>不想整页自动翻？切到「手动点击 / 划词」模式：点哪段译哪段、划哪句译哪句，Token 开销最小，适合只读关键内容的场景。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="16" rx="6"/><path d="M12 7v6M9.5 10h5"/></svg></div><h3>手动翻译模式</h3><p>不想整页自动翻？切到「手动点击 / 划词」模式：点哪段译哪段、划哪句译哪句，Token 开销最小，适合只读关键内容的场景。</p></div>
         </div>
       </div>
     </section>
@@ -240,10 +241,11 @@
         <div class="section-head reveal reveal--blur">
           <p class="section-eyebrow reveal">自由配置</p>
           <h2><span class="underline-grow">🎛️ 自由配置</span></h2>
-          <p>好翻的默认参数已经够用，但它不替你做主——服务商、模型、提示词、术语表，几乎所有环节都能按你的习惯调。</p>
+          <p>好翻的默认参数已经够用，但它不替你做主——服务商、模型、提示词、术语表、译文样式，几乎所有环节都能按你的习惯调。</p>
         </div>
         <div class="features" data-stagger>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-8 8H6v-6l8-8Z"/><path d="M9 9h2M12 6v2"/></svg></div><h3>自定义能力</h3><p>服务商、模型、Base URL、系统提示词、术语表、翻译风格……几乎所有环节都能配置，改完即存即用，不用重启。</p></div>
+          <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M7 4l-1 3M12 4l-1 3M17 4l-1 3"/></svg></div><h3>译文显示样式</h3><p>译文长相你来定：默认 / 蓝色虚线 / 下划线 / 高亮块四种样式，设置页一键切换即生效，长文阅读更跟手。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></div><h3>任意 OpenAI 兼容接口</h3><p>除了内置的 12 家服务，你也可以填任意兼容 OpenAI 协议的端点与 Base URL——接上自己的网关、代理或私有部署都行。</p></div>
           <div class="card tilt reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10"/><path d="M2 17h20M7 21h10"/></svg></div><h3>本地模型（Ollama）</h3><p>把翻译留在你自己的机器上：接入 Ollama 等本地模型，敏感内容完全不出本机——对数据最在意的场景，这是最稳的选择。</p></div>
         </div>
