@@ -451,8 +451,9 @@ test('multi-column layout: translations stay in their own columns', async ({ pag
   await page.locator('#ot-toolbar').click();
   await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
 
-  // 三列 6 段：每段译文紧跟原文（多列内 appendChild），总数 = h1 + 6 + 4卡 + 4行 = 15
-  await expect(page.locator('.ot-translation')).toHaveCount(15);
+  // 三列 6 段：每段译文紧跟原文（多列内 appendChild），
+  // 总数 = h1 + 6列段 + 4卡 + 4行 + 2(apple-tile h2/p) + 1(flex行容器外) = 18
+  await expect(page.locator('.ot-translation')).toHaveCount(18);
   // 每列段落内都有译文（而不是堆到列末尾）
   const col = page.locator('.cols3 p');
   for (let i = 0; i < 6; i++) {
@@ -502,7 +503,8 @@ test('full settings panel opens as an in-page panel with the settings form', asy
   // 内联渲染完整设置表单（不再使用 iframe——网页无法嵌入扩展页面会被浏览器拦截）
   await expect(full.locator('.ot-form')).toHaveCount(1);
   await expect(full.locator('h2', { hasText: '翻译引擎' })).toBeVisible();
-  await expect(full.locator('h2', { hasText: '语言与偏好' })).toBeVisible();
+  await expect(full.locator('h2', { hasText: '语言' })).toBeVisible();
+  await expect(full.locator('h2', { hasText: '译文显示' })).toBeVisible();
   await expect(full.locator('h2', { hasText: '功能开关' })).toBeVisible();
   // 样式已内嵌打包：表单字段带圆角卡片背景（iOS 分组样式生效）
   const bg = await full
@@ -571,9 +573,24 @@ test('settings panel follows dark color scheme with readable text', async ({ pag
   await page.locator('#ot-settings-btn').click();
   const panel = page.locator('#ot-settings-panel');
   await expect(panel).toBeVisible();
-  const bg = await panel.evaluate((el) => getComputedStyle(el).backgroundColor);
-  // 深色系统：面板为不透明深色底（可读，不透明）
-  expect(bg).toMatch(/rgb\(2[0-9],\s*2[0-9],\s*3[0-9]\)|rgb\(28,\s*28,\s*30\)/);
+  const style = await panel.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { bg: cs.backgroundColor, color: cs.color, backdrop: cs.backdropFilter };
+  });
+  // 深色系统：面板为深色玻璃底（Liquid Glass 为半透明 + 背景模糊）。
+  // 关键不是「不透明」，而是底色足够深 + 文字足够亮（可读）。
+  const rgba = style.bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  expect(rgba).not.toBeNull();
+  const [r, g, b] = [Number(rgba![1]), Number(rgba![2]), Number(rgba![3])];
+  expect(r).toBeLessThan(60);
+  expect(g).toBeLessThan(60);
+  expect(b).toBeLessThan(70);
+  // 文字为浅色，保证在深底上可读
+  const fg = style.color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  expect(fg).not.toBeNull();
+  expect(Number(fg![1])).toBeGreaterThan(180);
+  // 玻璃生效：带背景模糊
+  expect(style.backdrop).toContain('blur');
   await expect(panel.getByRole('combobox', { name: '目标语言' })).toBeVisible();
 });
 
@@ -823,4 +840,779 @@ test('stability: rapid translate/cancel/pause/resume cycles never hang', async (
   await toolbar.click();
   await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
   await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+});
+
+test('toggle translations: hide/show without re-translating (0 extra requests)', async ({ page }) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+
+  // 先翻译出译文（明确点主按钮：胶囊工具栏变宽后，容器中心已不是主按钮）
+  const mainBtn = page.locator('#ot-translate-btn');
+  await mainBtn.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+  const translations = page.locator('.ot-translation');
+  await expect(translations.first()).toBeVisible({ timeout: 60000 });
+  const count = await translations.count();
+  expect(count).toBeGreaterThan(0);
+  const firstText = (await translations.first().textContent())?.trim();
+
+  // 记录请求数：切换显隐不应产生任何新的翻译请求
+  const requestsBefore = await page.evaluate(
+    () => (window as any).__haofanRequestCount ?? 0,
+  );
+
+  // 点眼睛按钮隐藏
+  const hideBtn = page.locator('#ot-hide-btn');
+  await expect(hideBtn).toBeVisible();
+  await hideBtn.click();
+  await expect(page.locator('html')).toHaveClass(/ot-hide-translations/);
+  // 译文节点仍在 DOM（未被删除），只是不可见
+  expect(await translations.count()).toBe(count);
+  await expect(translations.first()).toBeHidden();
+
+  // 再点恢复：译文内容必须与隐藏前一致（证明没有重新翻译）
+  await hideBtn.click();
+  await expect(translations.first()).toBeVisible();
+  expect((await translations.first().textContent())?.trim()).toBe(firstText);
+  await expect(page.locator('html')).not.toHaveClass(/ot-hide-translations/);
+
+  // 隐藏期间没有新增请求（省 Token 的核心保证）
+  const requestsAfter = await page.evaluate(
+    () => (window as any).__haofanRequestCount ?? 0,
+  );
+  expect(requestsAfter).toBe(requestsBefore);
+});
+
+test('quick settings shows keyboard shortcuts so users can discover them', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+  // 快捷键常驻提示：Alt+T 翻译本页、Alt+S 显示/隐藏译文
+  const hint = panel.locator('.kbd-hint');
+  await expect(hint).toBeVisible();
+  const text = (await hint.textContent()) ?? '';
+  expect(text).toContain('Alt');
+  expect(text).toContain('T');
+  expect(text).toContain('S');
+  expect(text).toContain('翻译本页');
+  expect(text).toContain('隐藏译文');
+  // 提示在面板底部且在「打开完整设置」之后
+  const box = await hint.boundingBox();
+  const btn = await panel.getByRole('button', { name: '打开完整设置' }).boundingBox();
+  expect(box).not.toBeNull();
+  expect(btn).not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(btn!.y);
+});
+
+test('translation layout: source above, translation below, clearly separated', async ({ page }) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  await page.locator('#ot-translate-btn').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false', {
+    timeout: 60000,
+  });
+  const first = page.locator('.ot-translation').first();
+  await expect(first).toBeVisible({ timeout: 60000 });
+
+  // ① 位置关系：译文在原文下方（宿主元素在 DOM 中位于原文之后且垂直位置更低）
+  const geo = await first.evaluate((el) => {
+    const host = el as HTMLElement;
+    const prev = host.previousElementSibling ?? host.parentElement;
+    const r = host.getBoundingClientRect();
+    const p = prev?.getBoundingClientRect();
+    const cs = getComputedStyle(host);
+    return {
+      top: r.top,
+      prevBottom: p ? p.bottom : null,
+      marginTop: cs.marginTop,
+      marginBottom: cs.marginBottom,
+    };
+  });
+  if (geo.prevBottom !== null) {
+    expect(geo.top).toBeGreaterThanOrEqual(geo.prevBottom - 1);
+  }
+  // ② 垂直呼吸：与原文/下一段有明确间距（此前仅 2px/5px 会并拢）
+  expect(Number.parseFloat(geo.marginBottom)).toBeGreaterThanOrEqual(8);
+
+  // ③ 译文锚点：左侧竖线，让"哪行是译文"一眼可辨
+  const line = await first
+    .locator('.text')
+    .evaluate((el) => getComputedStyle(el).borderLeftWidth);
+  expect(Number.parseFloat(line)).toBeGreaterThanOrEqual(2);
+});
+
+// ===== 0.2.2 第一阶段缺口补全：对照模式 / 排版自定义 / 网站规则 =====
+
+test('dual mode: translation-only hides source, hover reveals it, zero re-translation', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  await page.locator('#ot-translate-btn').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false', {
+    timeout: 60000,
+  });
+  const firstTranslation = page.locator('.ot-translation').first();
+  await expect(firstTranslation).toBeVisible({ timeout: 60000 });
+
+  const callsBefore = Number(
+    await page.locator('html').getAttribute('data-translation-calls'),
+  );
+
+  // 切换为「只显示译文」：config 更新 → watch 就地应用（不重译）
+  await page.evaluate(async () => {
+    const { config } = await (window as any).chrome.storage.local.get('config');
+    await (window as any).chrome.storage.local.set({
+      config: { ...config, dualMode: 'translation-only' },
+    });
+  });
+  await page.waitForTimeout(400);
+
+  // 原文被隐藏（透明度 0），译文仍在
+  const sourceHidden = await firstTranslation.evaluate((el) => {
+    const anchor = (el as HTMLSpanElement & { otAnchor?: Element }).otAnchor as HTMLElement;
+    return anchor ? getComputedStyle(anchor).opacity : '';
+  });
+  expect(sourceHidden).toBe('0');
+  await expect(firstTranslation).toBeVisible();
+
+  // 悬停译文 → 原文临时恢复（事件委托在锚点上加 hover 类）
+  await firstTranslation.hover();
+  await page.waitForTimeout(150);
+  const sourceRevealed = await firstTranslation.evaluate((el) => {
+    const anchor = (el as HTMLSpanElement & { otAnchor?: Element }).otAnchor as HTMLElement;
+    return anchor ? anchor.classList.contains('ot-dual-source-hover') : false;
+  });
+  expect(sourceRevealed).toBe(true);
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(150);
+
+  // 0 重译：切换对照模式不产生任何新请求
+  const callsAfter = Number(
+    await page.locator('html').getAttribute('data-translation-calls'),
+  );
+  expect(callsAfter).toBe(callsBefore);
+});
+
+test('dual mode: hover-original highlights source, zero re-translation', async ({ page }) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  await page.locator('#ot-translate-btn').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false', {
+    timeout: 60000,
+  });
+  const firstTranslation = page.locator('.ot-translation').first();
+  await expect(firstTranslation).toBeVisible({ timeout: 60000 });
+
+  const callsBefore = Number(
+    await page.locator('html').getAttribute('data-translation-calls'),
+  );
+
+  await page.evaluate(async () => {
+    const { config } = await (window as any).chrome.storage.local.get('config');
+    await (window as any).chrome.storage.local.set({
+      config: { ...config, dualMode: 'hover-original' },
+    });
+  });
+  await page.waitForTimeout(400);
+
+  // 原文默认正常显示（没有被隐藏）
+  const sourceVisible = await firstTranslation.evaluate((el) => {
+    const anchor = (el as HTMLSpanElement & { otAnchor?: Element }).otAnchor as HTMLElement;
+    return anchor ? getComputedStyle(anchor).opacity : '';
+  });
+  expect(sourceVisible).toBe('1');
+
+  // 悬停译文 → 原文高亮背景类出现
+  await firstTranslation.hover();
+  await page.waitForTimeout(150);
+  const highlighted = await firstTranslation.evaluate((el) => {
+    const anchor = (el as HTMLSpanElement & { otAnchor?: Element }).otAnchor as HTMLElement;
+    return anchor ? anchor.classList.contains('ot-dual-source-hover-active') : false;
+  });
+  expect(highlighted).toBe(true);
+
+  const callsAfter = Number(
+    await page.locator('html').getAttribute('data-translation-calls'),
+  );
+  expect(callsAfter).toBe(callsBefore);
+});
+
+test('translation typography: custom size/line-height/opacity/color apply without re-translation', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  await page.locator('#ot-translate-btn').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false', {
+    timeout: 60000,
+  });
+  const firstTranslation = page.locator('.ot-translation').first();
+  await expect(firstTranslation).toBeVisible({ timeout: 60000 });
+
+  const callsBefore = Number(
+    await page.locator('html').getAttribute('data-translation-calls'),
+  );
+
+  // 设置四项自定义 → watch 就地更新 CSS 变量
+  await page.evaluate(async () => {
+    const { config } = await (window as any).chrome.storage.local.get('config');
+    await (window as any).chrome.storage.local.set({
+      config: {
+        ...config,
+        translationFontSize: 18,
+        translationLineHeight: 2,
+        translationOpacity: 1,
+        translationColor: '#e11d48',
+      },
+    });
+  });
+  await page.waitForTimeout(400);
+
+  const vars = await firstTranslation.evaluate((el) => {
+    const host = el as HTMLElement;
+    const cs = getComputedStyle(host);
+    return {
+      fontSize: cs.getPropertyValue('--ot-font-size').trim(),
+      lineHeight: cs.getPropertyValue('--ot-line-height').trim(),
+      opacity: cs.getPropertyValue('--ot-opacity').trim(),
+      color: cs.getPropertyValue('--ot-color').trim(),
+    };
+  });
+  expect(vars.fontSize).toBe('18px');
+  expect(vars.lineHeight).toBe('2');
+  expect(vars.opacity).toBe('1');
+  expect(vars.color).toBe('#e11d48');
+
+  // 消费变量的实际文本样式也更新（Shadow DOM 内 .text）
+  const textStyle = await firstTranslation.locator('.text').evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { size: cs.fontSize, color: cs.color, lineHeight: cs.lineHeight };
+  });
+  expect(textStyle.size).toBe('18px');
+  expect(textStyle.color).toBe('rgb(225, 29, 72)');
+  expect(Number.parseFloat(textStyle.lineHeight)).toBeGreaterThanOrEqual(2);
+
+  // 0 重译：排版变化不产生新请求
+  const callsAfter = Number(
+    await page.locator('html').getAttribute('data-translation-calls'),
+  );
+  expect(callsAfter).toBe(callsBefore);
+});
+
+test('site rules: always-site whitelist forces auto translation in manual mode', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 预置「手动模式 + 白名单含本站」后刷新：白名单应覆盖全局手动模式强制开译
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({
+      config: { provider: 'deepseek', apiKeys: { deepseek: 'test-key' }, translateMode: 'manual' },
+      alwaysSites: [location.host],
+    });
+  });
+  await page.reload();
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  // 白名单命中 → 强制整页自动翻译
+  await expect
+    .poll(async () => Number(await page.locator('html').getAttribute('data-batch-requests')))
+    .toBeGreaterThan(0);
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+});
+
+test('site rules: never-site exclusion pauses even when whitelisted', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 本站同时命中敏感列表（URL 子串）与白名单：敏感优先 → 完全暂停
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({
+      alwaysSites: [location.host],
+      neverSites: ['selection-regression'],
+    });
+  });
+  await page.reload();
+  // 暂停站：工具栏与整页翻译都不出现
+  await expect(page.locator('#ot-toolbar')).toHaveCount(0);
+  await expect.poll(async () => Number(await page.locator('html').getAttribute('data-batch-requests'))).toBe(0);
+  // 从敏感列表移除后恢复
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({ neverSites: [] });
+  });
+  await expect(page.locator('#ot-toolbar')).toBeVisible({ timeout: 60000 });
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+});
+
+test('fallback to a keyless provider shows a one-time status notice', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // mock 主引擎失败后回退免 Key 通道：响应携带 usedProvider='mymemory'，
+  // 且用户配置主引擎为 deepseek → 整页翻译完成提示里应合并「已用 MyMemory 翻译」。
+  await page.locator('html').evaluate((element) => {
+    element.dataset.mockUsedProvider = 'mymemory';
+  });
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+  // 状态条出现降级文案（合并进整页完成提示）
+  await expect(page.locator('#ot-status')).toContainText('已用 MyMemory 翻译', { timeout: 60000 });
+});
+
+test('single translation fallback shows an immediate status notice', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 单条交互（划词翻译）：不在整页任务中 → 直接弹一次性降级提示
+  await page.locator('html').evaluate((element) => {
+    element.dataset.mockUsedProvider = 'mymemory';
+  });
+  await page.getByRole('button', { name: 'Create selection' }).click();
+  const trigger = page.locator('#ot-selection-ui').getByRole('button', { name: '翻译选中内容' });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  await expect(page.locator('#ot-selection-ui')).toContainText('启用双重身份验证');
+  await expect(page.locator('#ot-status')).toContainText('主引擎不可用，已切换至 MyMemory 翻译', {
+    timeout: 60000,
+  });
+});
+
+test('fresh install defaults to the keyless MyMemory engine', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 清空已存配置 = 全新安装：normalizeConfig 回退 DEFAULT_CONFIG，
+  // 应得到免 Key 的 MyMemory 引擎（无需 Key、不弹引导、直接可用）。
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({ config: {} });
+  });
+  await page.reload();
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false');
+  // 没有 API Key 也能完成翻译（MyMemory 免 Key，guardSetupGate 不拦截）
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+  // 无引导卡（免 Key 不需要配置提示），状态条无降级文案
+  await expect(page.locator('#ot-error-modal')).toHaveCount(0);
+  await expect(page.locator('#ot-status')).not.toContainText('主引擎不可用');
+});
+
+// ===== 第 10 轮「最终版」：UI 反馈与实用功能回归 =====
+test('round10: primary translate button has hover and press feedback', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const btn = page.locator('#ot-translate-btn');
+  await expect(btn).toBeVisible();
+
+  // 默认态：渐变蓝底（非写死单色）
+  const initial = await btn.evaluate((el) => (el as HTMLElement).style.background);
+  expect(initial).toContain('linear-gradient');
+
+  // hover：提亮渐变 + 上浮 + 阴影增强（浏览器将 hex 解析为 rgb 返回）
+  await btn.hover();
+  const hovered = await btn.evaluate((el) => {
+    const s = (el as HTMLElement).style;
+    return { bg: s.background, transform: s.transform, shadow: s.boxShadow };
+  });
+  expect(hovered.bg).toContain('rgb(61, 153, 255)');
+  expect(hovered.transform).toBe('translateY(-1px)');
+  expect(hovered.shadow).toContain('0.45');
+
+  // mouseleave：还原（鼠标移到页面空白处离开按钮）
+  await page.mouse.move(10, 10);
+  const restored = await btn.evaluate((el) => {
+    const s = (el as HTMLElement).style;
+    return { bg: s.background, transform: s.transform };
+  });
+  expect(restored.bg).toContain('rgb(43, 140, 255)');
+  expect(restored.transform).toBe('translateY(0px)'); // 浏览器序列化为 0px
+});
+
+test('round10: loading background follows theme instead of hardcoded color', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const btn = page.locator('#ot-translate-btn');
+  await expect(btn).toBeVisible();
+
+  // mock hold 模式：批次永不返回（模拟慢网络），加载态可持续观测
+  await page.locator('html').evaluate((element) => {
+    element.dataset.batchMode = 'hold';
+  });
+  // 触发整页翻译 → 加载态背景不再写死 #8fb8ef，而是主题 accent 色
+  await page.locator('#ot-toolbar').click();
+  await expect(btn).toHaveAttribute('aria-busy', 'true', { timeout: 5000 });
+  const loadingBg = await btn.evaluate((el) => (el as HTMLElement).style.background);
+  expect(loadingBg).not.toBe('#8fb8ef');
+  // 主题 accent 色（浅色主题下为蓝色调，非旧写死的灰蓝）
+  expect(loadingBg).toContain('rgb(0, 122, 255)');
+  // 取消翻译恢复空闲态（点击工具栏取消）
+  await page.locator('#ot-toolbar').click();
+  await expect(btn).toHaveAttribute('aria-busy', 'false', { timeout: 5000 });
+});
+
+test('round10: status bar text is left-aligned for long multiline notices', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 整页翻译完成后状态条常驻，检查其文本对齐
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-status')).toBeVisible({ timeout: 60000 });
+  const align = await page.locator('#ot-status').evaluate((el) => getComputedStyle(el).textAlign);
+  expect(align).toBe('left');
+});
+
+test('round10: quick settings dropdown marks providers missing an API key', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+  const engine = panel.getByRole('combobox', { name: '翻译引擎' });
+
+  // 免 Key 引擎：标注「免 Key」
+  const mymemory = engine.locator('option[value="mymemory"]');
+  await expect(mymemory).toContainText('（免 Key）');
+
+  // mock 预置了 deepseek 的 Key：标注「已配 Key」，无警示类
+  const deepseek = engine.locator('option[value="deepseek"]');
+  await expect(deepseek).toContainText('（已配 Key）');
+
+  // 未配 Key 的引擎：标注「未配 Key」且 option 带 data-missing-key
+  const openai = engine.locator('option[value="openai"]');
+  await expect(openai).toContainText('（未配 Key）');
+  await expect(openai).toHaveAttribute('data-missing-key', 'true');
+
+  // 当前选中 deepseek（已配）→ 下拉无警示类
+  await expect(engine).not.toHaveClass(/missing-key/);
+
+  // 切到未配 Key 引擎 → 下拉加 missing-key 警示类（橙色边框提示去填 Key）
+  await engine.selectOption('openai');
+  await expect(engine).toHaveClass(/missing-key/);
+});
+
+test('round10: failed batch marks paragraphs retryable with completion hint', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // mock 返回 batchMode='fail'：整批请求失败（可重试的网络错误）
+  await page.locator('html').evaluate((element) => {
+    element.dataset.batchMode = 'fail';
+  });
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+
+  // 失败段落在完成文案中提示可重试
+  await expect(page.locator('#ot-status')).toContainText('失败', { timeout: 60000 });
+  await expect(page.locator('#ot-status')).toContainText('滚动或点击失败段落可重试', {
+    timeout: 60000,
+  });
+});
+
+// ===== round11：设置面板排版重构（单列一行一项 / 对比度 / 微信式滑块）=====
+// 根因备忘：options.css 里的 @media 看的是浏览器窗口宽度，而页内完整设置面板
+// 宽度固定 640px 且与窗口无关。旧的「≥1280px 双栏」「≥900px 三列」规则在宽屏打开
+// 面板时会把面板拆成两列、单格压到 90px，导致文字重叠与卡片错位。
+
+async function openFullSettings(page: import('@playwright/test').Page) {
+  await page.locator('#ot-toolbar').waitFor();
+  await page.locator('#ot-settings-btn').click();
+  await page.locator('#ot-settings-panel').getByRole('button', { name: '打开完整设置' }).click();
+  const full = page.locator('#ot-full-settings');
+  await expect(full).toBeVisible();
+  return full;
+}
+
+test('round11: full settings panel is a single-column list with one item per row', async ({
+  page,
+}) => {
+  // 故意用宽视口：旧版正是这里触发双栏、把 640px 面板挤坏
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  const metrics = await full.evaluate((host) => {
+    const root = (host as HTMLElement).shadowRoot!;
+    const countTracks = (value: string) =>
+      value.split(' ').filter((part) => /px$/.test(part)).length;
+    const form = root.querySelector('.ot-form') as HTMLElement;
+    const grid = root.querySelector('.ot-field-grid') as HTMLElement;
+    const fields = Array.from(root.querySelectorAll('.ot-field')) as HTMLElement[];
+    const body = root.querySelector('.ot-full-settings-body') as HTMLElement;
+    return {
+      formDisplay: getComputedStyle(form).display,
+      gridTracks: countTracks(getComputedStyle(grid).gridTemplateColumns),
+      fieldTracks: countTracks(getComputedStyle(fields[0]).gridTemplateColumns),
+      widths: [...new Set(fields.map((field) => Math.round(field.getBoundingClientRect().width)))],
+      overflowX: body.scrollWidth - body.clientWidth,
+    };
+  });
+
+  expect(metrics.formDisplay).toBe('block'); // 表单本身不再分栏
+  expect(metrics.gridTracks).toBe(1); // 字段容器恒为单列
+  expect(metrics.fieldTracks).toBe(2); // 每行 = 标签列 + 控件列
+  expect(metrics.widths).toHaveLength(1); // 所有字段等宽，左边缘对齐
+  expect(metrics.overflowX).toBe(0); // 不出现横向溢出
+});
+
+test('round11: missing-key guide is readable in dark mode', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  // 「自定义（OpenAI 兼容）」需要 Key 且当前未配置 → 引导条必须出现
+  await full.locator('select[data-f="provider"]').selectOption('custom');
+  const guide = full.locator('[data-f="keyGuide"]');
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('此引擎需要 API Key');
+
+  // 旧 bug：样式引用了未定义的 --color-text → 回退近黑 #1d1d1f，
+  // 深色底上文字与背景同色，整条只剩一个「空绿框」。
+  const luminance = await guide.evaluate((element) => {
+    const toLinear = (value: number) =>
+      value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    const channels = (getComputedStyle(element).color.match(/[\d.]+/g) || [])
+      .slice(0, 3)
+      .map((channel) => toLinear(Number(channel) / 255));
+    const [r = 0, g = 0, b = 0] = channels;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  });
+  expect(luminance).toBeGreaterThan(0.5); // 深色主题下必须是亮色文字
+});
+
+test('round11: switches render as sliding toggles', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  const autoSite = full.locator('#ot-full-auto');
+  await expect(autoSite).toBeAttached();
+
+  const track = await autoSite.evaluate((element) => {
+    const style = getComputedStyle(element, '::after');
+    return { width: style.width, height: style.height, radius: style.borderRadius };
+  });
+  expect(track.width).toBe('46px');
+  expect(track.height).toBe('28px');
+  expect(track.radius).toBe('999px'); // 胶囊轨道（不是圆形勾选框）
+
+  const knobBefore = await autoSite.evaluate(
+    (element) => getComputedStyle(element, '::before').transform,
+  );
+  await autoSite.click();
+  await expect(autoSite).toHaveClass(/is-checked/); // 走向由 storage 同步驱动
+  // 圆点有 0.2s 过渡动画：立即读会拿到起始值，必须轮询等动画结束
+  await expect
+    .poll(async () =>
+      autoSite.evaluate((element) => getComputedStyle(element, '::before').transform),
+    )
+    .not.toBe(knobBefore);
+});
+
+test('round11: field hint never overlaps its control', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  // 旧版「翻译模式」的说明文字直接压在下拉框上
+  const modeField = full.locator('.ot-field', { hasText: '翻译模式' });
+  const hintBox = await modeField.locator('span').boundingBox();
+  const controlBox = await modeField.locator('select').boundingBox();
+  expect(hintBox).not.toBeNull();
+  expect(controlBox).not.toBeNull();
+
+  const hint = hintBox!;
+  const control = controlBox!;
+  const overlaps = !(
+    hint.x + hint.width <= control.x ||
+    control.x + control.width <= hint.x ||
+    hint.y + hint.height <= control.y ||
+    control.y + control.height <= hint.y
+  );
+  expect(overlaps).toBe(false);
+});
+
+test('round11: options page keeps a single column on wide screens', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/tests/browser/options-regression.html');
+  await page.locator('.ot-form').waitFor();
+
+  const metrics = await page.evaluate(() => {
+    const form = document.querySelector('.ot-form') as HTMLElement;
+    const sections = Array.from(document.querySelectorAll('.ot-form-section')) as HTMLElement[];
+    return {
+      display: getComputedStyle(form).display,
+      leftEdges: [...new Set(sections.map((s) => Math.round(s.getBoundingClientRect().x)))],
+      overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+
+  expect(metrics.display).toBe('block');
+  expect(metrics.leftEdges).toHaveLength(1); // 所有分组左边缘一致（旧版是两栏两个 x）
+  expect(metrics.overflowX).toBe(0);
+});
+
+// ===== round12：免 Key 体验通道 + API Key 填写体验 =====
+test('round12: provider dropdown separates keyless trial engines from BYOK engines', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  const select = full.locator('select[data-f="provider"]');
+  const groups = select.locator('optgroup');
+  await expect(groups).toHaveCount(2);
+  await expect(groups.nth(0)).toHaveAttribute(
+    'label',
+    /免 Key 体验（零配置，装完就能用）/,
+  );
+  await expect(groups.nth(1)).toHaveAttribute('label', /接自己的 API（更准更快）/);
+
+  // 免 Key 组：MyMemory / Apertium / Ollama 本地；已下线的 Google 不在列表里
+  await expect(groups.nth(0)).toContainText('MyMemory');
+  await expect(groups.nth(0)).toContainText('Apertium');
+  await expect(groups.nth(0)).toContainText('Ollama');
+  await expect(select.locator('option[value="google"]')).toHaveCount(0);
+
+  // 需 Key 组：标注当前是否已配 Key（下拉里就能看出该去填哪一家）
+  await expect(groups.nth(1)).toContainText('DeepSeek');
+  await expect(groups.nth(1)).toContainText('OpenAI');
+  await expect(select.locator('option[value="deepseek"]')).toContainText('（已配 Key）');
+  await expect(select.locator('option[value="openai"]')).toContainText('（未配 Key）');
+});
+
+test('round12: API key input can be revealed and clears the guide once filled', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  // 切到需要 Key 的引擎 → 引导条出现
+  const select = full.locator('select[data-f="provider"]');
+  await select.selectOption('openai');
+  const guide = full.locator('[data-f="keyGuide"]');
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('免 Key 体验');
+
+  // 掩码输入可以切成明文核对（点完按钮文案变成「隐藏」）
+  const keyInput = full.locator('input[data-f="apiKey"]');
+  const toggle = full.locator('[data-f="keyToggle"]');
+  await expect(keyInput).toHaveAttribute('type', 'password');
+  await toggle.click();
+  await expect(keyInput).toHaveAttribute('type', 'text');
+  await expect(toggle).toHaveText('隐藏');
+
+  // 填入 Key 后引导条立即消失、下拉标注变成「已配 Key」
+  await keyInput.fill('sk-round12-test-key');
+  await expect(guide).toBeHidden();
+  await expect(select.locator('option[value="openai"]')).toContainText('（已配 Key）');
+});
+
+// ===== round13：布局安全（Apple 官网按钮被撑成正圆的回归） =====
+test('round13: standalone link buttons are never translated inside', async ({ page }) => {
+  await page.goto('/tests/browser/layout-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+
+  const cta = page.locator('.tile-ctas');
+  // 容器与按钮内部都不应出现任何译文节点
+  await expect(cta.locator('.ot-translation')).toHaveCount(0);
+
+  // 按钮保持原子形状：文本不变、没有被译文撑高（撑坏后会接近正圆）
+  const learn = cta.locator('a.button', { hasText: 'Learn more' });
+  await expect(learn).toHaveText('Learn more');
+  const box = await learn.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeLessThan(60);
+
+  // 跳过按钮不能误伤同一区块的正文：h2 与 p 各有一条译文（afterend 插在原文后面），
+  // 且译文中不能混入按钮文字（Learn more / Buy 不进翻译管线）
+  const tile = page.locator('.apple-tile');
+  await expect(tile.locator(':scope > .ot-translation')).toHaveCount(2);
+  const texts = await tile
+    .locator(':scope > .ot-translation')
+    .evaluateAll((nodes) =>
+      nodes.map((n) => (n as HTMLElement).dataset.translation || ''),
+    );
+  expect(texts.some((t) => t.includes('Product headline'))).toBe(true);
+  expect(texts.some((t) => t.includes('Learn more'))).toBe(false);
+  expect(texts.some((t) => t.includes('Buy'))).toBe(false);
+});
+
+test('round13: horizontal flex containers get their translation outside', async ({ page }) => {
+  await page.goto('/tests/browser/layout-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+
+  // 行向 flex 容器：译文必须插在容器外面（兄弟位置），不能成为新的 flex item
+  const row = page.locator('.flex-text-row');
+  await expect(row.locator('.ot-translation')).toHaveCount(0);
+  const outside = row.locator('xpath=following-sibling::*[1]');
+  await expect(outside).toHaveClass(/ot-translation/);
+
+  // 容器自身的子项数量不变（没有被塞进任何东西）
+  const childCount = await row.evaluate((element) => element.children.length);
+  expect(childCount).toBe(2);
+});
+
+// ===== round14：覆盖面与大面板信息完整度 =====
+test('round14: page-level nav is left untouched (no half-translated navbar)', async ({ page }) => {
+  await page.goto('/tests/browser/layout-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  await toolbar.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+
+  // 页面级导航整条不翻：Apple globalnav 实测半中半英（Store 被翻成商店，
+  // MacBook Air 没翻）的根因就是 li 是语义块、逐项收集
+  const nav = page.locator('nav.site-nav');
+  await expect(nav.locator('.ot-translation')).toHaveCount(0);
+  // 原文原样保留
+  await expect(nav.locator('li').first()).toHaveText('Store');
+  await expect(nav.locator('li').nth(1)).toHaveText('MacBook Air');
+});
+
+test('round14: every feature switch explains what it does', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  // 功能开关区（.ot-switches）里的每个开关都必须带一句说明——
+  // 光秃秃的「流式输出」「上下文感知」用户根本看不懂
+  const switches = full.locator('.ot-form-section', { hasText: '功能开关' }).locator('.ot-check');
+  const count = await switches.count();
+  expect(count).toBeGreaterThanOrEqual(9);
+  for (let i = 0; i < count; i++) {
+    await expect(switches.nth(i).locator('small')).not.toHaveText('');
+  }
+});
+
+test('round11: settings panel offers sticky section navigation', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+
+  const nav = full.locator('.ot-settings-nav');
+  await expect(nav).toBeVisible();
+  const items = nav.locator('.ot-settings-nav-item');
+  // 分组标题直接取自表单，共七个（含仅页内面板才有的「本站设置」）
+  await expect(items).toHaveCount(7);
+  await expect(items.first()).toHaveText('翻译引擎');
+  await expect(items.last()).toHaveText('高级设置');
+
+  // 吸顶：内容滚动后导航仍贴在滚动区顶部
+  const body = full.locator('.ot-full-settings-body');
+  await body.evaluate((element) => {
+    (element as HTMLElement).scrollTop = 1200;
+  });
+  const [navTop, bodyTop] = await Promise.all([
+    nav.evaluate((element) => element.getBoundingClientRect().top),
+    body.evaluate((element) => element.getBoundingClientRect().top),
+  ]);
+  expect(Math.abs(navTop - bodyTop)).toBeLessThan(8);
+
+  // 点最后一个分组 → 滚到面板末尾（高级设置）
+  await items.last().click();
+  await expect
+    .poll(async () =>
+      body.evaluate((element) => (element as HTMLElement).scrollTop),
+    )
+    .toBeGreaterThan(1200);
 });

@@ -36,6 +36,10 @@ const SEMANTIC_TAGS = new Set([
 ]);
 
 const FALLBACK_TAGS = new Set(['DIV', 'SECTION', 'ARTICLE', 'ASIDE', 'MAIN']);
+// 纯语义块选择器（不含 DIV 等兜底容器）：用于区分「正文里的链接」与「独立 CTA 链接」
+const SEMANTIC_BLOCK_SELECTOR = Array.from(SEMANTIC_TAGS)
+  .map((tag) => tag.toLowerCase())
+  .join(',');
 const INTERACTIVE_ROLES = new Set([
   'menuitem',
   'menuitemradio',
@@ -108,7 +112,19 @@ function isDirectPageChrome(element: Element): boolean {
   if (element.closest(PAGE_CHROME_SELECTOR)) return true;
   const header = element.closest('header');
   // 页面级页眉属于站点操作区；文章或正文内部的 header 仍应翻译。
-  return Boolean(header && !header.closest('main, article'));
+  if (header && !header.closest('main, article')) return true;
+  // 页面顶层的主导航同理：<nav id="globalnav"> 这类站点导航整条翻译会出现
+  // 半中半英的导航栏（Apple 官网实测），且搜索框、购物袋按钮都会被误翻。
+  // 只跳「页面顶层」的 nav——放在内容容器（main/article/aside/section/footer）里的
+  // nav 属于页面内容的一部分（如 GitHub 仓库侧栏导航、文章目录），仍应翻译。
+  const nav = element.closest('nav');
+  if (
+    nav &&
+    !nav.closest('main, article, aside, section, footer, [role="main"], [role="complementary"]')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function isPageChrome(element: Element): boolean {
@@ -182,8 +198,38 @@ function isCandidate(element: Element): boolean {
 
 function isExcludedControlText(parent: Element): boolean {
   const control = parent.closest('button, [role="button"]');
-  if (!control) return false;
-  return !control.matches(INTERACTIVE_SELECTOR);
+  if (control && !control.matches(INTERACTIVE_SELECTOR)) return true;
+  // 独立作为 CTA 的链接（不在任何语义段落里）视为按钮：Apple 官网的
+  // <a class="button"> 全是这种结构，译文一旦进按钮会把它撑成正圆。
+  // 正文段落（p/li/h*/td…）里的链接属于文本内容，照常翻译。
+  const anchor = parent.closest('a');
+  if (anchor && !anchor.closest(SEMANTIC_BLOCK_SELECTOR)) return true;
+  return false;
+}
+
+// 按钮/链接是「原子」视觉元素：多数站点的按钮其实是 <a>（Apple 官网 35 个
+// <a class="button">），它们的胶囊圆角在内容被撑高后会渲染成正圆。
+export function isInteractiveControl(el: Element): boolean {
+  return el.tagName === 'A' || el.tagName === 'BUTTON' || el.getAttribute('role') === 'button';
+}
+
+// 容器的可见文本全部来自交互控件（按钮/链接）→ 这是 UI 控件而非正文。
+// 翻译它会把译文塞进 flex/grid 布局：Apple 官网的 .tile-ctas（两个
+// <a class="button">）被追加译文后按钮被挤成圆形，整页视觉崩坏（v0.2.5 实测）。
+// 语义块（p/li/h*…）里的链接是正文的一部分，不受此规则影响，照常翻译。
+function isControlOnlyContainer(element: Element): boolean {
+  if (SEMANTIC_TAGS.has(element.tagName)) return false;
+  const children = Array.from(element.children);
+  if (children.length === 0) return false;
+  const controls = children.filter(isInteractiveControl);
+  if (controls.length !== children.length) return false;
+  const controlText = controls
+    .map((c) => textOfBlock(c))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!controlText) return false;
+  return controlText === textOfBlock(element);
 }
 
 export function isVisible(el: Element): boolean {
@@ -222,6 +268,7 @@ export function closestTextBlock(element: Element, includeProcessed = false): El
     if (
       isCandidate(current) &&
       !rejectsSubtree(current) &&
+      !isControlOnlyContainer(current) &&
       (includeProcessed || !isProcessed(current))
     )
       return current;
@@ -262,6 +309,7 @@ export function collectTextBlocks(
   const candidates: Element[] = [];
   const consider = (element: Element) => {
     if (isRejected(element) || !isCandidate(element) || !isVisible(element)) return;
+    if (isControlOnlyContainer(element)) return;
     const units = splitPlainBlockUnits(element);
     if (units) {
       for (const unit of units) {

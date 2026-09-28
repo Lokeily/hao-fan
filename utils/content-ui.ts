@@ -11,6 +11,11 @@ export interface TranslationNodeOptions {
   sourceText?: string;
   onEdit?: (newTranslation: string) => void;
   style?: string;
+  // 0.2.2 译文排版自定义（基础四项）：0 / 空 = 跟随原文默认值
+  fontSize?: number;
+  lineHeight?: number;
+  opacity?: number;
+  color?: string;
 }
 
 export function createTranslationNode(
@@ -30,6 +35,28 @@ export function createTranslationNode(
   host.style.setProperty('--ot-source-font', sourceStyle.fontFamily);
   host.style.setProperty('--ot-source-size', `${translationSize}px`);
   host.style.setProperty('--ot-source-align', sourceStyle.textAlign || 'start');
+  // 0.2.2 译文排版自定义：宿主级变量随 createTranslationNode 注入，
+  // 供 Shadow DOM 内 .text 消费；留空/0 时回退到跟随原文的默认值。
+  if (options?.fontSize && options.fontSize > 0) {
+    host.style.setProperty('--ot-font-size', `${options.fontSize}px`);
+  } else {
+    host.style.removeProperty('--ot-font-size');
+  }
+  if (options?.lineHeight && options.lineHeight > 0) {
+    host.style.setProperty('--ot-line-height', String(options.lineHeight));
+  } else {
+    host.style.removeProperty('--ot-line-height');
+  }
+  if (options?.opacity && options.opacity > 0) {
+    host.style.setProperty('--ot-opacity', String(options.opacity));
+  } else {
+    host.style.removeProperty('--ot-opacity');
+  }
+  if (options?.color) {
+    host.style.setProperty('--ot-color', options.color);
+  } else {
+    host.style.removeProperty('--ot-color');
+  }
   host.style.setProperty('all', 'initial', 'important');
   host.style.setProperty('display', 'block', 'important');
   host.style.setProperty('position', 'relative', 'important');
@@ -41,26 +68,35 @@ export function createTranslationNode(
   host.style.setProperty('max-height', 'none', 'important');
   host.style.setProperty('overflow', 'visible', 'important');
   host.style.setProperty('clear', 'both', 'important');
-  host.style.setProperty('margin', '2px 0 5px', 'important');
+  // 垂直呼吸：上与原文留一点间隙、下与「下一段原文」明确分隔。
+  // 此前 2px/5px 在密集段落里几乎贴在一起，用户反馈"并拢不容易看"。
+  host.style.setProperty('margin', '3px 0 9px', 'important');
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
-    :host { color-scheme: light dark; }
+    /* 译文锚点竖线：默认 plain 样式此前只有 opacity 变淡、没有任何标识，
+       长段落里分不清哪行是原文哪行是译文。加一条左侧细竖线作「这是译文」的锚点。 */
+    :host { color-scheme: light dark; --ot-line: rgba(0, 122, 255, 0.42); }
+    @media (prefers-color-scheme: dark) {
+      :host { --ot-line: rgba(10, 132, 255, 0.55); }
+    }
     .text {
       display: block;
       box-sizing: border-box;
       width: 100%;
-      padding: 0;
+      padding: 0 0 0 9px;
       border: 0;
+      border-left: 2px solid var(--ot-line);
       background: transparent;
-      color: var(--ot-source-color, currentColor);
+      /* 0.2.2 排版自定义变量：未设置时回退跟随原文 */
+      color: var(--ot-color, var(--ot-source-color, currentColor));
       font-family: var(--ot-source-font, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif);
-      font-size: var(--ot-source-size, 14px);
+      font-size: var(--ot-font-size, var(--ot-source-size, 14px));
       font-weight: 400;
-      line-height: 1.5;
+      line-height: var(--ot-line-height, 1.5);
       letter-spacing: 0;
       text-align: var(--ot-source-align, start);
-      opacity: 0.82;
+      opacity: var(--ot-opacity, 0.82);
       text-decoration: none;
       text-indent: 0;
       direction: auto;
@@ -78,7 +114,7 @@ export function createTranslationNode(
     :host([data-style="highlight"]) .text {
       background: rgba(0, 122, 255, 0.1);
       border-radius: 4px;
-      padding: 1px 4px;
+      padding: 1px 4px 1px 9px;
     }
     @keyframes ot-pulse {
       0%, 100% { opacity: 0.35; }
@@ -126,7 +162,8 @@ export function createTranslationNode(
       background: #34c759;
     }
     @media (prefers-color-scheme: dark) {
-      .text { opacity: 0.9; }
+      /* 深色默认 0.9 更亮；用户自定义透明度（--ot-opacity）优先 */
+      .text { opacity: var(--ot-opacity, 0.9); }
     }
   `;
   const text = document.createElement('span');
@@ -228,6 +265,8 @@ export function createNoticeHost(
   host.style.setProperty('inset', '0', 'important');
   host.style.setProperty('z-index', '2147483647', 'important');
   host.style.setProperty('display', 'block', 'important');
+  // 注入主题变量：对话框样式表消费 --ot-*，与气泡/设置面板同一套玻璃语言。
+  applyThemeVars(host, themeColors());
 
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
@@ -249,47 +288,39 @@ export function createNoticeHost(
       box-sizing: border-box;
       width: min(420px, 100%);
       padding: 22px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 14px;
-      background: #fff;
-      color: #202124;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+      border-radius: var(--ot-radius-lg, 18px);
+      background: var(--ot-surface, rgba(255, 255, 255, .72));
+      color: var(--ot-text, #1d1d1f);
+      border: 0.5px solid var(--ot-border, rgba(255, 255, 255, .65));
+      box-shadow: var(--ot-highlight), var(--ot-shadow, 0 24px 64px rgba(0, 0, 0, .28));
+      backdrop-filter: var(--ot-backdrop, blur(30px) saturate(180%));
+      -webkit-backdrop-filter: var(--ot-backdrop, blur(30px) saturate(180%));
       animation: haofan-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
     @keyframes haofan-pop {
       from { transform: scale(0.96); opacity: 0; }
       to { transform: scale(1); opacity: 1; }
     }
-    h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 650; letter-spacing: 0; }
-    p { margin: 10px 0 20px; color: #5f6368; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+    h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 650; letter-spacing: 0; color: var(--ot-text, #1d1d1f); }
+    p { margin: 10px 0 20px; color: var(--ot-text-2, #6e6e73); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
     .actions { display: flex; justify-content: flex-end; gap: 8px; }
     button {
       box-sizing: border-box;
       min-height: 36px;
       padding: 0 16px;
       border: 0;
-      border-radius: 6px;
-      background: #007aff;
+      border-radius: var(--ot-radius-sm, 9px);
+      background: var(--ot-accent, #007aff);
       color: #fff;
       font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       letter-spacing: 0;
       cursor: pointer;
       transition: background 0.15s ease;
     }
-    button:hover { background: #0069d9; }
-    button:focus-visible { outline: 3px solid rgba(0, 122, 255, 0.35); outline-offset: 2px; }
-    button.secondary { background: rgba(120, 120, 128, 0.16); color: #1d1d1f; }
-    button.secondary:hover { background: rgba(120, 120, 128, 0.26); }
-    @media (prefers-color-scheme: dark) {
-      .dialog {
-        border-color: rgba(84, 84, 88, 0.4);
-        background: rgba(28, 28, 30, 0.92);
-        color: #f5f5f7;
-      }
-      p { color: #aeaeb2; }
-      button.secondary { background: rgba(120, 120, 128, 0.32); color: #f5f5f7; }
-      button.secondary:hover { background: rgba(120, 120, 128, 0.44); }
-    }
+    button:hover { opacity: .9; }
+    button:focus-visible { outline: 3px solid var(--ot-accent-soft, rgba(0, 122, 255, .35)); outline-offset: 2px; }
+    button.secondary { background: var(--ot-surface-2, rgba(120, 120, 128, .16)); color: var(--ot-text, #1d1d1f); }
+    button.secondary:hover { background: var(--ot-accent-soft, rgba(120, 120, 128, .26)); }
   `;
   const backdrop = document.createElement('div');
   backdrop.className = 'backdrop';
@@ -360,6 +391,9 @@ export function createNoticeHost(
 }
 
 // ===== 划词翻译浮层样式 =====
+// 全部颜色走宿主注入的 --ot-* 变量（applyThemeVars），深浅色由 JS 主题统一决定，
+// 不再在样式表里写死第二套色板——此前这里混用了 GitHub Dark（#161b22/#58a6ff）
+// 与 Material 蓝（#1a73e8），与气泡/设置面板的苹果色板割裂。
 export function createSelectionUiStyle(): HTMLStyleElement {
   const style = document.createElement('style');
   style.textContent = `
@@ -368,42 +402,53 @@ export function createSelectionUiStyle(): HTMLStyleElement {
     button { font: inherit; letter-spacing: 0; }
     .trigger {
       width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
-      display: grid; place-items: center; background: #007aff; color: #fff;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer;
+      display: grid; place-items: center;
+      background: var(--ot-accent, #007aff); color: #fff;
+      box-shadow: var(--ot-shadow, 0 4px 14px rgba(0, 0, 0, .25));
+      backdrop-filter: var(--ot-backdrop, blur(20px) saturate(180%));
+      -webkit-backdrop-filter: var(--ot-backdrop, blur(20px) saturate(180%));
+      border: 1px solid rgba(255, 255, 255, .28);
+      cursor: pointer;
       font: 650 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
-      transition: background 0.15s ease, transform 0.1s ease;
+      transition: transform 0.14s ease, box-shadow 0.16s ease, opacity 0.16s ease;
     }
-    .trigger:hover { background: #0069d9; }
+    .trigger:hover { transform: translateY(-1px); opacity: .92; }
     .trigger:active { transform: scale(0.94); }
     .trigger:focus-visible, .action:focus-visible, .close:focus-visible {
-      outline: 3px solid rgba(0, 122, 255, .35); outline-offset: 2px;
+      outline: 3px solid var(--ot-accent-soft, rgba(0, 122, 255, .35)); outline-offset: 2px;
     }
     .panel {
       width: min(360px, calc(100vw - 16px)); max-height: min(360px, calc(100vh - 16px));
-      overflow: auto; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 14px;
-      background: #fff; color: #202124; box-shadow: 0 18px 48px rgba(0, 0, 0, .28);
+      overflow: auto;
+      border-radius: var(--ot-radius-lg, 18px);
+      background: var(--ot-surface, rgba(255, 255, 255, .72));
+      color: var(--ot-text, #1d1d1f);
+      border: 0.5px solid var(--ot-border, rgba(255, 255, 255, .65));
+      box-shadow: var(--ot-highlight), var(--ot-shadow);
+      backdrop-filter: var(--ot-backdrop, blur(30px) saturate(180%));
+      -webkit-backdrop-filter: var(--ot-backdrop, blur(30px) saturate(180%));
       font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       animation: haofan-pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
-    .head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 12px; border-bottom: 1px solid #e8eaed; }
-    .title { flex: 1; font-size: 13px; font-weight: 650; }
-    .close { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #5f6368; cursor: pointer; font-size: 20px; line-height: 1; }
-    .close:hover { background: rgba(60, 64, 67, .08); color: #202124; }
-    .source { padding: 10px 12px 0; color: #6b7280; font-size: 12px; overflow-wrap: anywhere; }
-    .result { min-height: 54px; padding: 8px 12px 12px; color: #202124; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .loading { color: #6b7280; }
-    .actions { display: flex; justify-content: flex-end; padding: 0 10px 10px; }
-    .action { min-height: 32px; padding: 0 10px; border: 1px solid #dadce0; border-radius: 6px; background: transparent; color: #1a73e8; cursor: pointer; font-weight: 600; }
-    .action:hover { background: rgba(26, 115, 232, .07); }
-    .skip-hint { margin: -4px 12px 8px; color: #9da7b3; font-size: 11px; line-height: 1.5; }
-    @media (prefers-color-scheme: dark) {
-      .panel { border-color: #30363d; background: #161b22; color: #f0f6fc; }
-      .head { border-color: #30363d; }
-      .close, .source, .loading { color: #9da7b3; }
-      .close:hover { background: rgba(255, 255, 255, .08); color: #f0f6fc; }
-      .result { color: #f0f6fc; }
-      .action { border-color: #3d444d; color: #58a6ff; }
+    .head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 14px; border-bottom: 1px solid var(--ot-hairline, rgba(0, 0, 0, .07)); }
+    .title { flex: 1; font-size: 13px; font-weight: 650; color: var(--ot-text); }
+    .close { width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--ot-radius-sm, 9px); background: transparent; color: var(--ot-text-2); cursor: pointer; font-size: 18px; line-height: 1; transition: background .15s ease, color .15s ease; }
+    .close:hover { background: var(--ot-accent-soft); color: var(--ot-text); }
+    .source { padding: 10px 14px 0; color: var(--ot-text-2); font-size: 12px; overflow-wrap: anywhere; }
+    .result { min-height: 54px; padding: 8px 14px 12px; color: var(--ot-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .loading { color: var(--ot-muted); }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 12px 12px; }
+    .action {
+      min-height: 32px; padding: 0 12px;
+      border: 0.5px solid var(--ot-border, rgba(255, 255, 255, .5));
+      border-radius: var(--ot-radius-sm, 9px);
+      background: var(--ot-surface-2, rgba(255, 255, 255, .5));
+      color: var(--ot-accent, #007aff); cursor: pointer; font-weight: 600;
+      transition: background .15s ease, transform .1s ease;
     }
+    .action:hover { background: var(--ot-accent-soft); }
+    .action:active { transform: scale(0.97); }
+    .skip-hint { margin: -4px 14px 8px; color: var(--ot-muted); font-size: 11px; line-height: 1.5; }
   `;
   return style;
 }
@@ -412,15 +457,39 @@ export function createSelectionUiStyle(): HTMLStyleElement {
 // ===== 译文朗读（TTS）按钮复用 utils/speech.ts 的 createSpeakButton =====
 import { createSpeakButton } from './speech.ts';
 
-// ===== 全局深浅色主题（不透明配色，保证任何网页上都可读） =====
+// ===== 全局深浅色主题：Apple Liquid Glass 视觉体系 =====
+// 设计语言：中透明度玻璃底 + 背景高斯模糊 + 饱和度提升（让下层色彩透出但被柔化），
+// 配顶部 1px 高光描边、极细发丝边框、多层弥散阴影，营造「浮在页面之上的一层玻璃」。
+// 可读性保障：玻璃底透明度取 0.72（而非更激进的 0.5），配合 30px 模糊，
+// 即使压在复杂/高对比页面上文字对比度依然达标；正文文字始终用纯色高对比。
+//
 // 注意：浮层宿主元素带 all:initial !important 防站点样式，shadow 内的 :host
 // 规则会被内联样式覆盖——因此背景/文字色必须由 JS 直接内联设置。
 export interface ThemeColors {
+  /** 玻璃底色（半透明，需配合 backdrop-filter） */
   surface: string;
+  /** 玻璃叠层色：内部卡片/表头等次级容器，比 surface 略实一层 */
+  surface2: string;
   text: string;
   text2: string;
+  /** 玻璃亮边（模拟玻璃切割面的高光描边） */
   border: string;
+  /** 发丝分隔线 */
+  hairline: string;
   muted: string;
+  /** 顶部高光 + 内描边（inset shadow，玻璃的「厚度」感来源） */
+  highlight: string;
+  /** 多层弥散阴影：接触影 + 中程影 + 远景影 */
+  shadow: string;
+  /** 背景滤镜：模糊 + 提饱和 */
+  backdrop: string;
+  /** 统一圆角：大（面板）/ 中（卡片、按钮）/ 小（控件） */
+  radiusLg: string;
+  radiusMd: string;
+  radiusSm: string;
+  /** 强调色（苹果系统蓝）与其次级填充 */
+  accent: string;
+  accentSoft: string;
 }
 
 export type ThemeMode = 'auto' | 'light' | 'dark';
@@ -442,19 +511,85 @@ export function themeColors(): ThemeColors {
         : (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
   return dark
     ? {
-        surface: '#1c1c1e',
+        surface: 'rgba(30, 30, 32, 0.72)',
+        surface2: 'rgba(58, 58, 64, 0.55)',
         text: '#f5f5f7',
         text2: '#aeaeb2',
-        border: 'rgba(84,84,88,0.6)',
+        border: 'rgba(255, 255, 255, 0.12)',
+        hairline: 'rgba(255, 255, 255, 0.08)',
         muted: '#8e8e93',
+        highlight:
+          'inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07)',
+        shadow:
+          '0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 30px rgba(0, 0, 0, 0.34), 0 28px 64px rgba(0, 0, 0, 0.42)',
+        backdrop: 'blur(30px) saturate(180%)',
+        radiusLg: '18px',
+        radiusMd: '13px',
+        radiusSm: '9px',
+        accent: '#0a84ff',
+        accentSoft: 'rgba(10, 132, 255, 0.22)',
       }
     : {
-        surface: '#ffffff',
+        surface: 'rgba(255, 255, 255, 0.72)',
+        surface2: 'rgba(255, 255, 255, 0.5)',
         text: '#1d1d1f',
         text2: '#6e6e73',
-        border: 'rgba(60,60,67,0.18)',
+        border: 'rgba(255, 255, 255, 0.65)',
+        hairline: 'rgba(0, 0, 0, 0.07)',
         muted: '#8e8e93',
+        highlight:
+          'inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 0.5px rgba(255, 255, 255, 0.55)',
+        shadow:
+          '0 1px 2px rgba(0, 0, 0, 0.05), 0 10px 26px rgba(0, 0, 0, 0.1), 0 28px 64px rgba(0, 0, 0, 0.13)',
+        backdrop: 'blur(30px) saturate(180%)',
+        radiusLg: '18px',
+        radiusMd: '13px',
+        radiusSm: '9px',
+        accent: '#007aff',
+        accentSoft: 'rgba(0, 122, 255, 0.14)',
       };
+}
+
+/**
+ * 把主题里的 CSS 变量注入到宿主元素，供 Shadow DOM 内的样式表直接消费。
+ * 浮层宿主带 all:initial !important，变量名不受影响（自定义属性不参与 all 重置）。
+ */
+export function applyThemeVars(host: HTMLElement, theme: ThemeColors): void {
+  const set = (name: string, value: string) => host.style.setProperty(name, value, 'important');
+  set('--ot-surface', theme.surface);
+  set('--ot-surface-2', theme.surface2);
+  set('--ot-text', theme.text);
+  set('--ot-text-2', theme.text2);
+  set('--ot-border', theme.border);
+  set('--ot-hairline', theme.hairline);
+  set('--ot-muted', theme.muted);
+  set('--ot-highlight', theme.highlight);
+  set('--ot-shadow', theme.shadow);
+  set('--ot-backdrop', theme.backdrop);
+  set('--ot-radius-lg', theme.radiusLg);
+  set('--ot-radius-md', theme.radiusMd);
+  set('--ot-radius-sm', theme.radiusSm);
+  set('--ot-accent', theme.accent);
+  set('--ot-accent-soft', theme.accentSoft);
+}
+
+/**
+ * 给浮层宿主套上统一的「玻璃外壳」：半透明底 + 模糊 + 高光描边 + 弥散阴影。
+ * 所有内容脚本浮层（气泡 / 划词面板 / 设置面板 / 通知）都走这里，视觉因此统一。
+ */
+export function applyGlassShell(host: HTMLElement, theme: ThemeColors, radius?: string): void {
+  const set = (prop: string, value: string) => host.style.setProperty(prop, value, 'important');
+  set('background', theme.surface);
+  set('color', theme.text);
+  set('border-radius', radius ?? theme.radiusLg);
+  set('box-shadow', `${theme.highlight}, ${theme.shadow}`);
+  set('backdrop-filter', theme.backdrop);
+  set('-webkit-backdrop-filter', theme.backdrop);
+  // 1px 亮边：玻璃的切割面高光，用 border 而非 outline（outline 不参与圆角裁切）。
+  set('border', `1px solid ${theme.border}`);
+  // 高 DPI 屏上细边框会被放大，统一按设备像素比收紧，保持发丝级观感。
+  host.style.setProperty('border-width', '0.5px', 'important');
+  applyThemeVars(host, theme);
 }
 
 // ===== 通用拖拽：把 host 通过 handle 拖到任意位置（fixed 定位） =====
@@ -534,11 +669,16 @@ export interface SettingsPanelOptions {
   targetLang: string;
   translateMode: 'auto' | 'manual';
   provider: string;
+  /** 第 10 轮：引擎下拉「未配 Key」标注——传入该引擎是否已配置 Key（免 Key 引擎恒 true） */
+  hasProviderKey: (providerId: string) => boolean;
   sitePaused: boolean;
   siteHost: string;
   autoTranslate: boolean;
   hoverTranslate: boolean;
   inputTranslate: boolean;
+  // 0.2.2 网站规则：始终翻译 / 敏感页面（快速面板内开关）
+  siteAlways: boolean;
+  siteNever: boolean;
   onAutoToggle: (enabled: boolean) => void;
   onHoverToggle: (enabled: boolean) => void;
   onInputToggle: (enabled: boolean) => void;
@@ -546,6 +686,8 @@ export interface SettingsPanelOptions {
   onTranslateMode: (value: 'auto' | 'manual') => void;
   onProvider: (value: string) => void;
   onSiteToggle: (paused: boolean) => void;
+  onAlwaysToggle: (enabled: boolean) => void;
+  onNeverToggle: (enabled: boolean) => void;
   onOpenFullSettings: () => void;
   onClose: () => void;
   onDrag?: (x: number, y: number) => void;
@@ -557,7 +699,15 @@ export interface SettingsPanel {
     patch: Partial<
       Pick<
         SettingsPanelOptions,
-        'targetLang' | 'provider' | 'translateMode' | 'sitePaused' | 'autoTranslate' | 'hoverTranslate' | 'inputTranslate'
+        | 'targetLang'
+        | 'provider'
+        | 'translateMode'
+        | 'sitePaused'
+        | 'autoTranslate'
+        | 'hoverTranslate'
+        | 'inputTranslate'
+        | 'siteAlways'
+        | 'siteNever'
       >
     >,
   ) => void;
@@ -571,18 +721,17 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   host.style.setProperty('position', 'fixed', 'important');
   host.style.setProperty('z-index', '2147483647', 'important');
   host.style.setProperty('width', '320px', 'important');
-  host.style.setProperty('border-radius', '16px', 'important');
   const theme = themeColors();
-  host.style.setProperty('background', theme.surface, 'important');
-  host.style.setProperty('color', theme.text, 'important');
-  host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
-  host.style.setProperty('box-shadow', '0 16px 48px rgba(0,0,0,0.3)', 'important');
+  applyGlassShell(host, theme);
   host.style.setProperty(
     'font-family',
     '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
     'important',
   );
   host.style.setProperty('overflow', 'hidden', 'important');
+  // 面板高度受限：超出视口高度的内容在 .body 内滚动，保证面板不遮住工具栏/主按钮
+  //（第 8 轮新增网站规则开关后面板变高，此前会把工具栏的齿轮盖住收不到点击）。
+  host.style.setProperty('max-height', 'min(520px, calc(100vh - 96px))', 'important');
 
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
@@ -602,7 +751,7 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
       background: transparent; color: ${theme.text2}; font-size: 16px; line-height: 1; cursor: pointer;
     }
     .close:hover { background: rgba(128,128,128,0.16); color: ${theme.text}; }
-    .body { padding: 10px 12px 12px; }
+    .body { padding: 10px 12px 12px; overflow-y: auto; max-height: calc(min(520px, 100vh - 96px) - 53px); }
 
     /* iOS inset grouped：分区卡片 */
     .group {
@@ -642,6 +791,9 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
       background-repeat: no-repeat;
     }
     .row select:focus { outline: 2px solid rgba(0,122,255,0.4); outline-offset: 1px; }
+    /* 第 10 轮：选中的是「未配 Key」引擎时，给边框警示，提醒去完整设置填 Key */
+    .row select.missing-key { border-color: rgba(255, 149, 0, 0.7); }
+    .row select.missing-key:focus { outline-color: rgba(255, 149, 0, 0.5); }
 
     /* iOS 开关：input 覆盖整个开关区域，点击任意位置都能切换 */
     .switch {
@@ -673,6 +825,27 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     .switch input:checked + .track .knob { transform: translateX(18px); }
     .switch input:focus-visible + .track { outline: 3px solid rgba(0,122,255,0.35); outline-offset: 1px; }
 
+    .kbd-hint {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 14px 12px;
+      border-top: 1px solid var(--ot-hairline);
+      margin-top: 2px;
+    }
+    .kbd-row { display: flex; align-items: center; gap: 4px; color: var(--ot-text-2); font-size: 11px; }
+    .kbd-desc { margin-left: 4px; }
+    kbd {
+      display: inline-block;
+      min-width: 18px;
+      padding: 1px 5px;
+      border: 0.5px solid var(--ot-border);
+      border-radius: 5px;
+      background: var(--ot-surface-2);
+      color: var(--ot-text);
+      font: 600 10px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      text-align: center;
+    }
     .full {
       display: block; width: 100%; min-height: 36px; margin-top: 2px;
       border: 0; border-radius: 10px;
@@ -740,12 +913,27 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   opts.providers.forEach((p) => {
     const o = document.createElement('option');
     o.value = p.id;
-    o.textContent = p.needsKey ? p.name : `${p.name}（免 Key）`;
+    // 第 10 轮：需要 Key 但当前未配置的引擎加「未配 Key」标注，避免选中后
+    // 翻译静默失败。免 Key 引擎显示「免 Key」；已配 Key 的显示「已配 Key」。
+    if (p.needsKey && !opts.hasProviderKey(p.id)) {
+      o.textContent = `${p.name}（未配 Key）`;
+      o.dataset.missingKey = 'true';
+    } else if (p.needsKey) {
+      o.textContent = `${p.name}（已配 Key）`;
+    } else {
+      o.textContent = `${p.name}（免 Key）`;
+    }
     provSel.appendChild(o);
   });
   provSel.value = opts.provider;
+  // 选中「未配 Key」引擎时加警示类：橙色边框提示去填 Key。
+  const syncMissingKeyClass = () => {
+    const selected = provSel.options[provSel.selectedIndex] as HTMLOptionElement | null;
+    provSel.classList.toggle('missing-key', !!selected?.dataset.missingKey);
+  };
   const provTitle = () => {
     provSel.title = provSel.options[provSel.selectedIndex]?.textContent || provSel.value;
+    syncMissingKeyClass();
   };
   provTitle();
   provSel.addEventListener('change', () => {
@@ -810,6 +998,10 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   siteGroup.append(
     sTitle,
     makeSwitchRow('自动翻译此站', opts.autoTranslate, opts.onAutoToggle, '自动翻译此站'),
+    // 0.2.2 白名单：始终翻译（手动模式下也自动译）——更明确的「这个站我全都要译」
+    makeSwitchRow('始终翻译此站', opts.siteAlways, opts.onAlwaysToggle, '始终翻译此站'),
+    // 0.2.2 敏感：绝不翻译此站（排除列表，覆盖其它规则）
+    makeSwitchRow('绝不翻译此站', opts.siteNever, opts.onNeverToggle, '绝不翻译此站'),
     makeSwitchRow(`暂停本站翻译（${opts.siteHost}）`, opts.sitePaused, opts.onSiteToggle, '暂停本站翻译'),
   );
 
@@ -830,7 +1022,15 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   fullBtn.textContent = '打开完整设置';
   fullBtn.addEventListener('click', opts.onOpenFullSettings);
 
-  body.append(translateGroup, siteGroup, featureGroup, fullBtn);
+  // 快捷键提示：功能已经存在（Alt+T 翻译本页 / Alt+S 显示隐藏译文），
+  // 但入口只藏在浏览器扩展快捷键设置里，用户根本不知道。放在面板底部常驻提示。
+  const kbdHint = document.createElement('div');
+  kbdHint.className = 'kbd-hint';
+  kbdHint.innerHTML =
+    '<span class="kbd-row"><kbd>Alt</kbd>+<kbd>T</kbd><span class="kbd-desc">翻译本页</span></span>' +
+    '<span class="kbd-row"><kbd>Alt</kbd>+<kbd>S</kbd><span class="kbd-desc">显示 / 隐藏译文</span></span>';
+
+  body.append(translateGroup, siteGroup, featureGroup, fullBtn, kbdHint);
   shadow.append(style, head, body);
   document.documentElement.appendChild(host);
 
@@ -856,6 +1056,8 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     };
     syncSwitch(patch.sitePaused, '暂停本站翻译');
     syncSwitch(patch.autoTranslate, '自动翻译此站');
+    syncSwitch(patch.siteAlways, '始终翻译此站');
+    syncSwitch(patch.siteNever, '绝不翻译此站');
     syncSwitch(patch.hoverTranslate, '悬停翻译');
     syncSwitch(patch.inputTranslate, '输入框翻译');
   };
@@ -881,12 +1083,9 @@ export function createHoverBubble(
   host.style.setProperty('z-index', '2147483646', 'important');
   host.style.setProperty('width', '280px', 'important');
   host.style.setProperty('max-width', 'min(320px, calc(100vw - 24px))', 'important');
-  host.style.setProperty('border-radius', '12px', 'important');
   const theme = themeColors();
-  host.style.setProperty('background', theme.surface, 'important');
-  host.style.setProperty('color', theme.text, 'important');
-  host.style.setProperty('border', `1px solid ${theme.border}`, 'important');
-  host.style.setProperty('box-shadow', '0 12px 36px rgba(0,0,0,0.28)', 'important');
+  // 统一玻璃外壳：与设置面板/通知共用同一套质感（此前各浮层各自写死颜色与阴影）。
+  applyGlassShell(host, theme, '14px');
   host.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif', 'important');
   host.style.setProperty('overflow', 'hidden', 'important');
   host.style.setProperty('pointer-events', 'auto', 'important');
@@ -896,6 +1095,11 @@ export function createHoverBubble(
   style.textContent = `
     :host { color-scheme: light dark; }
     * { box-sizing: border-box; }
+    :host { animation: ot-pop 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2); transform-origin: top left; }
+    @keyframes ot-pop {
+      from { opacity: 0; transform: scale(0.94) translateY(-3px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
     .src {
       padding: 8px 12px 4px;
       color: ${theme.muted};
@@ -1058,7 +1262,11 @@ export function createInputTranslateButton(
   btn.style.setProperty('height', '30px', 'important');
   btn.style.setProperty('border-radius', '50%', 'important');
   btn.style.setProperty('border', 'none', 'important');
-  btn.style.setProperty('background', 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)', 'important');
+  // 玻璃球材质：与工具栏/划词触发按钮一致（半透明蓝 + 模糊 + 高光边）。
+  btn.style.setProperty('background', 'rgba(0, 122, 255, 0.72)', 'important');
+  btn.style.setProperty('backdrop-filter', 'blur(30px) saturate(180%)', 'important');
+  btn.style.setProperty('-webkit-backdrop-filter', 'blur(30px) saturate(180%)', 'important');
+  btn.style.setProperty('border', '0.5px solid rgba(255, 255, 255, 0.55)', 'important');
   btn.style.setProperty('color', '#fff', 'important');
   btn.style.setProperty('font-size', '14px', 'important');
   btn.style.setProperty('font-weight', '600', 'important');
@@ -1067,7 +1275,7 @@ export function createInputTranslateButton(
   btn.style.setProperty('justify-content', 'center', 'important');
   btn.style.setProperty('cursor', 'pointer', 'important');
   // setProperty 只认连字符形式的 CSS 属性名；驼峰写法会被静默忽略（阴影从未生效）。
-  btn.style.setProperty('box-shadow', '0 3px 10px rgba(0,122,255,0.35)', 'important');
+  btn.style.setProperty('box-shadow', 'inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 2px 8px rgba(0, 122, 255, 0.3), 0 8px 22px rgba(0, 0, 0, 0.16)', 'important');
   btn.style.setProperty('font-family', '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif', 'important');
   btn.addEventListener('click', (e) => {
     e.preventDefault();

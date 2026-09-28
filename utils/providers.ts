@@ -154,17 +154,33 @@ export const PROVIDERS: Provider[] = [
     vision: true,
   },
 
-  // ===== 全球顶尖传统翻译引擎 =====
+  // ===== 免 Key 体验通道（新用户零配置即可翻译）=====
+  // 实测（2026-09-29）：MyMemory 是目前唯一稳定支持中英、且正规的免 Key 公共 API；
+  // Google 的 client=gtx 非官方端点在国内网络不可达（连接超时），微软 Edge 的
+  // /translate/auth 免 Key 端点已下线（404）——两者均已下线，不再出现在引擎列表里。
+  // 免 Key 通道只做「先让你用起来」的体验入口；要更准更快请接自己的 Key（BYOK）。
   {
-    id: 'google',
-    name: 'Google 翻译',
+    id: 'mymemory',
+    name: 'MyMemory',
     type: 'mt',
-    baseUrl: 'https://translate.googleapis.com',
+    baseUrl: 'https://api.mymemory.translated.net',
     models: [],
     defaultModel: '',
-    docUrl: 'https://translate.google.com',
+    docUrl: 'https://mymemory.translated.net/doc/spec.php',
     needsKey: false,
   },
+  {
+    id: 'apertium',
+    name: 'Apertium（欧洲语对）',
+    type: 'mt',
+    baseUrl: 'https://apertium.org',
+    models: [],
+    defaultModel: '',
+    docUrl: 'https://wiki.apertium.org/wiki/Apertium-apy',
+    needsKey: false,
+  },
+
+  // ===== 全球顶尖传统翻译引擎 =====
   {
     id: 'deepl',
     name: 'DeepL',

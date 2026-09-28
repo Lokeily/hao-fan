@@ -29,6 +29,9 @@
     disabledSites: disabledFromQuery ? [location.host] : [],
     // 测试环境默认不自动翻译（生产默认全开）；auto-translate 用例自行设置
     autoSites: [],
+    // 0.2.2 网站规则：白名单（始终翻译）/ 敏感页面（从不翻译），用例自行预置
+    alwaysSites: [],
+    neverSites: [],
     // v0.2.0 手动默认迁移已完成：防止迁移覆写下方 config 预置的 translateMode
     v2ManualDefaultApplied: true,
     // 测试环境代表「已配置好 API Key 的普通用户」：后台 mock 始终能返回译文，
@@ -293,6 +296,9 @@
             translation:
               text === 'Enable two-factor authentication' ? '启用双重身份验证' : `译文：${text}`,
             stats: {},
+            // 降级提示专项：mock 主引擎（deepseek）失败、后台回退免 Key 通道时，
+            // 响应携带 usedProvider='mymemory'，前端据此显示「已切换」提示。
+            usedProvider: root.dataset.mockUsedProvider || undefined,
           };
         }
         if (message?.type === 'TRANSLATE_BATCH') {
@@ -303,12 +309,23 @@
           const delays = JSON.parse(root.dataset.batchDelays || '[]');
           const delay = Number(delays[requestIndex]) || 0;
           if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+          // 第 10 轮：holdBatch 模式永不返回，验证加载态持续（busy 保持 true）
+          if (root.dataset.batchMode === 'hold') {
+            await new Promise(() => {});
+            return;
+          }
           root.dataset.batchCompletions = String(Number(root.dataset.batchCompletions || '0') + 1);
+          // 第 10 轮：batchMode='fail' 模拟整批网络失败（可重试错误），
+          // 验证失败段落的 data-retryable 标记与完成文案提示。
+          if (root.dataset.batchMode === 'fail') {
+            return { ok: false, error: '请求超时（mock 模拟批次失败）', stats: {} };
+          }
           return {
             ok: true,
             translations:
               root.dataset.batchMode === 'mismatch' ? [] : texts.map((text) => `译文：${text}`),
             stats: {},
+            usedProvider: root.dataset.mockUsedProvider || undefined,
           };
         }
         return { ok: true };

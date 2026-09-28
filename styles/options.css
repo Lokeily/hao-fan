@@ -1,22 +1,36 @@
 :root {
-  /* ===== Apple 设计令牌（iOS/macOS Human Interface）===== */
-  --bg: #f2f2f7;
-  --surface: #ffffff;
-  --surface-2: #f2f2f7;
+  /* ===== Apple Liquid Glass 设计令牌（iOS/macOS 玻璃材质体系）=====
+   surface/surface-2 为半透明玻璃底，配合 --glass-blur 的背景模糊与提饱和，
+   让下层渐变的色彩「透过来但被柔化」；顶部 1px 高光内描边模拟玻璃厚度。
+   可读性：卡片底透明度 0.68、输入控件 0.55 叠在模糊层上，对比度仍达标。 */
+  --bg: linear-gradient(160deg, #eef2f8 0%, #f5f2f8 38%, #eef4f7 68%, #f2f2f7 100%);
+  --bg-fallback: #f2f2f7;
+  --surface: rgba(255, 255, 255, 0.68);
+  --surface-2: rgba(255, 255, 255, 0.5);
+  --glass-blur: blur(30px) saturate(180%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5);
+  /* 文字对比度按 WCAG AA 校准：正文 14.6:1、次要 5.1:1、三级 4.6:1
+     （旧值 --text-3 #8e8e93 在浅底仅 2.9:1、深底 3.3:1，说明文字看不清） */
   --text: #1d1d1f;
-  --text-2: #6e6e73;
-  --text-3: #8e8e93;
-  --separator: rgba(60, 60, 67, 0.16);
-  --separator-strong: rgba(60, 60, 67, 0.3);
+  --text-2: #5c5c63;
+  --text-3: #76767e;
+  --separator: rgba(0, 0, 0, 0.07);
+  --separator-strong: rgba(0, 0, 0, 0.12);
+  /* 开关关态轨道色 */
+  --switch-off: rgba(120, 120, 128, 0.32);
+  /* 卡片描边：让玻璃卡片在深色底上也有清晰边界 */
+  --card-border: rgba(0, 0, 0, 0.06);
   --accent: #007aff;
   --accent-hover: #0069d9;
-  --accent-soft: rgba(0, 122, 255, 0.12);
+  --accent-soft: rgba(0, 122, 255, 0.14);
   --green: #34c759;
   --red: #ff3b30;
   --orange: #ff9500;
-  --radius-card: 14px;
-  --radius-control: 10px;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --radius-card: 18px;
+  --radius-control: 11px;
+  --shadow-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 10px 26px rgba(0, 0, 0, 0.07), 0 28px 64px rgba(0, 0, 0, 0.09);
   --font:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', 'PingFang SC',
     'Helvetica Neue', 'Microsoft YaHei', sans-serif;
@@ -24,18 +38,25 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
+    --bg: linear-gradient(160deg, #10131a 0%, #16121c 38%, #0f151d 68%, #000000 100%);
+    --bg-fallback: #000000;
+    --surface: rgba(30, 30, 32, 0.68);
+    --surface-2: rgba(58, 58, 64, 0.5);
+    --glass-blur: blur(30px) saturate(180%);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07);
     --text: #f5f5f7;
-    --text-2: #aeaeb2;
-    --text-3: #8e8e93;
-    --separator: rgba(84, 84, 88, 0.4);
-    --separator-strong: rgba(84, 84, 88, 0.65);
+    --text-2: #c9c9ce;
+    --text-3: #9d9da4;
+    --separator: rgba(255, 255, 255, 0.08);
+    --separator-strong: rgba(255, 255, 255, 0.16);
+    --switch-off: rgba(120, 120, 128, 0.42);
+    --card-border: rgba(255, 255, 255, 0.09);
     --accent: #0a84ff;
     --accent-hover: #409cff;
     --accent-soft: rgba(10, 132, 255, 0.22);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --shadow-card:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.3),
+      0 10px 30px rgba(0, 0, 0, 0.32), 0 28px 64px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -57,6 +78,7 @@ textarea {
 
 body {
   background: var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
@@ -81,7 +103,7 @@ summary:focus-visible,
 
 /* ===== 设置页 ===== */
 .ot-page {
-  width: min(100%, 980px);
+  width: min(100%, 800px);
   margin: 0 auto;
   padding: 28px 24px 64px;
 }
@@ -114,8 +136,8 @@ h1 {
 .ot-hint {
   margin: 18px 4px 0;
   color: var(--text-2);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
 /* ===== 表单：iOS 分组卡片 ===== */
@@ -132,60 +154,132 @@ h1 {
 .ot-form-section {
   margin: 14px 0;
   padding: 0;
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-card);
   overflow: hidden;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-card);
 }
 
 .ot-form-section h2 {
   margin: 0;
-  padding: 17px 16px 4px;
+  padding: 16px 16px 2px;
   color: var(--text-2);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.4;
   letter-spacing: 0;
-  text-transform: uppercase;
 }
 
 .ot-form-section > h2:first-child {
   padding-top: 13px;
 }
 
+/* ===== 字段列表：一行一项（标签居左 / 控件居右）=====
+   固定单列，不随窗口宽度改列数：页内完整设置面板只有 640px 宽，
+   而媒体查询看的是浏览器窗口宽度——旧的「宽屏三列 / 双栏」规则
+   会把面板强行拆成两列、单格压到 90px，文字全部重叠。 */
 .ot-field-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  padding: 4px 16px 14px;
-}
-
-@media (min-width: 900px) {
-  .ot-field-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+  padding: 2px 16px 10px;
 }
 
 .ot-field {
-  display: flex;
+  display: grid;
+  /* 控件列宽度设上限：宽屏（如设置页）下不让下拉框拉成一整条 */
+  grid-template-columns: minmax(0, 1fr) minmax(112px, min(264px, 44%));
+  align-items: center;
   min-width: 0;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 6px;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
+  column-gap: 12px;
+  row-gap: 4px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--separator);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
   line-height: 1.4;
 }
 
+.ot-field:last-child {
+  border-bottom: 0;
+}
+
+/* 控件右置、与标签同行垂直居中；说明文字独占下一行左侧。
+   匿名文本节点（标签本身）自动落到第 1 行第 1 列。 */
+.ot-field > select,
+.ot-field > input {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
 .ot-field > span {
-  color: var(--text-3);
-  font-size: 12px;
+  grid-column: 1;
+  grid-row: 2;
+  color: var(--text-2);
+  font-size: 12.5px;
   font-weight: 400;
+  line-height: 1.45;
+}
+
+/* 通栏字段（API Key / 端点 / 多行文本）：标签在上、控件占满整行 */
+.ot-field-block {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ot-field-block > select,
+.ot-field-block > input,
+.ot-field-block > textarea,
+.ot-field-block > span {
+  grid-column: 1;
+  grid-row: auto;
 }
 
 .ot-field-wide {
-  grid-column: 1 / -1;
+  grid-column: auto;
+}
+
+/* ===== API Key 行：输入框 + 明文/掩码切换 ===== */
+.ot-key-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ot-key-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ot-key-toggle {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.ot-key-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* 选中「未配 Key」的引擎时给下拉加警示边框，提醒去填 Key */
+.ot-form select.missing-key {
+  border-color: rgba(255, 149, 0, 0.7);
 }
 
 .ot-form input,
@@ -227,23 +321,36 @@ h1 {
   outline: none;
 }
 
-.ot-form input:read-only {
-  background: var(--surface-2);
+.ot-form input::placeholder,
+.ot-form textarea::placeholder {
   color: var(--text-3);
+  opacity: 1;
 }
 
-/* ===== iOS 风格开关行 ===== */
+/* 下拉在窄面板里被压窄时，超长选项名用省略号而不是溢出遮挡 */
+.ot-form select {
+  text-overflow: ellipsis;
+}
+
+.ot-form input:read-only {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+/* ===== 开关行：微信/系统设置式滑块 ===== */
 .ot-switches {
   border-top: 1px solid var(--separator);
   margin: 0 16px;
 }
 
 .ot-form .ot-check {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 56px;
   margin: 0;
+  padding-right: 60px;
   border-bottom: 1px solid var(--separator);
   color: var(--text);
   cursor: pointer;
@@ -260,44 +367,65 @@ h1 {
   opacity: 0;
 }
 
+/* 滑块轨道 */
 .ot-form .ot-check::after {
   content: '';
-  width: 26px;
-  height: 26px;
-  margin-left: auto;
-  flex: 0 0 26px;
-  border: 2px solid var(--separator-strong);
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 46px;
+  height: 28px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--switch-off);
+  transition: background 0.2s ease;
+}
+
+/* 滑块圆点：靠 transform 平移，不触发 layout */
+.ot-form .ot-check::before {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translateY(-50%);
   border-radius: 50%;
-  background: transparent;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
 }
 
 .ot-form .ot-check.is-checked::after {
-  border-color: var(--accent);
-  background: var(--accent)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-6' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    center / 14px no-repeat;
+  background: var(--green);
+}
+
+.ot-form .ot-check.is-checked::before {
+  transform: translateY(-50%) translateX(-18px);
 }
 
 .ot-check span,
 .ot-check strong,
 .ot-check small {
   display: block;
+  min-width: 0;
 }
 
 .ot-check strong {
+  color: var(--text);
   font-size: 14px;
   font-weight: 600;
 }
 
 .ot-check small {
   margin-top: 2px;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--text-2);
+  font-size: 12.5px;
   font-weight: 400;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* ===== 高级设置折叠 ===== */
@@ -363,7 +491,7 @@ h1 {
 .ot-status {
   min-width: 0;
   color: var(--green);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
@@ -527,6 +655,9 @@ h1 {
   background: var(--surface);
   box-shadow: var(--shadow-card);
   cursor: pointer;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-card);
 }
 
 .ot-site-copy {
@@ -684,6 +815,9 @@ h1 {
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-card);
 }
 
 .ot-stats-head {
@@ -768,6 +902,93 @@ h1 {
   border-top: 1px solid var(--separator);
 }
 
+/* ===== 月度预算（BYOK 省钱核心） ===== */
+.ot-budget {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--separator);
+}
+
+.ot-budget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-2);
+}
+
+.ot-budget-head span:last-child {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ot-budget-track {
+  height: 6px;
+  margin: 7px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--separator);
+}
+
+.ot-budget-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+
+.ot-budget-over .ot-budget-bar,
+.ot-budget-bar-over {
+  background: #ff9f0a;
+}
+
+.ot-budget-over .ot-budget-head span:last-child {
+  color: #ff9f0a;
+  font-weight: 700;
+}
+
+.ot-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ot-budget-row input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.ot-budget-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ot-budget-row button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ot-budget-hint {
+  margin: 6px 0 0;
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 .ot-img-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -840,17 +1061,13 @@ h1 {
 }
 
 .ot-popup .ot-field-grid {
-  grid-template-columns: 1fr;
-  gap: 0;
   padding: 2px 14px 10px;
 }
 
 .ot-popup .ot-field {
-  padding: 8px 4px;
-}
-
-.ot-popup .ot-field-wide {
-  grid-column: auto;
+  /* popup 只有 360px 宽：控件区收窄一点，给标签留出空间 */
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 40%);
+  padding: 9px 0;
 }
 
 .ot-popup .ot-form input,
@@ -873,38 +1090,15 @@ h1 {
   margin-top: 10px;
 }
 
-/* ===== 大屏双栏：设置页充分利用宽屏面积 ===== */
-@media (min-width: 1280px) {
-  .ot-form {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    align-items: start;
-  }
-
-  .ot-form-section {
-    margin: 0;
-  }
-
-  .ot-form-actions {
-    grid-column: 1 / -1;
-    margin-top: 4px;
-  }
-}
-
+/* 表单列数恒为单列：不再按浏览器窗口宽度切换列数。
+   页内完整设置面板宽度固定 640px 且与窗口无关，按窗口宽度切列会把
+   面板拆成两列、字段压到 90px（文字重叠的根因）。窄屏只调整操作区排布。 */
 @media (max-width: 600px) {
-  .ot-field-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .ot-field-wide {
-    grid-column: auto;
-  }
-
   .ot-form-actions {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
-    padding: 15px 0;
+    gap: 10px;
+    padding: 12px 0;
   }
 }
 
@@ -1005,10 +1199,13 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 12px;
+  margin: 12px 16px 6px;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--surface-2);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-card);
 }
 
 .ot-cache-info {
@@ -1104,6 +1301,9 @@ h1 {
   background: var(--surface);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-card);
 }
 
 .ot-history-item:hover {
@@ -1155,6 +1355,39 @@ h1 {
   line-height: 1.6;
 }
 
+/* ===== 配置复制 / 恢复按钮行（先前无样式，用的是浏览器默认按钮外观） ===== */
+.ot-field-grid.ot-migrate-row {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  padding: 4px 16px 14px;
+}
+
+.ot-migrate-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ot-migrate-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.ot-migrate-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* ===== 迁移提示 ===== */
 .ot-migrate-hint {
   margin-top: 12px;
@@ -1167,18 +1400,17 @@ h1 {
   line-height: 1.65;
 }
 
-/* ===== 功能开关网格（v0.2.1 面板重排） ===== */
+/* ===== 功能开关列表：与「本站设置」共用同一套行样式（一行一个） ===== */
 .ot-switch-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  margin-bottom: 14px;
+  margin: 0 16px 14px;
+  border-top: 1px solid var(--separator);
 }
 
 .ot-switch-grid .ot-check {
-  min-height: 44px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border, rgba(0,0,0,.06));
+  min-height: 52px;
 }
 
 .ot-sec-hint {
@@ -1190,20 +1422,119 @@ h1 {
 /* ===== 高级设置折叠面板 ===== */
 details.ot-advanced-section > summary {
   cursor: pointer;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid transparent;
+  color: var(--text);
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text-2, #6e6e73);
-  padding: 10px 0;
+  font-weight: 650;
   list-style: none;
   user-select: none;
 }
+details.ot-advanced-section[open] > summary {
+  border-bottom-color: var(--separator);
+}
 details.ot-advanced-section > summary::before {
-  content: '▸ ';
+  content: '▸';
+  display: inline-block;
+  width: 16px;
   color: var(--accent);
 }
 details.ot-advanced-section[open] > summary::before {
-  content: '▾ ';
+  content: '▾';
 }
-details.ot-advanced-section[open] > summary {
-  margin-bottom: 8px;
+
+
+/* ===== 首启引导欢迎面板（onboarding） ===== */
+.ot-welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  padding: 16px;
+}
+.ot-welcome[hidden] { display: none; }
+.ot-welcome-card {
+  width: 100%;
+  max-width: 300px;
+  background: var(--bg-fallback, #ffffff);
+  color: var(--text);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+.ot-welcome-brand img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  margin: 0 auto 10px;
+  display: block;
+}
+.ot-welcome-card h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ot-welcome-sub {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.ot-welcome-btn {
+  width: 100%;
+  margin: 6px 0 0;
+}
+.ot-welcome-free-note,
+.ot-welcome-config-note {
+  margin: 4px 0 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ot-welcome-skip {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+.ot-welcome-skip:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+
+/* ===== 引擎需要 Key 时的引导条 =====
+   此前用的是 --color-text（本文件未定义）→ 回退近黑色 #1d1d1f，
+   深色主题下文字与背景同色，整条只剩一个空绿框。 */
+.ot-key-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(52, 199, 89, 0.42);
+  border-radius: 12px;
+  background: rgba(52, 199, 89, 0.1);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.ot-key-guide[hidden] { display: none; }
+.ot-key-guide strong {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 650;
+}
+.ot-key-guide span {
+  color: var(--text-2);
 }

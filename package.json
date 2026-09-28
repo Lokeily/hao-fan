@@ -1,6 +1,6 @@
 {
   "name": "open-translator-cn",
-  "version": "0.2.1",
+  "version": "0.2.7",
   "description": "开源、免费、可自配置 API 的沉浸式 AI 翻译浏览器插件（国内模型优先）",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
     "test": "npm run test:unit",
-    "test:unit": "node --experimental-strip-types --test tests/core.test.mjs tests/translator-network.test.mjs tests/settings-backup.test.mjs tests/history-store.test.mjs tests/lang-detection.test.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/core.test.mjs tests/translator-network.test.mjs tests/settings-backup.test.mjs tests/history-store.test.mjs tests/lang-detection.test.mjs tests/usage.test.mjs",
     "test:browser": "playwright test",
     "check:version": "node scripts/check-version.mjs",
     "test:all": "npm run check:version && npm run lint && npm run test && npm run typecheck && npm run build && npm run test:browser",

@@ -88,6 +88,24 @@ test('keeps an existing provider key when legacy data is also present', () => {
   assert.equal(getProviderApiKey(migrated), 'current-secret');
 });
 
+test('provider and base URL are always a matched pair after normalize', () => {
+  // 存量配置里只有 provider 没有 baseUrl：默认 baseUrl（mymemory）不能张冠李戴
+  const deepseek = normalizeConfig({ provider: 'deepseek' });
+  const deepseekPreset = 'https://api.deepseek.com';
+  assert.equal(deepseek.baseUrl, deepseekPreset);
+
+  // 存了别的引擎的端点：校正回当前引擎的预设端点（UI 里非 custom 端点是只读的）
+  const mismatched = normalizeConfig({
+    provider: 'deepseek',
+    baseUrl: 'https://api.mymemory.translated.net',
+  });
+  assert.equal(mismatched.baseUrl, deepseekPreset);
+
+  // custom 引擎的端点是用户自己填的，不校正
+  const custom = normalizeConfig({ provider: 'custom', baseUrl: 'https://my-proxy.example/v1' });
+  assert.equal(custom.baseUrl, 'https://my-proxy.example/v1');
+});
+
 test('normalizes and updates per-site translation pauses', () => {
   assert.equal(siteKeyOf('https://Example.com/article'), 'example.com');
   assert.equal(siteKeyOf('http://example.com/other'), 'example.com');
@@ -143,9 +161,14 @@ test('cancels active translation jobs and rejects requests that arrive late', as
 });
 
 test('migrates retired display settings and keeps custom vision opt-in', () => {
+  // 0.2.2 起 dualMode 由旧 boolean 死字段升级为字符串三态：
+  // 历史 boolean 值（dualMode:false）应被归一化为默认 'below'，而非污染功能字段。
   const migrated = normalizeConfig({ dualMode: false, customVision: true });
-  assert.equal('dualMode' in migrated, false);
+  assert.equal(migrated.dualMode, 'below');
   assert.equal(migrated.customVision, true);
+  // 合法三态原样保留
+  const translationOnly = normalizeConfig({ dualMode: 'translation-only' });
+  assert.equal(translationOnly.dualMode, 'translation-only');
 });
 
 test('migrates the retired Zhipu endpoint without changing custom endpoints', () => {

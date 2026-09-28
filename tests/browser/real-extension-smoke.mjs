@@ -1,7 +1,7 @@
 // 真实 Chrome 加载未打包扩展的端到端冒烟（v3，纯净页面）：
 //  ① 扩展真实启动：content script 注入、工具栏出现
 //  ② 无 Key：自动翻译被引导卡拦下（不弹请求）、点「译」同样被拦
-//  ③ 用扩展自己的快速设置面板切到 google（免 Key）→ 点「译」→ 真实网络翻译出译文
+//  ③ 用扩展自己的快速设置面板切到 mymemory（免 Key）→ 点「译」→ 真实网络翻译出译文
 // 注意：需在真实桌面 Chrome 环境运行（沙箱/无头环境不支持 --load-extension）：
 //   node tests/browser/real-extension-smoke.mjs
 import { existsSync } from 'node:fs';
@@ -60,7 +60,7 @@ try {
     .click()
     .catch(() => {});
 
-  // ③ 用真实设置面板切到 google（免 Key）
+  // ③ 用真实设置面板切到 mymemory（免 Key）
   await page.locator('#ot-settings-btn').click();
   const panel = page.locator('#ot-settings-panel');
   let panelShown = false;
@@ -71,7 +71,7 @@ try {
   record('快速设置面板打开', panelShown);
 
   if (panelShown) {
-    await panel.getByRole('combobox', { name: '翻译引擎' }).selectOption('google');
+    await panel.getByRole('combobox', { name: '翻译引擎' }).selectOption('mymemory');
     await page.waitForTimeout(600); // 等配置落盘
     await page.locator('#ot-settings-panel').locator('.close').click().catch(() => {});
   }
@@ -90,7 +90,7 @@ try {
     const notice = await page.locator('#ot-error-modal').textContent().catch(() => '');
     if (notice) detail += ` | 错误弹窗: ${notice.slice(0, 120)}`;
   }
-  record('google 免 Key 真实网络翻译', translated, detail);
+  record('mymemory 免 Key 真实网络翻译', translated, detail);
 
   record('页面无 JS 报错', consoleErrors.length === 0, consoleErrors.join(' | ').slice(0, 300));
 } catch (error) {

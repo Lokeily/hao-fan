@@ -16,48 +16,10 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ===== 悬浮翻译按钮（苹果系统蓝）—— !important 防止站点 CSS 覆盖 ===== */
-.ot-toolbar {
-  position: fixed !important;
-  right: 20px !important;
-  bottom: 20px !important;
-  z-index: 2147483647 !important;
-  width: 44px !important;
-  height: 44px !important;
-  border-radius: 50% !important;
-  background: linear-gradient(180deg, #2b8cff 0%, #007aff 100%) !important;
-  color: #fff !important;
-  font-weight: 600 !important;
-  font-size: 16px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  user-select: none !important;
-  box-shadow:
-    0 2px 8px rgba(0, 122, 255, 0.35),
-    0 8px 24px rgba(0, 0, 0, 0.18) !important;
-  transition:
-    transform 0.15s ease,
-    background 0.2s ease,
-    box-shadow 0.2s ease !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-  border: none !important;
-  padding: 0 !important;
-  line-height: 1 !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-}
-.ot-toolbar:hover {
-  background: linear-gradient(180deg, #409cff 0%, #0069d9 100%);
-  transform: translateY(-2px);
-}
-.ot-toolbar:active {
-  transform: scale(0.94);
-}
+/* 注：悬浮工具栏使用 #ot-toolbar（JS 内联样式 + content-ui 玻璃主题），
+   此处不再维护 .ot-toolbar 类规则（历史遗留的死代码已清理），避免两处样式互相误导。
 
-/* ===== 图片翻译：悬浮结果面板（毛玻璃，轻量不遮挡） ===== */
+/* ===== 图片翻译：悬浮结果面板（玻璃，与其他浮层一致的材质） ===== */
 .ot-img-panel {
   position: fixed;
   z-index: 2147483647;
@@ -65,15 +27,17 @@
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.72);
   color: #1d1d1f;
-  border: 1px solid rgba(60, 60, 67, 0.16);
-  border-radius: 14px;
+  border: 0.5px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
   box-shadow:
-    0 2px 10px rgba(0, 0, 0, 0.1),
-    0 16px 40px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 10px 26px rgba(0, 0, 0, 0.1),
+    0 28px 64px rgba(0, 0, 0, 0.13);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
   font-size: 13.5px;
   overflow: hidden;
   animation: ot-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
@@ -83,8 +47,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  background: rgba(242, 242, 247, 0.7);
-  border-bottom: 1px solid rgba(60, 60, 67, 0.16);
+  background: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -96,14 +60,14 @@
   line-height: 1;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 7px;
+  border-radius: 9px;
   transition:
     background 0.15s ease,
     color 0.15s ease;
 }
 .ot-img-close:hover {
   color: #1d1d1f;
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 122, 255, 0.14);
 }
 .ot-img-toggle {
   display: flex;
@@ -111,7 +75,7 @@
   gap: 8px;
   padding: 10px 14px;
   color: #6e6e73;
-  border-bottom: 1px solid rgba(60, 60, 67, 0.16);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
   cursor: pointer;
   font-size: 13px;
 }
@@ -192,30 +156,35 @@
   }
 }
 
-/* ===== 深色模式（跟随站点） ===== */
+/* ===== 深色模式（跟随系统） ===== */
 @media (prefers-color-scheme: dark) {
   .ot-img-panel {
-    background: rgba(28, 28, 30, 0.94);
+    background: rgba(30, 30, 32, 0.72);
     color: #f5f5f7;
-    border-color: rgba(84, 84, 88, 0.4);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 1px 2px rgba(0, 0, 0, 0.28),
+      0 10px 30px rgba(0, 0, 0, 0.34),
+      0 28px 64px rgba(0, 0, 0, 0.42);
   }
   .ot-img-head {
-    background: rgba(44, 44, 46, 0.7);
-    border-bottom-color: rgba(84, 84, 88, 0.4);
+    background: rgba(58, 58, 64, 0.55);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
   }
   .ot-img-close {
     color: #aeaeb2;
   }
   .ot-img-close:hover {
     color: #f5f5f7;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(10, 132, 255, 0.22);
   }
   .ot-img-toggle {
     color: #aeaeb2;
-    border-bottom-color: rgba(84, 84, 88, 0.4);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
   }
   .ot-img-item {
-    border-bottom-color: rgba(84, 84, 88, 0.4);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
   }
   .ot-img-item .src {
     color: #aeaeb2;
@@ -228,7 +197,35 @@
   }
   .ot-img-seg {
     border-color: rgba(10, 132, 255, 0.75);
-    background: rgba(28, 28, 30, 0.72);
+    background: rgba(30, 30, 32, 0.62);
     color: #f5f5f7;
   }
+}
+
+/* ===== 译文显隐切换：隐藏已插入的译文节点，保留原文（0 请求，不重复付费）=====
+   content.ts 在 <html> 上切换 .ot-hide-translations，并逐个改写译文节点的内联
+   display（译文节点自带 display:block !important，外部 CSS 的 !important 无法
+   覆盖内联 !important，只能同级覆盖）。此规则作为兜底，覆盖未内联的节点。 */
+html.ot-hide-translations .ot-translation {
+  display: none !important;
+}
+
+/* ===== 0.2.2 对照模式 =====
+   below：译文在原文下方（默认，无需特殊规则）。
+   translation-only：隐藏原文，只留译文；悬停译文时临时显示原文（找回原文）。
+   hover-original：译文在下方，悬停译文时把原文高亮，便于逐句对照。
+   类由 content.ts 在 applyDualModeToNode 中按 currentDualMode 切换；
+   悬停恢复由 JS 事件委托（bindDualModeHover）在锚点上临时加
+   .ot-dual-source-hover（译文插在原文之后/内部，CSS 兄弟选择器无法向前命中）。 */
+.ot-dual-source-hidden:not(:hover) {
+  opacity: 0 !important;
+  user-select: none;
+}
+.ot-dual-source-hidden.ot-dual-source-hover {
+  opacity: 1 !important;
+}
+/* hover-original：默认原文正常显示；悬停译文时点亮原文 */
+.ot-dual-source-hover.ot-dual-source-hover-active {
+  background: rgba(255, 193, 7, 0.16);
+  border-radius: 3px;
 }

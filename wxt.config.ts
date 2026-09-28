@@ -12,7 +12,7 @@ export default defineConfig({
   manifest: ({ browser }) => ({
     name: '好翻',
     description:
-      '好翻 · 开源免费的沉浸式 AI 翻译插件，直连 DeepSeek、智谱、腾讯混元等国内大模型，用户自配 API Key，不经中转服务器。',
+      '好翻 · 开源免费的沉浸式双语翻译插件：开箱即用 Google 免 Key 翻译，也可直连 DeepSeek、智谱、腾讯混元等大模型（自配 API Key，不经中转服务器）。',
     // WXT 根据 entrypoints/options.html 与 popup.html 生成 options_ui / action.default_popup
     permissions: ['storage', 'activeTab', 'contextMenus', 'scripting'],
     // 内容脚本需要 fetch 扩展设置页与样式（页面内完整设置面板），
@@ -28,6 +28,10 @@ export default defineConfig({
       'translate-page': {
         suggested_key: { default: 'Alt+T' },
         description: '翻译当前网页（好翻）',
+      },
+      'toggle-translations': {
+        suggested_key: { default: 'Alt+S' },
+        description: '显示/隐藏译文（好翻，不会重新翻译）',
       },
     },
     // 后台需要跨域调用各家大模型 API，故放开 host 权限

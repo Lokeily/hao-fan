@@ -1,6 +1,6 @@
 ﻿import { defineBackground } from 'wxt/utils/define-background';
 import { browser } from 'wxt/browser';
-import { configItem, disabledSitesItem, usageItem } from '../utils/storage.ts';
+import { configItem, disabledSitesItem, usageItem, monthUsageItem } from '../utils/storage.ts';
 import { putImageJob } from '../utils/image-job-store.ts';
 import { getProviderApiKey, normalizeConfig, type AppConfig } from '../utils/config.ts';
 import { getProvider } from '../utils/providers.ts';
@@ -21,7 +21,12 @@ import {
   readSingle,
 } from '../utils/messages.ts';
 import { applyManualDefaultMigration } from '../utils/storage.ts';
-import { accumulateUsage, EMPTY_USAGE_TOTALS, type TranslationStats } from '../utils/usage.ts';
+import {
+  accumulateUsage,
+  addMonthUsage,
+  EMPTY_USAGE_TOTALS,
+  type TranslationStats,
+} from '../utils/usage.ts';
 import { randomId } from '../utils/id.ts';
 import { isSiteDisabled } from '../utils/site-policy.ts';
 import { TranslationJobRegistry } from '../utils/translation-jobs.ts';
@@ -95,6 +100,12 @@ function recordUsage(stats: TranslationStats): Promise<void> {
   const write = usageWriteQueue.then(async () => {
     const current = await usageItem.getValue();
     await usageItem.setValue(accumulateUsage(current, stats));
+    // 月度预算用量：与累计统计一并写入（同一串行队列，避免并发写覆盖）。
+    const usedTokens = stats.promptTokens + stats.completionTokens;
+    if (usedTokens > 0) {
+      const month = await monthUsageItem.getValue();
+      await monthUsageItem.setValue(addMonthUsage(month, usedTokens));
+    }
   });
   usageWriteQueue = write.catch(() => {});
   return write.catch(() => {});
@@ -253,6 +264,7 @@ function setupStreamingPort() {
             postDone({
               translation: r.translation,
               issue: r.issue ?? null,
+              usedProvider: r.usedProvider,
               stats: {
                 estimatedTokensSaved: r.stats.estimatedTokensSaved,
                 localSkipped: r.stats.localSkipped > 0,
@@ -271,6 +283,7 @@ function setupStreamingPort() {
               postDone({
                 translation: r.translation,
                 issue: r.issue ?? null,
+                usedProvider: r.usedProvider,
                 stats: {
                   estimatedTokensSaved: r.stats.estimatedTokensSaved,
                   localSkipped: r.stats.localSkipped > 0,
@@ -338,9 +351,24 @@ export default defineBackground(() => {
       return respond(async () => ({ stats: await usageItem.getValue() }), sendResponse);
     }
 
+    if (message.type === 'GET_BUDGET_STATUS') {
+      // popup 展示「本月已用 / 预算」：预算配置在 config，当月用量在 monthUsage。
+      return respond(async () => {
+        const cfg = await getCfg();
+        const month = await monthUsageItem.getValue();
+        return {
+          budget: cfg.monthlyTokenBudget,
+          warnPercent: cfg.budgetWarnPercent,
+          monthUsage: month,
+        };
+      }, sendResponse);
+    }
+
     if (message.type === 'RESET_USAGE_STATS') {
       return respond(async () => {
         await resetUsage();
+        // 累计统计清零时同步清零月度预算用量，避免「统计已清零但预算进度条仍显示旧值」。
+        await monthUsageItem.setValue(null);
         return { stats: { ...EMPTY_USAGE_TOTALS } };
       }, sendResponse);
     }
@@ -360,6 +388,7 @@ export default defineBackground(() => {
             translations: result.translations,
             stats: result.stats,
             issues: result.issues,
+            usedProvider: result.usedProvider,
           };
         });
       }, sendResponse);
@@ -380,6 +409,7 @@ export default defineBackground(() => {
             stats: result.stats,
             issue: result.issue,
             localSkipped: result.stats.localSkipped > 0,
+            usedProvider: result.usedProvider,
           };
         });
       }, sendResponse);
@@ -493,6 +523,19 @@ export default defineBackground(() => {
 
   // 快捷键：Alt+T 翻译当前网页。复用右键"翻译本页"的注入与站点策略逻辑。
   browser.commands?.onCommand.addListener((command) => {
+    // 显示/隐藏译文：纯前端切换，不需要重新注入，也不产生任何翻译请求。
+    if (command === 'toggle-translations') {
+      void (async () => {
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+        browser.tabs
+          .sendMessage(tab.id, { type: 'TOGGLE_TRANSLATIONS' })
+          .catch(() => {
+            /* 页面未注入内容脚本（如 chrome:// 页面）：忽略 */
+          });
+      })();
+      return;
+    }
     if (command !== 'translate-page') return;
     void (async () => {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });

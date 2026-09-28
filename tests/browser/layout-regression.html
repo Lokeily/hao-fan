@@ -36,6 +36,40 @@
     <span>Inline span three talks about beta access.</span>
     <span>Inline span four talks about community feedback.</span>
   </div>
+  <!-- round13：复刻 Apple 官网按钮结构（flex 容器 + <a class="button"> 胶囊）。
+       v0.2.5 实测：容器文本全部来自 <a>，译文被"纵向下潜"塞进按钮内部，
+       border-radius:980px 的胶囊被撑成正圆。 -->
+  <style>
+    .tile-ctas { display: flex; gap: 14px; justify-content: center; margin: 14px 0; }
+    .button {
+      display: inline-block; padding: 10px 22px;
+      border-radius: 980px; background: #0071e3; color: #fff;
+      text-decoration: none; font-size: 15px; white-space: nowrap;
+    }
+    .flex-text-row { display: flex; gap: 12px; border: 1px solid #ddd; padding: 10px; }
+  </style>
+  <section class="apple-tile">
+    <h2>Apple style tile</h2>
+    <p>Product headline text about the new flagship phone.</p>
+    <div class="tile-ctas">
+      <a class="button" href="#learn">Learn more</a>
+      <a class="button" href="#buy">Buy</a>
+    </div>
+  </section>
+  <div class="flex-text-row">
+    <span>Flexible row text one about pricing plans.</span>
+    <span>Flexible row text two about storage options.</span>
+  </div>
+  <!-- round14：页面级导航（Apple globalnav 同构）——整条不该被翻译 -->
+  <nav class="site-nav" aria-label="Global">
+    <ul>
+      <li>Store</li>
+      <li>MacBook Air</li>
+      <li>Watch</li>
+      <li>AirPods</li>
+      <li>Accessories</li>
+    </ul>
+  </nav>
   <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
 </body>
 </html>

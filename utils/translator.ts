@@ -1,4 +1,4 @@
-import { getProviderApiKey, type AppConfig } from './config.ts';
+﻿import { getProviderApiKey, type AppConfig } from './config.ts';
 import { getProvider } from './providers.ts';
 import { langCode } from './languages.ts';
 import { ensureCacheLoaded, getCachedSync, setCachedSync } from './cache.ts';
@@ -11,7 +11,7 @@ import {
   type StreamMeta,
 } from './requester.ts';
 import { batchInstruction, createBatchItems, parseBatchTranslations } from './batch-protocol.ts';
-import { localSkipReason } from './language-detection.ts';
+import { detectLang, localSkipReason } from './language-detection.ts';
 import { createStats, estimateTokens, type TranslationStats } from './usage.ts';
 import { splitLongText } from './chunking.ts';
 import {
@@ -105,12 +105,14 @@ export interface TranslationResult {
   translation: string;
   stats: TranslationStats;
   issue?: string[] | null; // 质量自检发现的缺失符号（数字/URL/代码 token）
+  usedProvider?: string; // 实际成功引擎：主引擎失败降级后为备用引擎 id（默认=主引擎）
 }
 
 export interface TranslationBatchResult {
   translations: string[];
   stats: TranslationStats;
   issues?: (string[] | null)[]; // 与 translations 等长的逐段质量标记
+  usedProvider?: string; // 实际成功引擎：批量路径降级后为备用引擎 id
 }
 
 interface ChatResult {
@@ -150,7 +152,10 @@ function buildCandidates(cfg: AppConfig): AppConfig[] {
       if (!fb || fb === cfg.provider) continue;
       const provider = getProvider(fb);
       if (!provider) continue;
-      if (!getProviderApiKey(cfg, fb)) continue; // 无 Key 的备用引擎直接跳过
+      // 免 Key 引擎（needsKey=false，如 Google 翻译 / Ollama 本地）即使没配 Key 也允许作兜底：
+      // 大众用户主引擎额度用尽 / Key 失效 / 网络波动时，自动降级到免费引擎保证「永远有结果」。
+      // 需要 Key 的备用引擎仍要求已配置对应 Key，否则跳过。
+      if (provider.needsKey && !getProviderApiKey(cfg, fb)) continue;
       const resolvedBaseUrl = fb === 'custom' ? cfg.baseUrl : provider.baseUrl;
       if (!resolvedBaseUrl) continue; // 端点为空的候选不可用
       out.push({
@@ -259,10 +264,13 @@ export function auditTranslation(original: string, translation: string): string[
 // ===== 句子级缓存 + 归一化匹配：整段精确匹配升级为按句缓存 =====
 // SPA 内容微变时只重译变化的句子；句末标点 / 大小写 / 空白差异归一化命中，省 Token。
 function normalizeSentence(s: string): string {
+  // 注意末尾标点集合必须包含半角句号「.」：此前只列了 。！？!?；;：:，,、，
+  // 导致 "Hello." 与 "Hello" 归一化后仍不相等——句子级缓存与批次内去重都无法互命中，
+  // 网页里"带句号的句子"和"不带句号的同一句"会各翻译一次，白花 Token。
   return s
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/[。！？!?；;：:，,、\s]+$/u, '')
+    .replace(/[。．.!！？?；;：:，,、\s]+$/u, '')
     .trim()
     .toLowerCase();
 }
@@ -279,7 +287,11 @@ function splitSentences(text: string): { content: string; delim: string }[] {
   });
   const restore = (piece: string) =>
     piece.replace(/\uE000(\d+)\uE001/g, (_, i) => abbrs[Number(i)] ?? '');
-  const re = /([。！？；]+|(?:\r?\n)+|[.!?]+(?=\s|$))/g;
+  // 句末标点后的尾随空白（空格 / 空行 / 缩进）并入 delim，而不是内容：
+  // ① 修复英文 "Hello. World." 拆句后句间空格被 trim 丢失、拼装粘连成 "Hello.World."。
+  // ② 修复纯空白段落分隔（如 "A。\n\nB"）因 content 为空而被丢弃、空行整体消失。
+  // 拼装时译文 + delim 原样还原，空格与段落分隔都能保留。
+  const re = /([。！？；]+|[.!?]+(?=\s|$)|(?:\r?\n)+)(?:\s*)/g;
   const out: { content: string; delim: string }[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -302,12 +314,13 @@ function isSentenceCacheable(text: string): boolean {
 
 // ===== 核心单句翻译（不含句子缓存/整段缓存，避免递归）=====
 // 负责：术语注入 + LLM/MT 调用 + 故障转移 + 质量自检（一次校正重试）。
+// 返回值带 usedProvider：主引擎失败降级后为实际成功的备用引擎 id，前端据此提示。
 async function coreTranslate(
   cfg: AppConfig,
   text: string,
   signal: AbortSignal | undefined,
   opts: { context?: TranslationContext; glossaryBlock?: string } = {},
-): Promise<{ text: string; stats: TranslationStats; issue?: string[] | null }> {
+): Promise<{ text: string; stats: TranslationStats; issue?: string[] | null; usedProvider?: string }> {
   const stats = createStats(0);
   const provider = getProvider(cfg.provider);
   if (!provider) throw new Error('不支持的翻译引擎');
@@ -382,7 +395,12 @@ async function coreTranslate(
       }
     }
   }
-  return { text: translation, stats, issue };
+  return {
+    text: translation,
+    stats,
+    issue,
+    usedProvider: usedCfg.provider,
+  };
 }
 
 // 单条翻译（按引擎类型分发；含整段缓存 + 术语整条命中 + 句子级缓存 + 强模型路由）
@@ -435,9 +453,12 @@ export async function translateOneDetailed(
   stats.sentCharacters = t.length;
 
   // 句子级缓存：逐句命中，仅重译变化的句子。
+  // 仅 LLM 引擎走句子拆分：MT（Google/DeepL/Microsoft）按字符计费且单句缺上下文
+  // 质量更差，拆句只会把 1 次请求拆成 N 次、无 Token 收益。
   if (
     cfg.sentenceCache !== false &&
     effectiveCfg === cfg && // 强模型路由时不走句子拆分（长文整体翻译更稳）
+    getProvider(effectiveCfg.provider)?.type !== 'mt' &&
     isSentenceCacheable(t)
   ) {
     const sentences = splitSentences(t);
@@ -452,7 +473,7 @@ export async function translateOneDetailed(
     cfg.glossaryEnabled !== false
       ? buildGlossaryBlock(relevantTerms([t], cfg.targetLang, glossary, cfg.glossaryTermLimit ?? 12))
       : '';
-  let core: { text: string; stats: TranslationStats; issue?: string[] | null };
+  let core: { text: string; stats: TranslationStats; issue?: string[] | null; usedProvider?: string };
   try {
     core = await coreTranslate(effectiveCfg, t, signal, { context: liveContext, glossaryBlock: block });
   } catch (error) {
@@ -485,7 +506,7 @@ export async function translateOneDetailed(
   stats.completionTokens += core.stats.completionTokens;
   stats.qualityIssues += core.stats.qualityIssues;
   if (cfg.cacheEnabled) setCachedSync(t, cfg.targetLang, ck, core.text);
-  return { translation: core.text, stats, issue: core.issue };
+  return { translation: core.text, stats, issue: core.issue, usedProvider: core.usedProvider };
 }
 
 async function translateSentences(
@@ -541,6 +562,7 @@ async function translateSentences(
   //    逐句串行会把 system 提示词 + 术语表 + 上下文前缀重复发 N 遍：
   //    5 句改一句时，串行是 5 次请求 5 份前缀，合并后是 1 次请求 1 份前缀。
   let issue: string[] | null = null;
+  let usedProvider: string | undefined;
   if (missingIndexes.length > 0) {
     signal?.throwIfAborted();
     const batch = await translateBatchDetailed(
@@ -551,6 +573,7 @@ async function translateSentences(
       { disableStrongRouting: true },
     );
     mergeSubStats(stats, batch.stats);
+    usedProvider = batch.usedProvider;
     const missingTokens = new Set<string>();
     missingIndexes.forEach((sentenceIndex, batchIndex) => {
       const sentence = sentences[sentenceIndex];
@@ -565,7 +588,7 @@ async function translateSentences(
     if (missingTokens.size > 0) issue = Array.from(missingTokens);
   }
 
-  return { translation: translated.join(''), stats, issue };
+  return { translation: translated.join(''), stats, issue, usedProvider };
 }
 
 // 把子调用（批量翻译）的用量合并回父统计。
@@ -663,6 +686,8 @@ export async function translateOneStream(
   let full = '';
   let lastErr: unknown;
   let ok = false;
+  // 记录最终实际使用的候选引擎（主引擎失败降级后为备用引擎 id，前端据此提示）
+  let usedProvider: string | undefined;
   for (const c of candidates) {
     // 单次调用（不带内部故障转移）：与 coreTranslate 一致，候选遍历由外层统一负责，
     // 避免双层故障转移平方级放大请求数。每次尝试用独立 meta，成功后才合入，
@@ -685,6 +710,7 @@ export async function translateOneStream(
         onDelta(restorePartial(masked, full));
       }
       Object.assign(meta, attemptMeta);
+      usedProvider = c.provider;
       ok = true;
       break;
     } catch (error) {
@@ -717,7 +743,7 @@ export async function translateOneStream(
   } else if (cfg.cacheEnabled) {
     setCachedSync(t, cfg.targetLang, ck, translation);
   }
-  const r = { translation, stats, issue };
+  const r = { translation, stats, issue, usedProvider };
   onDone?.(r);
   return r;
 }
@@ -755,6 +781,8 @@ export async function translateBatchDetailed(
 
   const result: string[] = new Array(texts.length);
   const issues: (string[] | null)[] = new Array(texts.length).fill(null);
+  // 实际成功引擎：主引擎失败降级后由 callChat 的 onUsed 回填，前端据此提示。
+  let usedProvider: string | undefined;
   const pendingByText = new Map<string, { indexes: number[]; text: string }>();
   for (let i = 0; i < texts.length; i++) {
     const t = texts[i].trim();
@@ -789,12 +817,16 @@ export async function translateBatchDetailed(
         continue;
       }
     }
-    const pending = pendingByText.get(t);
+    // 批次内去重：键用「归一化文本」而非精确原文，让 "Read more" / "read more."
+    // 这类仅大小写或句末标点不同的重复文案也只翻译一次（网页里极常见）。
+    // 与句子级缓存同一套归一化口径，语义一致。
+    const dedupeKey = normalizeSentence(t) || t;
+    const pending = pendingByText.get(dedupeKey);
     if (pending) {
       pending.indexes.push(i);
       stats.duplicateHits++;
       countSaved(stats, t);
-    } else pendingByText.set(t, { indexes: [i], text: t });
+    } else pendingByText.set(dedupeKey, { indexes: [i], text: t });
   }
   const toTranslate = Array.from(pendingByText.values());
   if (toTranslate.length === 0) return { translations: result, stats, issues };
@@ -809,11 +841,16 @@ export async function translateBatchDetailed(
       effectiveCfg,
       signal,
     );
+    usedProvider = effectiveCfg.provider;
     stats.requests += batch.requests;
     toTranslate.forEach((item, itemIndex) => {
       const translation = batch.translations[itemIndex] || item.text;
-      item.indexes.forEach((index) => (result[index] = translation));
-      if (cfg.cacheEnabled) setCachedSync(item.text, cfg.targetLang, ck, translation);
+      item.indexes.forEach((index) => {
+        result[index] = translation;
+        // 为每个重复出现的原文都写缓存：此前只写首个，其余变体下次仍会重新付费。
+        const raw = texts[index].trim();
+        if (cfg.cacheEnabled && raw) setCachedSync(raw, cfg.targetLang, ck, translation);
+      });
       if (cfg.qualityCheck) {
         const miss = auditTranslation(item.text, translation);
         if (miss.length) {
@@ -822,7 +859,7 @@ export async function translateBatchDetailed(
         }
       }
     });
-    return { translations: result, stats, issues };
+    return { translations: result, stats, issues, usedProvider };
   }
 
   const applyResult = (item: (typeof toTranslate)[number], translation: string, miss?: string[] | null) => {
@@ -830,8 +867,10 @@ export async function translateBatchDetailed(
     item.indexes.forEach((index) => {
       result[index] = tr;
       if (miss) issues[index] = miss;
+      // 为每个重复出现的原文都写缓存：此前只写首个，其余变体下次仍会重新付费。
+      const raw = texts[index].trim();
+      if (cfg.cacheEnabled && raw) setCachedSync(raw, cfg.targetLang, ck, tr);
     });
-    if (cfg.cacheEnabled) setCachedSync(item.text, cfg.targetLang, ck, tr);
   };
 
   const translateLongItem = async (item: (typeof toTranslate)[number]) => {
@@ -847,7 +886,16 @@ export async function translateBatchDetailed(
           ? buildGlossaryBlock(relevantTerms([parts[index]], cfg.targetLang, glossary, cfg.glossaryTermLimit ?? 12))
           : '';
         const m = maskIdentifiers(parts[index]);
-        const response = await callChat(effectiveCfg, m.masked, undefined, block, liveContext, signal, m.count);
+        const response = await callChat(
+          effectiveCfg,
+          m.masked,
+          undefined,
+          block,
+          liveContext,
+          signal,
+          m.count,
+          (p) => (usedProvider = p),
+        );
         addChatUsage(stats, response);
         translated[index] = m.restore(response.text);
       }
@@ -871,7 +919,16 @@ export async function translateBatchDetailed(
           : '';
         try {
           const m = maskIdentifiers(item.text);
-          const response = await callChat(effectiveCfg, m.masked, undefined, block, liveContext, signal, m.count);
+          const response = await callChat(
+            effectiveCfg,
+            m.masked,
+            undefined,
+            block,
+            liveContext,
+            signal,
+            m.count,
+            (p) => (usedProvider = p),
+          );
           const restored = m.restore(response.text);
           addChatUsage(stats, response);
           const miss = cfg.qualityCheck ? auditTranslation(item.text, restored) : null;
@@ -936,6 +993,7 @@ export async function translateBatchDetailed(
         liveContext,
         signal,
         anyMasked ? 1 : 0,
+        (p) => (usedProvider = p),
       );
       addChatUsage(stats, response);
     } catch (error) {
@@ -985,7 +1043,7 @@ export async function translateBatchDetailed(
   };
 
   await translateGroup(toTranslate);
-  return { translations: result, stats, issues };
+  return { translations: result, stats, issues, usedProvider };
 }
 
 export async function translateBatch(
@@ -997,7 +1055,94 @@ export async function translateBatch(
   return (await translateBatchDetailed(cfg, texts, signal, context)).translations;
 }
 
-// ===== 传统翻译引擎（DeepL / Google / Microsoft） =====
+// ===== 免 Key 体验通道（MyMemory / Apertium） =====
+// MyMemory 的匿名调用按 IP 限量；带上 de（联系邮箱）可把每日额度提到约 5 万字符。
+// 该邮箱仅用于服务商统计配额，不会接收任何内容。
+const MYMEMORY_CONTACT = 'haofan-feedback@example.com';
+const MYMEMORY_MAX_CHARS = 480;
+
+// MyMemory / Apertium 都不接受 auto 源语言（直接 400/403），
+// 源语言为「自动检测」时按文本特征猜一个具体语言码。
+function guessSourceCode(text: string): string {
+  const key = detectLang(text || '');
+  switch (key) {
+    case 'zh':
+      return 'zh-CN';
+    case 'ja':
+      return 'ja';
+    case 'ko':
+      return 'ko';
+    case 'cyrillic':
+      return 'ru';
+    case 'arabic':
+      return 'ar';
+    case 'devanagari':
+      return 'hi';
+    case 'thai':
+      return 'th';
+    default:
+      // latin / other：绝大多数免 Key 体验场景是「英→中」，按英文处理
+      return 'en';
+  }
+}
+
+// MyMemory 对超长文本会返回被截断/重复的译文，超限时按句切成多段分别请求。
+function splitForMyMemory(text: string): string[] {
+  if (text.length <= MYMEMORY_MAX_CHARS) return [text];
+  const parts: string[] = [];
+  let current = '';
+  for (const piece of text.split(/(?<=[。．.!?！？\n])/)) {
+    if (current.length + piece.length > MYMEMORY_MAX_CHARS && current) {
+      parts.push(current);
+      current = '';
+    }
+    current += piece;
+    while (current.length > MYMEMORY_MAX_CHARS) {
+      parts.push(current.slice(0, MYMEMORY_MAX_CHARS));
+      current = current.slice(MYMEMORY_MAX_CHARS);
+    }
+  }
+  if (current) parts.push(current);
+  return parts.filter(Boolean);
+}
+
+function readMyMemoryError(payload: any, fallback: string): string {
+  const raw = String(payload?.responseDetails || payload?.responseData?.translatedText || '');
+  if (/USAGE LIMIT|quota/i.test(raw)) {
+    return '今日免费额度已用完：换个免 Key 通道，或接自己的 API Key（设置页）';
+  }
+  if (/INVALID LANGUAGE PAIR/i.test(raw)) return '该语言对 MyMemory 暂不支持';
+  if (/QUERY LENGTH LIMIT/i.test(raw)) return '单段文本过长';
+  return raw ? raw.slice(0, 120) : fallback;
+}
+
+/** 单段文本走 MyMemory（含超长分段）。 */
+async function myMemoryTranslate(
+  text: string,
+  source: string,
+  target: string,
+  cfg: AppConfig,
+  signal?: AbortSignal,
+): Promise<string> {
+  const base =
+    (cfg.baseUrl?.replace(/\/+$/, '') || 'https://api.mymemory.translated.net') + '/get';
+  const url =
+    `${base}?q=${encodeURIComponent(text)}` +
+    `&langpair=${encodeURIComponent(`${source}|${target}`)}` +
+    `&de=${encodeURIComponent(MYMEMORY_CONTACT)}`;
+  const res = await fetchWithTimeout(url, { signal }, 20_000);
+  if (!res.ok) throw new Error(`MyMemory 免 Key 通道返回 ${res.status}`);
+  const data = await readBodyWithTimeout(res.json(), 20_000);
+  const out = String(data?.responseData?.translatedText ?? '').trim();
+  // 配额耗尽等错误会被塞进 translatedText 而不是 status 字段，必须一并识别，
+  // 否则用户会看到「译文」其实是英文报错串。
+  if (!out || /MYMEMORY WARNING|QUERY LENGTH LIMIT|USAGE LIMIT|INVALID LANGUAGE PAIR/i.test(out)) {
+    throw new Error(`MyMemory：${readMyMemoryError(data, '返回空译文')}`);
+  }
+  return out;
+}
+
+// ===== 传统翻译引擎（DeepL / MyMemory / Apertium / Microsoft） =====
 async function translateMT(
   providerId: string,
   text: string,
@@ -1007,20 +1152,31 @@ async function translateMT(
   const source = langCode(cfg.sourceLang);
   const target = langCode(cfg.targetLang);
   const apiKey = cleanSecret(getProviderApiKey(cfg));
-  if (providerId === 'google') {
-    // 注意：以下为非官方免费端点（client=gtx），无 SLA，可能被限流或临时停用。
-    // 它作为「免 Key 体验通道」保留，但稳定性不保证；正式使用建议配置需 Key 的翻译服务。
-    // baseUrl 可覆盖（测试用 mock 端点；生产默认就是 translate.googleapis.com）。
-    const base = (cfg.baseUrl?.replace(/\/+$/, '') || 'https://translate.googleapis.com') + '/translate_a/single';
-    const url = `${base}?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
-    const res = await fetchWithTimeout(url, { signal }, 20000);
-    if (!res.ok) {
-      throw new Error(
-        `Google 免 Key 端点返回 ${res.status}。该端点为非官方通道，可能限流或临时不可用；若持续失败，请改用需 API Key 的翻译服务（见设置页）。`,
-      );
+  if (providerId === 'mymemory') {
+    const resolvedSource = source === 'auto' ? guessSourceCode(text) : source;
+    const chunks = splitForMyMemory(text);
+    if (chunks.length === 1) {
+      return await myMemoryTranslate(chunks[0], resolvedSource, target, cfg, signal);
     }
-    const data = await readBodyWithTimeout(res.json(), 20000);
-    return (data?.[0] ?? []).map((seg: any) => seg?.[0] ?? '').join('');
+    const pieces: string[] = [];
+    for (const chunk of chunks) {
+      pieces.push(await myMemoryTranslate(chunk, resolvedSource, target, cfg, signal));
+    }
+    return pieces.join('');
+  }
+  if (providerId === 'apertium') {
+    // Apertium 是开源规则/统计翻译，语对有限（欧洲语对强，中英缺失）；
+    // 不支持的语对会直接 400，交给上层故障转移到下一个免 Key 通道。
+    const base = (cfg.baseUrl?.replace(/\/+$/, '') || 'https://apertium.org') + '/apy/translate';
+    const resolvedSource = source === 'auto' ? guessSourceCode(text) : source;
+    const url = `${base}?langpair=${encodeURIComponent(`${resolvedSource}|${target}`)}&q=${encodeURIComponent(text)}`;
+    const res = await fetchWithTimeout(url, { signal }, 20_000);
+    if (!res.ok) throw new Error(`Apertium 返回 ${res.status}（该语言对可能不受支持）`);
+    const data = await readBodyWithTimeout(res.json(), 20_000);
+    if (data?.responseStatus !== 200) {
+      throw new Error(`Apertium：${String(data?.explanation || '该语言对不受支持')}`);
+    }
+    return String(data?.responseData?.translatedText ?? '');
   }
   if (providerId === 'deepl') {
     const url = `${cfg.baseUrl || 'https://api-free.deepl.com'}/v2/translate`;
@@ -1150,6 +1306,7 @@ async function translateMTBatch(
 // ===== LLM（OpenAI 兼容）文本翻译 =====
 // glossaryBlock：本批文本相关的「术语对照表」，附加到 system 末尾（稳定前缀在前，利于供应商 Prompt Caching）。
 // 故障转移：主引擎 429/5xx/网络错误时，自动切换 buildCandidates 中的备用引擎。
+// onUsed：成功时回调实际使用的引擎 id（主引擎失败降级到备用时用于前端提示）。
 async function callChat(
   cfg: AppConfig,
   text: string,
@@ -1158,12 +1315,15 @@ async function callChat(
   context?: TranslationContext,
   signal?: AbortSignal,
   maskCount = 0,
+  onUsed?: (providerId: string) => void,
 ): Promise<ChatResult> {
   const candidates = buildCandidates(cfg);
   let lastErr: unknown;
   for (const c of candidates) {
     try {
-      return await callChatOnce(c, text, extraInstruction, glossaryBlock, context, signal, maskCount);
+      const result = await callChatOnce(c, text, extraInstruction, glossaryBlock, context, signal, maskCount);
+      onUsed?.(c.provider);
+      return result;
     } catch (error) {
       if (signal?.aborted) throw error;
       if (!isFailoverError(error)) throw error;

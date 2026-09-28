@@ -1,4 +1,4 @@
-// 网络层集成测试：用可编程的 mock OpenAI 兼容端点驱动 utils/translator.ts，
+﻿// 网络层集成测试：用可编程的 mock OpenAI 兼容端点驱动 utils/translator.ts，
 // 覆盖批量协议、截断降级、坏 JSON 恢复、漏条目回退、429 重试、缓存与术语命中、
 // 以及注入防护的系统提示。运行在真实 fetch 之上，验证的是完整请求链路。
 import test from 'node:test';
@@ -84,6 +84,9 @@ function cfgFor(port, overrides = {}) {
   return {
     provider: 'custom',
     baseUrl: `http://127.0.0.1:${port}/v1`,
+    // 测试内不触发免 Key 通道的自动降级：降级会去请求真实的 apertium.org，
+    // 让失败用例卡在网络超时上，而不是快速失败。
+    fallbackProviders: [],
     apiKeys: { custom: 'test-key-123' },
     model: 'test-model',
     sourceLang: 'English',
@@ -444,20 +447,73 @@ test('cleanSecret 拒绝含非 ASCII 字符的 Key', () => {
   assert.equal(cleanSecret('  sk-abc123  '), 'sk-abc123');
 });
 
-test('Google 免 Key 引擎：请求格式与响应解析正确', async () => {
+test('MyMemory 免 Key 引擎：请求格式与响应解析正确', async () => {
   const server = await startMockServer();
   server.setHandler((req) => {
-    assert.ok(req.url.includes('/translate_a/single'), '应请求 translate_a/single');
-    assert.ok(req.url.includes('client=gtx'), '应带 gtx 参数');
-    assert.ok(req.url.includes('sl=en') && req.url.includes('tl=zh'), '语言参数应正确');
-    assert.ok(req.url.includes(encodeURIComponent('Two-factor authentication')), '原文应 URL 编码');
-    // google 官方返回格式：[[["译文","原文",null,null,10]],null,"en"]
-    return [[['双重身份验证', 'Two-factor authentication', null, null, 10]], null, 'en'];
+    assert.ok(req.url.includes('/get'), '应请求 MyMemory 的 /get');
+    const url = new URL(req.url, 'http://127.0.0.1');
+    assert.equal(url.searchParams.get('langpair'), 'en|zh', '语言对应为 en|zh');
+    assert.equal(url.searchParams.get('q'), 'Two-factor authentication', '原文应带在 q 参数');
+    return { responseData: { translatedText: '双重身份验证' }, responseStatus: 200 };
   });
-  const result = await translateOneDetailed(cfgFor(server.port, { provider: 'google' }), 'Two-factor authentication');
+  const result = await translateOneDetailed(cfgFor(server.port, { provider: 'mymemory' }), 'Two-factor authentication');
   assert.equal(result.translation, '双重身份验证');
   assert.equal(server.requests.length, 1);
   await server.close();
+});
+
+test('MyMemory 源语言为「自动检测」时不发 auto（会被拒），按文本猜源语言', async () => {
+  const server = await startMockServer();
+  server.setHandler((req) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    const pair = url.searchParams.get('langpair');
+    assert.notEqual(pair, 'auto|zh', 'MyMemory 不接受 auto 源语言（会 403）');
+    assert.ok(/^[a-z-]{2,}\|zh$/.test(pair || ''), `源语言应为具体语言码，实际 ${pair}`);
+    return { responseData: { translatedText: '早上好' }, responseStatus: 200 };
+  });
+  const result = await translateOneDetailed(
+    cfgFor(server.port, { provider: 'mymemory', sourceLang: '自动检测' }),
+    'good morning',
+  );
+  assert.equal(result.translation, '早上好');
+  await server.close();
+});
+
+test('MyMemory 超长文本按段拆分后拼接（避免被服务端截断/重复）', async () => {
+  const server = await startMockServer();
+  const seen = [];
+  server.setHandler((req) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    seen.push(url.searchParams.get('q') || '');
+    return { responseData: { translatedText: '段译文' }, responseStatus: 200 };
+  });
+  const long = 'First sentence here. '.repeat(80); // 约 1600 字符
+  const result = await translateOneDetailed(cfgFor(server.port, { provider: 'mymemory' }), long);
+  assert.ok(seen.length > 1, `超长文本应拆分多次请求，实际 ${seen.length} 次`);
+  assert.ok(
+    seen.every((q) => q.length <= 480),
+    '每段都不应超过单段上限',
+  );
+  assert.equal(result.translation, '段译文'.repeat(seen.length), '各段译文应按顺序拼接');
+  await server.close();
+});
+
+test('MyMemory 配额耗尽：报错串必须变成错误，不能当译文显示给用户', async () => {
+  const server = await startMockServer();
+  try {
+    const warning = 'MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY';
+    server.setHandler(() => ({ responseData: { translatedText: warning }, responseStatus: 200 }));
+    // 用唯一文本：普通词会命中前面用例写入的翻译缓存，压根走不到网络请求
+    const probe = `quota probe ${Date.now()}`;
+    // 该错误会抛到调用方（由界面统一提示），绝不能把英文报错当成译文返回
+    await assert.rejects(
+      translateOneDetailed(cfgFor(server.port, { provider: 'mymemory' }), probe),
+      /额度|MyMemory/,
+    );
+  } finally {
+    // 断言抛错时也要关掉 mock server：否则进程因句柄泄漏卡住不退出
+    await server.close();
+  }
 });
 
 test('DeepL 引擎：Authorization 头与响应解析正确', async () => {
@@ -608,13 +664,13 @@ test('顶层单条目纯文本回退时还原占位符（PUA 不入译文与缓�
   await server.close();
 });
 
-test('Google 批量翻译单条失败不拖垮整批', async () => {
+test('MyMemory 批量翻译单条失败不拖垮整批', async () => {
   const server = await startMockServer();
   server.setHandler((req) => {
     if (req.url.includes(encodeURIComponent('Bad one'))) return 500; // 这条失败
-    return [[['这条成功', 'x', null, null, 10]], null, 'en'];
+    return { responseData: { translatedText: '这条成功' }, responseStatus: 200 };
   });
-  const result = await translateBatchDetailed(cfgFor(server.port, { provider: 'google' }), [
+  const result = await translateBatchDetailed(cfgFor(server.port, { provider: 'mymemory' }), [
     'Bad one',
     'Good two',
   ]);
@@ -640,3 +696,86 @@ test('句子本地跳过保留原文大小写（norm 只作缓存键不作输出
 });
 
 
+
+test('句子级缓存拼装：英文句间空格保留（Alpha. Beta. 不粘连成 Alpha.Beta.）', async () => {
+  const server = await startMockServer();
+  let call = 0;
+  server.setHandler(() => {
+    call++;
+    // batchOk(['a','b']) 返回 `译文${i}`；首次批量收到两句 → 译文0、译文1；
+    // 二次只有新句 → 单条译文0。
+    return call === 1 ? batchOk(['a', 'b']) : batchOk(['c']);
+  });
+  const cfg = cfgFor(server.port, { sentenceCache: true });
+  try {
+    const first = await translateOneDetailed(cfg, 'Alpha. Beta.');
+    // 修复前 delim 只有 "."（句间空格被 trim 丢弃），输出会粘连成 "译文0.译文1."。
+    // 末尾 "." 是 Beta 句自身的句号，保留正确。
+    assert.equal(first.translation, '译文0. 译文1.', '首次翻译保留句间空格');
+    // 第二次微变：Alpha 命中句子级缓存，走 hit + delim 拼装路径，同样要保留空格。
+    const second = await translateOneDetailed(cfg, 'Alpha. Gamma.');
+    assert.equal(second.translation, '译文0. 译文0.', '缓存命中拼装路径同样保留句间空格');
+    assert.equal(second.stats.cacheHits, 1);
+    assert.equal(server.requests.length, 2, '第二次只发缺失句，Alpha 走缓存');
+  } finally {
+    await server.close();
+  }
+});
+
+test('句子级缓存拼装：段落空行保留（第一句。\n\n 第二句不丢空行）', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => batchOk(['a', 'b']));
+  // targetLang 设为英文，原文是中文：避免本地跳过（中文不是英文目标语言）。
+  const cfg = cfgFor(server.port, { sentenceCache: true, targetLang: 'English' });
+  try {
+    const result = await translateOneDetailed(cfg, '第一句。\n\n第二句');
+    // 修复前纯空白段（\n\n）会被整体丢弃，输出退化成单行 "译文0。译文1"。
+    assert.equal(result.translation, '译文0。\n\n译文1', '段落空行分隔保留');
+  } finally {
+    await server.close();
+  }
+});
+
+test('批次内归一化去重：大小写/句末标点变体只翻译一次（省 Token）', async () => {
+  const server = await startMockServer();
+  // 按请求条目数动态返回（返回条数不符会触发逐条回退，测不到合并效果）
+  server.setHandler((req) => {
+    const content = req.body.messages[1].content;
+    const texts = [...content.matchAll(/"text":"([^"]*)"/g)].map((m) => m[1]);
+    return batchOk(texts);
+  });
+  const cfg = cfgFor(server.port);
+  try {
+    // 注意：不能用 "Read more" 这类词——它们在内置术语表里会直接 0 Token 命中
+    // （术语命中比去重更省），测不到批次内去重。这里用业务文案。
+    const result = await translateBatchDetailed(cfg, [
+      'Quarterly revenue increased',
+      'quarterly revenue increased.',
+      'QUARTERLY REVENUE INCREASED!',
+      'Totally different sentence',
+    ]);
+    // 三条互为归一化变体 → 只发送一次，共享同一译文
+    assert.equal(result.stats.duplicateHits, 2, '两条变体应命中批次内去重');
+    assert.equal(result.translations[0], result.translations[1]);
+    assert.equal(result.translations[1], result.translations[2]);
+    // 实际只发 1 次请求，且请求体只有 2 条（1 条变体 + 1 条不同句）
+    assert.equal(server.requests.length, 1);
+  } finally {
+    await server.close();
+  }
+});
+
+test('去重回填缓存：每个变体原文都写入整段缓存（下次不再付费）', async () => {
+  const server = await startMockServer();
+  server.setHandler(() => batchOk(['a', 'b']));
+  const cfg = cfgFor(server.port);
+  try {
+    await translateBatchDetailed(cfg, ['Quarterly revenue increased', 'quarterly revenue increased.']);
+    const again = await translateBatchDetailed(cfg, ['quarterly revenue increased.']);
+    // 第二次取「变体原文」本身也应命中缓存，而不是重新翻译
+    assert.equal(again.stats.cacheHits, 1, '变体原文应命中整段缓存');
+    assert.equal(again.stats.requests, 0);
+  } finally {
+    await server.close();
+  }
+});

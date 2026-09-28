@@ -10,12 +10,15 @@ import {
   OBSERVED_CLASS,
   isVisible,
   closestTextBlock,
+  isInteractiveControl,
 } from '../utils/dom.ts';
 import { planTextChunks, takeFirstTextChunk } from '../utils/chunking.ts';
 import {
   configItem,
   disabledSitesItem,
   autoSitesItem,
+  alwaysSitesItem,
+  neverSitesItem,
   toolbarPosItem,
   settingsPanelPosItem,
   setupNoticeShownItem,
@@ -31,13 +34,21 @@ import {
   makeDraggable,
   setThemeOverride,
   themeColors,
+  applyThemeVars,
 } from '../utils/content-ui.ts';
 import { mountImageResultOverlay } from '../utils/image-overlay.ts';
 import { isRetryableTranslationError, NoticeCycleGate } from '../utils/notice-policy.ts';
 import { SessionTranslationCache } from '../utils/session-translation-cache.ts';
 import { addHistoryEntry } from '../utils/history-store.ts';
 import { randomId } from '../utils/id.ts';
-import { isSiteDisabled, withSiteDisabled } from '../utils/site-policy.ts';
+import {
+  isSiteDisabled,
+  withSiteDisabled,
+  isAlwaysSite,
+  withAlwaysSite,
+  isNeverSite,
+  withNeverSite,
+} from '../utils/site-policy.ts';
 import { UI_SURFACE_SELECTOR } from '../utils/dom.ts';
 import { normalizeConfig, getProviderApiKey, type AppConfig } from '../utils/config.ts';
 import { buildConfigForm } from '../utils/ui.ts';
@@ -62,6 +73,8 @@ const MAX_TRANSLATION_RETRIES = 2;
 
 export default defineContentScript({
   matches: ['<all_urls>'],
+  // 顶层文档脚本：UI（工具栏/浮层/划词）与整页翻译。
+  // iframe 内嵌内容暂不翻译（主脚本 UI 与翻译深度耦合，独立 iframe 脚本留待后续）。
   runAt: 'document_idle',
   main() {
     // v0.2.0 一次性迁移：翻译模式默认改为「手动」（SW 休眠时由内容脚本兜底执行）
@@ -109,7 +122,17 @@ export default defineContentScript({
     const sessionTranslations = new SessionTranslationCache();
     let translationConfigRevision = 0;
     let currentTranslationStyle = 'plain';
+    // 0.2.2 译文排版自定义：跟随配置加载与变化，插译文节点时传给 createTranslationNode。
+    let currentFontSize = 0;
+    let currentLineHeight = 0;
+    let currentOpacity = 0;
+    let currentColor = '';
+    // 0.2.2 对照模式：below=译文在原文下方（默认）；translation-only=只显示译文（原文悬停显示）；
+    // hover-original=显示译文但悬停译文时临时显示原文（与沉浸式「悬停看原文」对应）。
+    let currentDualMode: 'below' | 'translation-only' | 'hover-original' = 'below';
     let currentTranslateMode: 'auto' | 'manual' = 'manual';
+    // 主引擎基准（降级提示用）：配置加载与变化时同步；实际成功引擎与之不同即发生降级。
+    let currentProvider = '';
     // 站点级「总是自动翻译此站」显式开启时，覆盖全局手动模式——该站表现为完整自动翻译
     let thisSiteAutoOverride = false;
     const effectiveAutoMode = () => currentTranslateMode === 'auto' || thisSiteAutoOverride;
@@ -137,6 +160,23 @@ export default defineContentScript({
     } catch {
       /* 存储监听不可用时，仍使用首次读取到的站点规则。 */
     }
+    // 0.2.2 白名单 / 敏感列表变化：重新评估本站站点规则（可能触发 自动翻译 / 暂停）
+    try {
+      alwaysSitesItem.watch(() => {
+        sitePolicyRevision++;
+        void refreshSiteRules();
+      });
+    } catch {
+      /* 存储监听不可用 */
+    }
+    try {
+      neverSitesItem.watch(() => {
+        sitePolicyRevision++;
+        void refreshSiteRules();
+      });
+    } catch {
+      /* 存储监听不可用 */
+    }
     const initialSitePolicyRevision = sitePolicyRevision;
     const sitePolicyReady = disabledSitesItem
       .getValue()
@@ -146,19 +186,11 @@ export default defineContentScript({
         }
       })
       .then(async () => {
-        // 自动翻译此站：站点在自动翻译列表且未被暂停时，页面加载后自动开始翻译。
+        // 站点规则统一评估：敏感(never) / 暂停(disabled) / 白名单(always，强制自动) / 自动列表(auto)。
+        // 0.2.2 起改用 refreshSiteRules() 一次性覆盖全部规则，避免各列表各自校验互相冲突。
         try {
-          const autoSites = await autoSitesItem.getValue();
-          // null（未配置）= 默认自动翻译此站；配置过则按列表判断
-          const autoEnabled = autoSites === null || isSiteDisabled(autoSites, location.href);
-          // 站点级显式开启 → 覆盖全局手动模式
-          thisSiteAutoOverride = Array.isArray(autoSites) && isSiteDisabled(autoSites, location.href);
-          if (autoEnabled) {
+          if (!sitePolicyLoaded) {
             await new Promise<void>((resolve) => {
-              if (sitePolicyLoaded) {
-                resolve();
-                return;
-              }
               const timer = setInterval(() => {
                 if (sitePolicyLoaded) {
                   clearInterval(timer);
@@ -166,10 +198,9 @@ export default defineContentScript({
                 }
               }, 60);
             });
-            if (!siteDisabled && !document.querySelector('.ot-translation') && (currentTranslateMode === 'auto' || thisSiteAutoOverride)) {
-              void translatePage(true);
-            }
           }
+          // 传入链起始 revision：消息在读取期间到达也算竞态，放弃本次列表评估
+          await refreshSiteRules(initialSitePolicyRevision);
         } catch {
           /* 存储不可用时跳过自动翻译 */
         }
@@ -185,13 +216,25 @@ export default defineContentScript({
         translationConfigRevision++;
         sessionTranslations.clear();
         if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+        if (v && typeof v.provider === 'string') currentProvider = v.provider;
         if (v && (v.translateMode === 'auto' || v.translateMode === 'manual')) currentTranslateMode = v.translateMode;
         hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
         inputTranslateEnabled = v ? v.inputTranslate !== false : true;
         streamingEnabled = v ? v.streaming !== false : true;
+        // 0.2.2 排版自定义与对照模式：配置变化时同步本地状态，
+        // 并对已渲染译文就地更新样式 / 对照模式（无需重译）。
+        if (v && typeof v.translationFontSize === 'number') currentFontSize = v.translationFontSize;
+        if (v && typeof v.translationLineHeight === 'number') currentLineHeight = v.translationLineHeight;
+        if (v && typeof v.translationOpacity === 'number') currentOpacity = v.translationOpacity;
+        if (v && typeof v.translationColor === 'string') currentColor = v.translationColor;
+        if (v && (v.dualMode === 'below' || v.dualMode === 'translation-only' || v.dualMode === 'hover-original')) {
+          currentDualMode = v.dualMode;
+        }
         document.querySelectorAll('.ot-translation').forEach((el) => {
           (el as HTMLElement).dataset.style = currentTranslationStyle;
         });
+        applyDualModeToExisting();
+        applyTypographyToExisting();
       });
       void configItem
         .getValue()
@@ -202,10 +245,18 @@ export default defineContentScript({
             currentTtsVoice = typeof v.ttsVoiceName === 'string' ? v.ttsVoiceName : '';
           }
           if (v && typeof v.translationStyle === 'string') currentTranslationStyle = v.translationStyle;
+          if (v && typeof v.provider === 'string') currentProvider = v.provider;
           if (v && (v.translateMode === 'auto' || v.translateMode === 'manual')) currentTranslateMode = v.translateMode;
           hoverTranslateEnabled = v ? v.hoverTranslate !== false : true;
           inputTranslateEnabled = v ? v.inputTranslate !== false : true;
           streamingEnabled = v ? v.streaming !== false : true;
+          if (v && typeof v.translationFontSize === 'number') currentFontSize = v.translationFontSize;
+          if (v && typeof v.translationLineHeight === 'number') currentLineHeight = v.translationLineHeight;
+          if (v && typeof v.translationOpacity === 'number') currentOpacity = v.translationOpacity;
+          if (v && typeof v.translationColor === 'string') currentColor = v.translationColor;
+          if (v && (v.dualMode === 'below' || v.dualMode === 'translation-only' || v.dualMode === 'hover-original')) {
+            currentDualMode = v.dualMode;
+          }
         })
         .catch(() => {});
       // 双向同步：设置变化时刷新已打开的大面板与快速设置面板，保证两边状态一致。
@@ -228,6 +279,7 @@ export default defineContentScript({
         // 主题手动覆盖（auto/light/dark）：影响后续新建的所有浮层。
         setThemeOverride(v.themeMode === 'light' || v.themeMode === 'dark' ? v.themeMode : 'auto');
         if (typeof v.targetLang === 'string') currentTargetLang = v.targetLang;
+        if (typeof v.provider === 'string') currentProvider = v.provider;
         currentTtsVoice = typeof v.ttsVoiceName === 'string' ? v.ttsVoiceName : '';
         hoverTranslateEnabled = v.hoverTranslate !== false;
         inputTranslateEnabled = v.inputTranslate !== false;
@@ -275,6 +327,16 @@ export default defineContentScript({
         settingsPanel?.update({ autoTranslate: autoOn });
         fullSettingsFormApi?.updateSiteState(autoOn, undefined);
       });
+      safeWatch(alwaysSitesItem, (sites) => {
+        const alwaysOn = isAlwaysSite(sites, location.href);
+        settingsPanel?.update({ siteAlways: alwaysOn });
+        fullSettingsFormApi?.updateSiteState(undefined, undefined, alwaysOn, undefined);
+      });
+      safeWatch(neverSitesItem, (sites) => {
+        const neverOn = isNeverSite(sites, location.href);
+        settingsPanel?.update({ siteNever: neverOn });
+        fullSettingsFormApi?.updateSiteState(undefined, undefined, undefined, neverOn);
+      });
     } catch {
       /* 极少数页面中 storage 监听不可用时，仅保留当前页面会话缓存。 */
     }
@@ -318,6 +380,8 @@ export default defineContentScript({
       savedTokens: number;
       /** 命中「原文已是目标语言」本地跳过：界面据此提示而非静默显示原文 */
       localSkipped?: boolean;
+      /** 实际成功引擎：主引擎失败降级后为备用引擎 id（默认=主引擎），前端据此提示降级 */
+      usedProvider?: string;
     };
     type StreamPort = ReturnType<typeof runtime.connect>;
     type StreamWaiter = {
@@ -386,6 +450,7 @@ export default defineContentScript({
             done?: unknown;
             translation?: unknown;
             issue?: unknown;
+            usedProvider?: unknown;
             error?: unknown;
             stats?: { estimatedTokensSaved?: unknown; localSkipped?: unknown };
           }
@@ -415,6 +480,7 @@ export default defineContentScript({
         issue: Array.isArray(msg.issue) ? (msg.issue as string[]) : null,
         savedTokens: Math.max(0, Number(msg.stats?.estimatedTokensSaved) || 0),
         localSkipped: msg.stats?.localSkipped === true,
+        usedProvider: typeof msg.usedProvider === 'string' ? msg.usedProvider : undefined,
       });
     }
 
@@ -447,7 +513,7 @@ export default defineContentScript({
     function streamTranslateOne(
       text: string,
       onDelta: (partial: string) => void,
-      options?: { jobId?: string; context?: { title?: string; prev?: string } },
+      options?: { jobId?: string; context?: { title?: string; prev?: string }; signal?: AbortSignal },
     ): Promise<StreamResult> | null {
       if (!streamingEnabled) return null;
       const port = getStreamPort();
@@ -457,6 +523,22 @@ export default defineContentScript({
         const waiter: StreamWaiter = { port, onDelta, resolve, reject, timer: null };
         streamWaiters.set(id, waiter);
         armStreamTimer(id, waiter);
+        // 所有等待方离开时整条请求被中止：主动通知后台取消生成（避免白烧 Token），
+        // 并同步拒绝本地 waiter，防止悬挂的 Promise 在后台结果到达时才被唤醒。
+        const onAbort = () => {
+          if (streamWaiters.delete(id)) {
+            if (waiter.timer) clearTimeout(waiter.timer);
+            notifyCancelStream(id);
+            reject(new Error('翻译任务已取消'));
+          }
+        };
+        if (options?.signal) {
+          if (options.signal.aborted) {
+            onAbort();
+            return;
+          }
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        }
         try {
           port.postMessage({
             type: 'translate-one',
@@ -466,6 +548,7 @@ export default defineContentScript({
             context: options?.context,
           });
         } catch (error) {
+          options?.signal?.removeEventListener('abort', onAbort);
           if (waiter.timer) clearTimeout(waiter.timer);
           streamWaiters.delete(id);
           if (streamPort === port) streamPort = null;
@@ -476,6 +559,18 @@ export default defineContentScript({
 
     // 单条翻译统一入口：能流式就流式（首字更快），流式不可用 / 超时 / 出错立即回退普通请求，
     // 回退后的最终译文会覆盖已经显示的增量，用户看不到中间失败。
+    // in-flight 去重：同一文本在途时复用同一请求，避免悬停移开再移回 / 快速重复触发双发
+    // （双发 = 双倍 Token）。键含配置版本与目标语言：配置变化后旧请求结果不再被新场景复用。
+    // 所有等待方离开且请求未完成时中止整个请求（含流式取消与普通请求回退拦截），
+    // 避免「移开不再回来」的悬停气泡把一次无人查看的翻译跑完白烧 Token。
+    const pendingSingleTranslations = new Map<
+      string,
+      {
+        promise: Promise<StreamResult>;
+        deltas: Set<(partial: string) => void>;
+        controller: AbortController;
+      }
+    >();
     async function translateOneText(
       text: string,
       options?: {
@@ -484,29 +579,113 @@ export default defineContentScript({
         onDelta?: (partial: string) => void;
       },
     ): Promise<StreamResult> {
+      const requestKey = `${translationConfigRevision}|${currentTargetLang}|${text}`;
+      const inFlight = pendingSingleTranslations.get(requestKey);
+      if (inFlight) {
+        // 复用同一在途请求：增量广播给所有等待方，完成后共享结果。
+        const hadDelta = !!options?.onDelta;
+        if (options?.onDelta) inFlight.deltas.add(options.onDelta);
+        try {
+          return await inFlight.promise;
+        } finally {
+          if (options?.onDelta) inFlight.deltas.delete(options.onDelta);
+          // 等待方全部离开（复用者退出且发起者已无增量订阅）→ 无人查看，中止整条请求。
+          if (hadDelta && inFlight.deltas.size === 0 && !inFlight.controller.signal.aborted) {
+            inFlight.controller.abort();
+          }
+        }
+      }
+      const deltas = new Set<(partial: string) => void>();
+      if (options?.onDelta) deltas.add(options.onDelta);
+      const controller = new AbortController();
+      const promise = doTranslateOneText(text, deltas, controller.signal, options);
+      pendingSingleTranslations.set(requestKey, { promise, deltas, controller });
+      try {
+        const result = await promise;
+        // 仅发起方累计「约省 Token」：等待方复用同一请求，不重复累加（数字虚高会误导用户）。
+        estimatedTokensSaved += result.savedTokens;
+        return result;
+      } finally {
+        // 仅当仍指向本请求时清除：配置变化后新键已生成，旧项自然淘汰。
+        if (pendingSingleTranslations.get(requestKey)?.promise === promise) {
+          pendingSingleTranslations.delete(requestKey);
+        }
+        deltas.clear();
+      }
+    }
+    async function doTranslateOneText(
+      text: string,
+      deltas: Set<(partial: string) => void>,
+      signal: AbortSignal,
+      options?: {
+        jobId?: string;
+        context?: { title?: string; prev?: string };
+        onDelta?: (partial: string) => void;
+      },
+    ): Promise<StreamResult> {
+      const broadcastDelta = (partial: string) => {
+        deltas.forEach((cb) => {
+          try {
+            cb(partial);
+          } catch {
+            /* 单个调用方渲染失败不影响其他等待方 */
+          }
+        });
+      };
       if (options?.onDelta) {
-        const streamed = streamTranslateOne(text, options.onDelta, options);
+        const streamed = streamTranslateOne(text, broadcastDelta, {
+          ...options,
+          signal,
+        });
         if (streamed) {
           try {
             const result = await streamed;
-            if (result.translation) return result;
-          } catch {
+            if (result.translation) {
+              maybeNotifyFallback(result.usedProvider);
+              return result;
+            }
+          } catch (error) {
+            // 所有等待方已离开（移开不再回来）：整条请求被中止，直接抛错不回退普通请求。
+            // 否则流式取消后落入 TRANSLATE_ONE 普通请求，等于没省 Token。
+            if (signal.aborted) throw error;
             /* 落到下面的普通请求 */
           }
         }
       }
-      const res: any = await sendRuntimeMessage({
-        type: 'TRANSLATE_ONE',
-        payload: { text, jobId: options?.jobId, context: options?.context },
+      // 普通请求无原生取消：abort 时放弃等待（请求可能在后台继续，但已无任何 UI 等待方，
+      // 且后台自身有 15s 空闲超时 + 任务取消联动，不会无限占用）。
+      if (signal.aborted) throw new Error('翻译任务已取消');
+      const res: any = await new Promise<any>((resolve, reject) => {
+        const onAbort = () => reject(new Error('翻译任务已取消'));
+        if (signal.aborted) {
+          reject(new Error('翻译任务已取消'));
+          return;
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+        sendRuntimeMessage({
+          type: 'TRANSLATE_ONE',
+          payload: { text, jobId: options?.jobId, context: options?.context },
+        }).then(
+          (value) => {
+            signal.removeEventListener('abort', onAbort);
+            resolve(value);
+          },
+          (error) => {
+            signal.removeEventListener('abort', onAbort);
+            reject(error);
+          },
+        );
       });
       if (!res?.ok) throw new Error(res?.error || '翻译失败');
       const translation = typeof res.translation === 'string' ? res.translation : '';
       if (!translation) throw new Error('翻译服务返回了空结果');
+      maybeNotifyFallback(typeof res.usedProvider === 'string' ? res.usedProvider : undefined);
       return {
         translation,
         issue: Array.isArray(res.issue) ? (res.issue as string[]) : null,
         savedTokens: Math.max(0, Number(res.stats?.estimatedTokensSaved) || 0),
         localSkipped: res.localSkipped === true,
+        usedProvider: typeof res.usedProvider === 'string' ? res.usedProvider : undefined,
       };
     }
 
@@ -635,8 +814,17 @@ export default defineContentScript({
         sourceText,
         onEdit: (next) => handleTranslationEdit(el, next),
         style: currentTranslationStyle,
+        // 0.2.2 排版自定义：0 = 跟随原文默认值
+        fontSize: currentFontSize > 0 ? currentFontSize : undefined,
+        lineHeight: currentLineHeight > 0 ? currentLineHeight : undefined,
+        opacity: currentOpacity > 0 ? currentOpacity : undefined,
+        color: currentColor || undefined,
       });
       translationNodes.set(el, node);
+      // 节点上直接挂锚点引用：对照模式批量应用时需要「节点 → 原文锚点」的反查
+      //（WeakMap 不可迭代），且避免按 class 猜测锚点出现误判。
+      (node as HTMLSpanElement & { otAnchor?: Element }).otAnchor = el;
+      applyDualModeToNode(el, node);
       const tag = el.tagName;
       const role = el.getAttribute('role');
       if (
@@ -669,6 +857,92 @@ export default defineContentScript({
       applyWithFallback(el, node, computePlacementStrategies(el));
     }
 
+    // ===== 0.2.2 对照模式：below / translation-only / hover-original =====
+    // below：译文在原文下方（默认，已有行为）。
+    // translation-only：隐藏原文只留译文，悬停译文时临时显示原文（找回原文）。
+    // hover-original：译文在下方，悬停译文时临时把原文高亮显示（对照阅读）。
+    // 实现一律走「类切换 + 内联覆盖」：译文节点自带 display:block !important，
+    // 且测试页不加载 content.css，仅靠外部样式表不可靠（第 5 轮踩过同样的坑），
+    // 因此原文显隐 / 悬停高亮直接写内联样式，CSS 类作为状态标记与生产兜底。
+    // 切换不删节点、不重译（0 Token）。
+    const DUAL_HIDDEN_OPACITY = '0';
+    const DUAL_HIDDEN_USER_SELECT = 'none';
+    function applyDualModeToNode(el: Element, node: HTMLSpanElement) {
+      const mode = currentDualMode;
+      const source = el as HTMLElement;
+      if (mode === 'below') {
+        node.classList.remove('ot-dual-translation-only', 'ot-dual-hover-original');
+        node.classList.add('ot-dual-below');
+        source.classList.remove('ot-dual-source-hidden', 'ot-dual-source-hover');
+        source.style.removeProperty('opacity');
+        source.style.removeProperty('user-select');
+        source.style.removeProperty('background');
+        return;
+      }
+      if (mode === 'translation-only') {
+        node.classList.remove('ot-dual-below', 'ot-dual-hover-original');
+        node.classList.add('ot-dual-translation-only');
+        // 原文隐藏，但保留占位锚点高度避免整页跳动；悬停译文时恢复原文。
+        source.classList.add('ot-dual-source-hidden');
+        source.classList.remove('ot-dual-source-hover');
+        source.style.setProperty('opacity', DUAL_HIDDEN_OPACITY, 'important');
+        source.style.setProperty('user-select', DUAL_HIDDEN_USER_SELECT, 'important');
+        source.style.removeProperty('background');
+        return;
+      }
+      // hover-original
+      node.classList.remove('ot-dual-below', 'ot-dual-translation-only');
+      node.classList.add('ot-dual-hover-original');
+      source.classList.remove('ot-dual-source-hidden');
+      source.classList.add('ot-dual-source-hover');
+      source.style.removeProperty('opacity');
+      source.style.removeProperty('user-select');
+      source.style.removeProperty('background');
+    }
+
+    // 悬停译文时：translation-only 恢复原文（opacity 1）；hover-original 高亮背景。
+    function applyDualHover(anchor: Element, active: boolean) {
+      const host = anchor as HTMLElement;
+      if (currentDualMode === 'translation-only') {
+        host.style.setProperty('opacity', active ? '1' : DUAL_HIDDEN_OPACITY, 'important');
+      } else if (currentDualMode === 'hover-original') {
+        host.style.setProperty(
+          'background',
+          active ? 'rgba(255, 193, 7, 0.16)' : '',
+          'important',
+        );
+        if (active) host.style.setProperty('border-radius', '3px', 'important');
+        else host.style.removeProperty('border-radius');
+      }
+    }
+
+    function applyDualModeToExisting() {
+      document.querySelectorAll('.ot-translation').forEach((node) => {
+        const span = node as HTMLSpanElement & { otAnchor?: Element };
+        const anchor = span.otAnchor;
+        if (anchor && anchor.isConnected) applyDualModeToNode(anchor, span);
+        else {
+          span.classList.remove('ot-dual-below', 'ot-dual-translation-only', 'ot-dual-hover-original');
+          span.classList.add(currentDualMode === 'below' ? 'ot-dual-below' : 'ot-dual-translation-only');
+        }
+      });
+    }
+
+    // 0.2.2 排版自定义批量应用：配置变化时更新已渲染译文，无需重译。
+    function applyTypographyToExisting() {
+      document.querySelectorAll('.ot-translation').forEach((node) => {
+        const host = node as HTMLElement;
+        if (currentFontSize > 0) host.style.setProperty('--ot-font-size', `${currentFontSize}px`);
+        else host.style.removeProperty('--ot-font-size');
+        if (currentLineHeight > 0) host.style.setProperty('--ot-line-height', String(currentLineHeight));
+        else host.style.removeProperty('--ot-line-height');
+        if (currentOpacity > 0) host.style.setProperty('--ot-opacity', String(currentOpacity));
+        else host.style.removeProperty('--ot-opacity');
+        if (currentColor) host.style.setProperty('--ot-color', currentColor);
+        else host.style.removeProperty('--ot-color');
+      });
+    }
+
     type PlacementStrategy = 'inside' | 'afterend';
 
     // 「嵌入原文块内部」时，若锚点自身是行向 flex/grid 容器，直接 append 会让
@@ -690,6 +964,11 @@ export default defineContentScript({
         if (!horizontal) break;
         const last = kids[kids.length - 1] as HTMLElement | undefined;
         if (!last || last.tagName === 'BR') break;
+        // 下潜目标是「原子」视觉单元时必须停：按钮/行内元素/「文本+按钮」混合条
+        // （Apple 官网 hero 价格条）被塞入译文后会撑爆——胶囊变圆、横条爆高。
+        if (isInteractiveControl(last)) break;
+        if (getComputedStyle(last).display.startsWith('inline')) break;
+        if (last.querySelector('a, button, [role="button"]')) break;
         host = last;
       }
       return host;
@@ -705,6 +984,13 @@ export default defineContentScript({
         );
       const ownFloat = cs.float !== 'none';
       const ownAbs = cs.position === 'absolute' || cs.position === 'fixed';
+      // 行向 flex/grid 的「inside + 纵向下潜」会把译文塞进子项内部，把按钮
+      // 撑变形（Apple 官网 .tile-ctas 的胶囊按钮被撑成正圆），或作为新 item
+      // 挤压整行布局：这类锚点一律插到容器外面。
+      const ownHorizontalFlex =
+        (cs.display.includes('flex') && !(cs.flexDirection || 'row').includes('column')) ||
+        (cs.display.includes('grid') &&
+          (cs.gridTemplateColumns || '').split(' ').filter(Boolean).length > 1);
       // 多列布局祖先加深到 6 层：嵌套卡片内的多列文本此前漏判导致译文流入下一列
       let columnAncestor = false;
       let depth = 0;
@@ -719,6 +1005,7 @@ export default defineContentScript({
           break;
         }
       }
+      if (ownHorizontalFlex) return ['afterend'];
       if (parentCreatesLayout || ownFloat || ownAbs || columnAncestor) {
         return ['inside', 'afterend'];
       }
@@ -798,6 +1085,8 @@ export default defineContentScript({
       }
       insertTranslation(el, translation, original);
       markTranslated(el);
+      // 第 10 轮：重试成功后清除失败标记（保留会给整页完成文案误报失败数）。
+      el.removeAttribute('data-retryable');
       return 'inserted';
     }
 
@@ -829,23 +1118,31 @@ export default defineContentScript({
         statusEl.id = 'ot-status';
         statusEl.setAttribute('role', 'status');
         statusEl.setAttribute('aria-live', 'polite');
+        // 玻璃材质与主题色：此前状态条写死为深色（rgba(28,28,30,0.86)），
+        // 在浅色网页上突兀且与其余浮层不是同一种材质。改为跟随主题的玻璃胶囊。
+        const st = themeColors();
         Object.assign(statusEl.style, {
           position: 'fixed',
           right: '20px',
-          bottom: '74px',
+          bottom: '78px',
           zIndex: '2147483646',
-          background: 'rgba(28,28,30,0.86)',
-          color: '#fff',
+          background: st.surface,
+          color: st.text,
+          backdropFilter: st.backdrop,
+          WebkitBackdropFilter: st.backdrop,
+          border: `0.5px solid ${st.border}`,
           font: '12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          padding: '6px 11px',
-          borderRadius: '8px',
+          padding: '7px 12px',
+          borderRadius: '11px',
           pointerEvents: 'none',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+          boxShadow: `${st.highlight}, ${st.shadow}`,
           opacity: '0',
-          transition: 'opacity 0.2s ease',
+          transition: 'opacity 0.2s ease, transform 0.2s ease',
           maxWidth: '300px',
           whiteSpace: 'normal',
-          textAlign: 'right',
+          // 左对齐：整页完成文案（含「· 约省 N Token · 滚动时继续 · 主引擎不可用…」
+          // 等多段拼接）较长，右对齐在多行时右侧参差难读。
+          textAlign: 'left',
           overflowWrap: 'break-word',
         });
         document.documentElement.appendChild(statusEl);
@@ -863,8 +1160,67 @@ export default defineContentScript({
       if (statusEl) statusEl.style.opacity = '0';
     }
 
+    // 降级提示：实际成功引擎 ≠ 用户配置的主引擎时，一次性说明「已自动切换」，
+    // 避免用户看到译文却以为还在用自己的模型（质量/价格预期错位）。
+    // 只提示一次：同一会话内后续降级不重复打扰（noticeCycles 语义类似）。
+    // 单条交互立即弹状态；整页翻译则记录到完成文案里（否则会被「已翻译 N 段」覆盖）。
+    let fallbackNotified = false;
+    let currentFallbackName = '';
+    function maybeNotifyFallback(providerId: string | undefined) {
+      if (!providerId || fallbackNotified) return;
+      // currentProvider 为 ''（配置尚未同步）时无法判断是否降级，不提示；
+      // 已同步且实际引擎等于主引擎 → 正常路径，不提示。
+      if (currentProvider && providerId === currentProvider) return;
+      const name = PROVIDERS.find((p) => p.id === providerId)?.name || providerId;
+      fallbackNotified = true;
+      currentFallbackName = name;
+      // 整页翻译进行中：降级说明合并到最终完成提示，避免瞬时弹窗被覆盖。
+      // 单条交互（划词/悬停/手动）不在整页任务中，直接弹一次性提示。
+      if (!busy) {
+        showStatus(`主引擎不可用，已切换至 ${name} 翻译`, true, 4000);
+      }
+    }
+    function fallbackSuffix(): string {
+      return fallbackNotified ? ` · 主引擎不可用，已用 ${currentFallbackName} 翻译` : '';
+    }
+
     // ===== 翻译清理：移除所有已插入的译文节点 + 清除标记 =====
     // 这是解决"多次点击导致译文堆叠"的核心：每次整页翻译前先彻底清理上一次的残留。
+    // ===== 译文显隐切换（0 Token）：临时看原文 / 看译文 =====
+    // 动机：此前想「只看原文」只能点收起（clearTranslations）——译文被删除，
+    // 再想看译文必须整页重译，等于同一批内容重复付费。改用纯 CSS 显隐，
+    // 来回切换不产生任何请求，也保留已翻译结果。
+    let translationsHidden = false;
+
+    function setTranslationsHidden(hidden: boolean): void {
+      translationsHidden = hidden;
+      // 根节点 class 作为状态标记（供样式与测试判定）。
+      document.documentElement.classList.toggle('ot-hide-translations', hidden);
+      // 必须逐个改内联样式：译文节点自身带 display:block !important，
+      // 外部样式表的 !important 无法覆盖内联 !important，只能以同级内联覆盖。
+      // 节点数通常几十~几百，偶发切换的遍历开销可忽略（远小于一次翻译请求）。
+      document.querySelectorAll('.ot-translation').forEach((el) => {
+        (el as HTMLElement).style.setProperty(
+          'display',
+          hidden ? 'none' : 'block',
+          'important',
+        );
+      });
+      const btn = document.getElementById('ot-hide-btn');
+      if (btn) {
+        btn.textContent = hidden ? '\u{1F441}\uFE0E' : '\u{1F441}\uFE0E'; // 保持图标，状态由样式与 title 表达
+        btn.title = hidden ? '显示译文（快捷键 Alt+S）' : '隐藏译文（快捷键 Alt+S）';
+        btn.setAttribute('aria-label', btn.title);
+        btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        btn.style.opacity = hidden ? '0.45' : '1';
+      }
+    }
+
+    function toggleTranslations(): void {
+      setTranslationsHidden(!translationsHidden);
+      showStatus(translationsHidden ? '已隐藏译文（再按 Alt+S 恢复，不会重新翻译）' : '已显示译文', true, 2200);
+    }
+
     function clearTranslations() {
       stopDynamic();
       stopLazyTranslation();
@@ -881,6 +1237,10 @@ export default defineContentScript({
       document
         .querySelectorAll(`.${TRANSLATED_CLASS}`)
         .forEach((el) => (el as HTMLElement).classList.remove(TRANSLATED_CLASS));
+      // 第 10 轮：清除失败重试标记（收起全部译文时一并复位，避免残留脏标记）
+      document
+        .querySelectorAll('[data-retryable="true"]')
+        .forEach((el) => el.removeAttribute('data-retryable'));
       // 清除排队中标记
       document
         .querySelectorAll(`.${PENDING_CLASS}`)
@@ -1035,7 +1395,7 @@ export default defineContentScript({
         if (activePageJobId === jobId) {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
           const failureText = failures > 0 ? ` · ${failures} 批失败` : '';
-          showStatus(`已翻译 ${progressText()} 段${savedText}${failureText} · 滚动时继续`, true);
+          showStatus(`已翻译 ${progressText()} 段${savedText}${failureText}${fallbackSuffix()} · 滚动时继续`, true);
         }
       } finally {
         if (activePageJobId === jobId) {
@@ -1077,6 +1437,7 @@ export default defineContentScript({
               payload: { text: item.text, jobId, context },
             });
             if (!r?.ok) throw new Error(r?.error || '逐条翻译失败');
+            maybeNotifyFallback(typeof r.usedProvider === 'string' ? r.usedProvider : undefined);
             const t = typeof r.translation === 'string' ? r.translation : '';
             if (!t) throw new Error('翻译服务返回了空结果');
             if (jobId && activePageJobId !== jobId) return;
@@ -1133,11 +1494,13 @@ export default defineContentScript({
               translations?: unknown;
               issues?: (string[] | null)[] | null;
               stats?: { estimatedTokensSaved?: number };
+              usedProvider?: string;
               error?: string;
             }
           | undefined;
         if (jobId && activePageJobId !== jobId) return;
         if (!res?.ok) throw new Error(res?.error || '翻译失败');
+        maybeNotifyFallback(res.usedProvider);
         const translations = res.translations;
         if (!Array.isArray(translations) || translations.length !== items.length) {
           // 批量响应条目数异常：逐条回退翻译，避免整页翻译被单批错误中断。
@@ -1198,6 +1561,9 @@ export default defineContentScript({
               const attempts = retryCounts.get(item.el) || 0;
               if (attempts >= MAX_TRANSLATION_RETRIES) return false;
               retryCounts.set(item.el, attempts + 1);
+              // 第 10 轮：失败段落标记可重试，提示用户可点击重译（手动模式点击段落
+              // 会重新走 manualTranslateBlock；自动模式滚动到视口自动重试）。
+              (item.el as HTMLElement).dataset.retryable = 'true';
               return true;
             })
           : [];
@@ -1206,6 +1572,8 @@ export default defineContentScript({
             if (!jobId || activePageJobId === jobId) observeForLazyTranslation(retryable);
           }, 500);
         }
+        // 第 10 轮：失败原因以状态条呈现（重试入口可见），不再只弹模态打断阅读。
+        // 整页完成提示会附带「N 段失败」统计（见 translatePage 完成文案）。
         throw error;
       } finally {
         // 失败时允许后续动态扫描重试；成功时 markTranslated 已移除此标记。
@@ -1344,15 +1712,24 @@ export default defineContentScript({
         if (activePageJobId !== jobId) return;
 
         if (failures > 0) {
-          showStatus(`已翻译 ${progressText()} 段，${failures} 个批次失败`, true);
+          // 第 10 轮：失败段明确提示数量与重试方式（滚动到视口自动重试 /
+          // 手动模式点击段落重试），不再让用户面对「明明有译文却少了几个」的困惑。
+          const retryHint =
+            document.querySelectorAll('[data-retryable="true"]').length > 0
+              ? '，滚动或点击失败段落可重试'
+              : '';
+          showStatus(
+            `已翻译 ${progressText()} 段，${failures} 个批次失败${retryHint}${fallbackSuffix()}`,
+            true,
+          );
         } else if (translatedCount === 0) {
           const savedText =
             estimatedTokensSaved > 0 ? `，本地约省 ${estimatedTokensSaved} Token` : '';
-          showStatus(`无需翻译（内容已为目标语言）${savedText}`, true);
+          showStatus(`无需翻译（内容已为目标语言）${savedText}${fallbackSuffix()}`, true);
         } else {
           const savedText = estimatedTokensSaved > 0 ? ` · 约省 ${estimatedTokensSaved} Token` : '';
           const lazyText = deferredCount > 0 ? ' · 滚动时继续' : '';
-          showStatus(`已翻译 ${progressText()} 段${savedText}${lazyText}`, true);
+          showStatus(`已翻译 ${progressText()} 段${savedText}${lazyText}${fallbackSuffix()}`, true);
         }
       } catch (e: any) {
         showNotice(e?.message || '翻译失败', jobId || 'page-translation');
@@ -1405,6 +1782,7 @@ export default defineContentScript({
         translationNodes.delete(element);
         const classes = (element as HTMLElement).classList;
         classes?.remove(PENDING_CLASS, OBSERVED_CLASS, TRANSLATED_CLASS);
+        element.removeAttribute('data-retryable');
       };
 
       const releaseRemovedSubtree = (root: Element) => {
@@ -1771,9 +2149,15 @@ export default defineContentScript({
         closeSettingsPanel();
         closeFullSettings();
         document.getElementById('ot-toolbar')?.remove();
+        // 站点暂停时停止动态观察：MutationObserver 继续监听 body 只会空转
+        // 浪费 CPU（此前遗漏，暂停的站点仍会被 characterData/childList 突变唤醒）。
+        // mountedToolbar 由恢复分支重新 mount，动态翻译在恢复时重新启动。
+        stopDynamic();
       } else {
         noticeCycles.release('site-paused');
         mountToolbar();
+        // 恢复翻译时若处于自动模式，重新启动动态内容观察（暂停前的观察已断开）。
+        startDynamicTranslation();
       }
     }
 
@@ -1782,6 +2166,103 @@ export default defineContentScript({
       // 用 randomId 会让 NoticeCycleGate 永远放行、反复闪屏。
       showNotice('当前网站已暂停翻译，请在扩展弹窗中恢复', 'site-paused');
     }
+
+    // ===== 0.2.2 网站规则：白名单（始终翻译）/ 敏感页面（从不翻译）=====
+    // 优先级：敏感(never) > 暂停(disabledSites) > 白名单(always，强制自动翻译)。
+    // 页面启动时与站内规则切换时调用；首启动时由 sitePolicyReady 链兜底。
+    // 直接策略消息（SITE_POLICY_CHANGED，background 权威判定）会 sitePolicyRevision++，
+    // 因此本函数在异步读取列表前快照 revision，读取后若 revision 已变则放弃应用——
+    // 避免用旧列表覆盖掉更新、更权威的暂停/恢复指令。
+    let refreshSiteRulesRunning = false;
+    async function refreshSiteRules(revisionAnchor?: number) {
+      if (refreshSiteRulesRunning) return;
+      refreshSiteRulesRunning = true;
+      // 快照基准：默认取调用时 revision；sitePolicyReady 链启动时传入链起始值
+      //（initialSitePolicyRevision），把「消息在列表读取期间到达」也视为竞态——
+      // 否则陈旧列表会覆盖掉消息设置的权威暂停/恢复。
+      const revisionAtStart = revisionAnchor ?? sitePolicyRevision;
+      try {
+        const [always, never, disabledSites, autoSites] = await Promise.all([
+          alwaysSitesItem.getValue(),
+          neverSitesItem.getValue(),
+          disabledSitesItem.getValue(),
+          autoSitesItem.getValue(),
+        ]);
+        if (sitePolicyRevision !== revisionAtStart) return; // 期间有更新的权威指令，放弃本次
+        // 敏感页面优先：从不在列表 => 一律暂停（即使白名单命中也被覆盖）
+        if (isNeverSite(never, location.href)) {
+          setSiteDisabledState(true);
+          return;
+        }
+        // 白名单 => 强制自动翻译；否则维持暂停/自动列表判定
+        const alwaysOn = isAlwaysSite(always, location.href);
+        if (alwaysOn) {
+          thisSiteAutoOverride = true;
+          setSiteDisabledState(false);
+          // 白名单已译/未译：若尚未翻译且当前处于手动模式，也直接触发整页翻译
+          if (!document.querySelector('.ot-translation')) {
+            void translatePage(true);
+          }
+          return;
+        }
+        // 非白名单：恢复全局模式与站点自动列表判定
+        const autoOn = autoSites === null || isSiteDisabled(autoSites, location.href);
+        thisSiteAutoOverride = Array.isArray(autoSites) && isSiteDisabled(autoSites, location.href);
+        if (!isNeverSite(never, location.href)) {
+          setSiteDisabledState(isSiteDisabled(disabledSites, location.href));
+        }
+        if (autoOn && !siteDisabled && !document.querySelector('.ot-translation') && effectiveAutoMode()) {
+          void translatePage(true);
+        }
+      } catch {
+        /* 规则读取失败时保持现状 */
+      } finally {
+        refreshSiteRulesRunning = false;
+      }
+    }
+
+    // ===== 0.2.2 对照模式悬停恢复：事件委托 =====
+    // 译文节点实际插在原文「之后」（afterend）或「内部」（appendChild），CSS 的
+    // `+` / `~` 兄弟选择器只能向后匹配，无法从译文选中其前面的原文。改用事件
+    // 委托（捕获阶段冒泡到 document）实现：
+    //   - translation-only：悬停译文 → 临时显示其锚点原文；离开恢复隐藏。
+    //   - hover-original：悬停译文 → 高亮其锚点原文；离开取消高亮。
+    // 锚点从节点上的 otAnchor 反查（insertTranslation 挂载），无锚点则跳过。
+    // translation-only：hover 类恢复原文（opacity 规则）；hover-original：active 类高亮原文背景。
+    function bindDualModeHover() {
+      document.addEventListener(
+        'mouseover',
+        (event) => {
+          const target = (event.target as HTMLElement | null)?.closest?.('.ot-translation');
+          if (!target) return;
+          const anchor = (target as HTMLSpanElement & { otAnchor?: Element }).otAnchor;
+          if (!anchor || !anchor.isConnected) return;
+          const host = anchor as HTMLElement;
+          if (currentDualMode === 'translation-only') {
+            host.classList.add('ot-dual-source-hover');
+            applyDualHover(anchor, true);
+          } else if (currentDualMode === 'hover-original') {
+            host.classList.add('ot-dual-source-hover-active');
+            applyDualHover(anchor, true);
+          }
+        },
+        true,
+      );
+      document.addEventListener(
+        'mouseout',
+        (event) => {
+          const target = (event.target as HTMLElement | null)?.closest?.('.ot-translation');
+          if (!target) return;
+          const anchor = (target as HTMLSpanElement & { otAnchor?: Element }).otAnchor;
+          if (!anchor || !anchor.isConnected) return;
+          const host = anchor as HTMLElement;
+          host.classList.remove('ot-dual-source-hover', 'ot-dual-source-hover-active');
+          applyDualHover(anchor, false);
+        },
+        true,
+      );
+    }
+    bindDualModeHover();
 
     // ---- 划词翻译：结果留在独立浮层中，不改写正文，也不会覆盖整段译文。 ----
     type SelectionSnapshot = { text: string; rect: DOMRect };
@@ -1874,6 +2355,9 @@ export default defineContentScript({
       host.style.setProperty('all', 'initial', 'important');
       host.style.setProperty('position', 'fixed', 'important');
       host.style.setProperty('z-index', '2147483647', 'important');
+      // 注入 Liquid Glass 主题变量：CSS 自定义属性会继承进 Shadow DOM，
+      // 划词浮层样式表（createSelectionUiStyle）直接消费 --ot-*，深浅色随之统一。
+      applyThemeVars(host, themeColors());
       const shadow = host.attachShadow({ mode: 'open' });
       shadow.appendChild(createSelectionUiStyle());
       document.documentElement.appendChild(host);
@@ -1964,6 +2448,14 @@ export default defineContentScript({
         copy.className = 'action';
         copy.textContent = '复制';
         copy.addEventListener('click', async () => {
+          // 空译文（流式中/失败占位）复制空串无意义，给明确提示而非静默成功。
+          if (!translation) {
+            copy.textContent = '没有可复制的内容';
+            setTimeout(() => {
+              if (copy.isConnected) copy.textContent = '复制';
+            }, 1200);
+            return;
+          }
           try {
             await navigator.clipboard.writeText(translation);
             copy.textContent = '已复制';
@@ -2163,7 +2655,6 @@ export default defineContentScript({
           translatedCount++;
           refreshToolbarIdleLabels();
         }
-        estimatedTokensSaved += r.savedTokens;
       } catch (error) {
         // 失败不再完全静默：给出原因便于排查；半截流式译文必须撤掉
         if (streamedPartial) dropTranslationNode(el);
@@ -2181,6 +2672,10 @@ export default defineContentScript({
         if (effectiveAutoMode() || siteDisabled) return;
         const target = e.target as Element | null;
         if (!target) return;
+        // composedPath 穿透 Shadow DOM：点击自有浮层（悬停气泡按钮/设置面板等）
+        // 不得触发段落翻译（closest 穿不过 shadow root 会漏判成网页内容）。
+        const path = e.composedPath() as EventTarget[];
+        if (hoverBubble && path.includes(hoverBubble.host)) return;
         if (
           target.closest(
             UI_SURFACE_SELECTOR,
@@ -2199,6 +2694,11 @@ export default defineContentScript({
       if (msg?.type === 'SITE_POLICY_CHANGED' && typeof msg.payload?.disabled === 'boolean') {
         sitePolicyRevision++;
         setSiteDisabledState(msg.payload.disabled);
+        return;
+      }
+      // 快捷键 Alt+S / 工具栏眼睛按钮：切换译文显隐（0 请求，不重新翻译）。
+      if (msg?.type === 'TOGGLE_TRANSLATIONS') {
+        toggleTranslations();
         return;
       }
       if (msg?.type === 'TRANSLATE_PAGE') {
@@ -2291,6 +2791,26 @@ export default defineContentScript({
       fullSettingsFormApi = null;
     }
 
+    // 按表单里实际存在的分组标题生成吸顶导航（不写死文案：
+    // ui.ts 增删分组时导航自动跟随，不会出现"导航有、内容没有"的错位）。
+    function buildSettingsNav(nav: HTMLElement, mount: HTMLElement) {
+      nav.replaceChildren();
+      const sections = Array.from(mount.querySelectorAll<HTMLElement>('.ot-form-section'));
+      for (const section of sections) {
+        const label = section.querySelector('h2, summary')?.textContent?.trim();
+        if (!label) continue;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'ot-settings-nav-item';
+        item.textContent = label;
+        item.addEventListener('click', () => {
+          section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        });
+        nav.appendChild(item);
+      }
+      nav.hidden = nav.childElementCount === 0;
+    }
+
     function openFullSettingsPanel() {
       closeSettingsPanel();
       closeFullSettings();
@@ -2325,8 +2845,9 @@ export default defineContentScript({
         .modal {
           display: flex; flex-direction: column;
           width: min(640px, calc(100vw - 48px));
+          /* 只保留一个 max-height：原先后一条 calc(100vh - 48px) 覆盖了
+             min(80vh, 720px)，等于没有高度上限，长表单会把面板拉到贴边。 */
           max-height: min(80vh, 720px);
-          max-height: calc(100vh - 48px);
           border-radius: 20px;
           background: ${theme.surface};
           color: ${theme.text};
@@ -2361,6 +2882,34 @@ export default defineContentScript({
           border-top: 1px solid ${theme.border};
         }
         .foot-hint { color: ${theme.text2}; font-size: 11px; }
+        /* 分组快捷导航：单列列表后内容约 4 屏高，顶部吸顶便于直接跳转 */
+        .ot-settings-nav {
+          position: sticky; top: 0; z-index: 3;
+          display: flex; flex-wrap: wrap; gap: 6px;
+          margin: 0 -6px 10px; padding: 8px 6px;
+          background: ${theme.surface};
+          backdrop-filter: ${theme.backdrop};
+          -webkit-backdrop-filter: ${theme.backdrop};
+          border-bottom: 1px solid ${theme.hairline};
+        }
+        .ot-settings-nav[hidden] { display: none; }
+        .ot-settings-nav-item {
+          padding: 5px 11px;
+          border: 0; border-radius: 999px;
+          background: ${theme.surface2}; color: ${theme.text2};
+          font-family: inherit; font-size: 12.5px; font-weight: 600;
+          white-space: nowrap; cursor: pointer;
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+        .ot-settings-nav-item:hover {
+          color: ${theme.text};
+          background: ${theme.accentSoft};
+        }
+        .ot-settings-nav-item:focus-visible {
+          outline: 2px solid ${theme.accentSoft}; outline-offset: 1px;
+        }
+        /* 抵消吸顶导航的高度，跳转后分组标题不被遮住 */
+        .ot-form-section { scroll-margin-top: 60px; }
       `;
       const head = document.createElement('div');
       head.className = 'head';
@@ -2377,8 +2926,13 @@ export default defineContentScript({
 
       const body = document.createElement('div');
       body.className = 'ot-full-settings-body';
+      // 分组快捷导航：表单项是异步构建的，所以先占位、构建完成后再按实际分组标题填充
+      const nav = document.createElement('nav');
+      nav.className = 'ot-settings-nav';
+      nav.setAttribute('aria-label', '设置分组');
+      nav.hidden = true;
       const mount = document.createElement('div');
-      body.appendChild(mount);
+      body.append(nav, mount);
       const foot = document.createElement('div');
       foot.className = 'foot';
       const hint = document.createElement('span');
@@ -2446,6 +3000,9 @@ export default defineContentScript({
             // null = 从未配置 = 默认自动翻译。漏掉前缀会让开关显示与实际行为相反。
             autoTranslate: autoSites === null || isSiteDisabled(autoSites, location.href),
             paused: isSiteDisabled(disabledSites, location.href),
+            // 0.2.2 网站规则：始终翻译白名单 / 敏感页面排除
+            always: isAlwaysSite(await alwaysSitesItem.getValue(), location.href),
+            never: isNeverSite(await neverSitesItem.getValue(), location.href),
             onAuto: (enabled) => {
               enqueueSettingsWrite(async () => {
                 const sites = await autoSitesItem.getValue();
@@ -2458,7 +3015,23 @@ export default defineContentScript({
                 await disabledSitesItem.setValue(withSiteDisabled(sites, location.href, paused));
               });
             },
+            onAlways: (enabled) => {
+              enqueueSettingsWrite(async () => {
+                const sites = await alwaysSitesItem.getValue();
+                await alwaysSitesItem.setValue(withAlwaysSite(sites, location.href, enabled));
+                // 白名单变化立即影响本站自动翻译判定
+                refreshSiteRules();
+              });
+            },
+            onNever: (enabled) => {
+              enqueueSettingsWrite(async () => {
+                const sites = await neverSitesItem.getValue();
+                await neverSitesItem.setValue(withNeverSite(sites, location.href, enabled));
+                refreshSiteRules();
+              });
+            },
           });
+          buildSettingsNav(nav, mount);
         } catch {
           // 表单构建失败：面板保留头部与关闭按钮，不崩溃内容脚本
           mount.textContent = '设置加载失败，请重新打开';
@@ -2474,13 +3047,17 @@ export default defineContentScript({
         const cfg = normalizeConfig(await configItem.getValue());
         // await 期间可能已有更新的一次打开（或被关闭）：放弃本次结果，防孤儿面板。
         if (mySeq !== settingsPanelSeq) return;
-        const [disabledSites, autoSites] = await Promise.all([
+        const [disabledSites, autoSites, alwaysSites, neverSites] = await Promise.all([
           disabledSitesItem.getValue(),
           autoSitesItem.getValue(),
+          alwaysSitesItem.getValue(),
+          neverSitesItem.getValue(),
         ]);
         if (mySeq !== settingsPanelSeq) return;
         const paused = isSiteDisabled(disabledSites, location.href);
         const autoOn = autoSites === null || isSiteDisabled(autoSites, location.href);
+        const alwaysOn = isAlwaysSite(alwaysSites, location.href);
+        const neverOn = isNeverSite(neverSites, location.href);
         const hoverOn = cfg.hoverTranslate !== false;
         const inputOn = cfg.inputTranslate !== false;
         let panelX = anchorX;
@@ -2497,18 +3074,39 @@ export default defineContentScript({
         const panel = createSettingsPanel({
           languages: LANGUAGES.map((l) => l.name),
           providers: PROVIDERS.map((p) => ({ id: p.id, name: p.name, needsKey: p.needsKey })),
+          // 第 10 轮：引擎下拉「未配 Key」标注的依据——免 Key 引擎恒 true。
+          hasProviderKey: (providerId) =>
+            !PROVIDERS.find((p) => p.id === providerId)?.needsKey ||
+            !!getProviderApiKey(cfg, providerId).trim(),
           targetLang: cfg.targetLang,
           translateMode: cfg.translateMode === 'manual' ? 'manual' : 'auto',
           provider: cfg.provider,
           sitePaused: paused,
           siteHost: location.host,
           autoTranslate: autoOn,
+          siteAlways: alwaysOn,
+          siteNever: neverOn,
           hoverTranslate: hoverOn,
           inputTranslate: inputOn,
           onAutoToggle: (enabled) => {
             enqueueSettingsWrite(async () => {
               const sites = await autoSitesItem.getValue();
               await autoSitesItem.setValue(withSiteDisabled(sites, location.href, enabled));
+            });
+          },
+          onAlwaysToggle: (enabled) => {
+            enqueueSettingsWrite(async () => {
+              const sites = await alwaysSitesItem.getValue();
+              await alwaysSitesItem.setValue(withAlwaysSite(sites, location.href, enabled));
+              // 白名单变化立即影响本站自动翻译判定
+              refreshSiteRules();
+            });
+          },
+          onNeverToggle: (enabled) => {
+            enqueueSettingsWrite(async () => {
+              const sites = await neverSitesItem.getValue();
+              await neverSitesItem.setValue(withNeverSite(sites, location.href, enabled));
+              refreshSiteRules();
             });
           },
           onHoverToggle: (enabled) => {
@@ -2697,7 +3295,6 @@ export default defineContentScript({
           hoverBubble.setTranslation(r.translation, { localSkipped: r.localSkipped === true });
           // 跳过结果不进会话缓存（见划词路径同款注释）。
           if (!r.localSkipped) sessionTranslations.remember(text, r.translation);
-          estimatedTokensSaved += r.savedTokens;
         })
         .catch((error) => {
           if (hoverBubble && hoverEl === el) {
@@ -2714,6 +3311,10 @@ export default defineContentScript({
         if (!effectiveAutoMode()) return;
         const target = e.target as Element | null;
         if (!target || !document.body.contains(target)) return;
+        // composedPath 穿透 Shadow DOM：鼠标悬停到自有 UI（如悬停气泡内部按钮）
+        // 时不得当作网页内容触发翻译（closest 穿不过 shadow root 会漏判）。
+        const path = e.composedPath() as EventTarget[];
+        if (hoverBubble && path.includes(hoverBubble.host)) return;
         if (
           target.closest(
             UI_SURFACE_SELECTOR,
@@ -2741,8 +3342,13 @@ export default defineContentScript({
       'mousemove',
       (e) => {
         if (!hoverEl || hoverPinned || !hoverBubble) return;
+        // 用 composedPath 判断是否落在气泡（或其 Shadow DOM 内部按钮）上：
+        // closest('#ot-hover-bubble') 无法穿透 shadow root，会导致鼠标移向
+        // 「固定/复制/朗读」按钮时气泡误隐藏、用户来不及点击。
+        const path = e.composedPath() as EventTarget[];
+        const onBubble = path.includes(hoverBubble.host);
         const target = e.target as Element | null;
-        if (target && (target.closest('#ot-hover-bubble') || hoverEl.contains(target))) {
+        if (onBubble || (target && hoverEl.contains(target))) {
           if (hoverHideTimer) {
             clearTimeout(hoverHideTimer);
             hoverHideTimer = null;
@@ -2763,8 +3369,10 @@ export default defineContentScript({
     document.addEventListener(
       'click',
       (e) => {
-        const target = e.target as Element | null;
-        if (target?.closest('#ot-hover-bubble')) return;
+        const path = e.composedPath() as EventTarget[];
+        // 同上：closest 穿不过 shadow root，点击气泡内部的「固定」会错误地
+        // 取消固定并隐藏气泡；用 composedPath 判断是否命中气泡 host。
+        if (hoverBubble && path.includes(hoverBubble.host)) return;
         if (hoverPinned) {
           hoverPinned = false;
           hideHoverBubble();
@@ -2868,9 +3476,10 @@ export default defineContentScript({
           if (res.localSkipped === true) {
             const hint = document.createElement('div');
             hint.textContent = '原文已是目标语言，未翻译';
+            const hintTheme = themeColors();
             Object.assign(hint.style, {
               marginTop: '6px',
-              color: '#8e8e93',
+              color: hintTheme.muted,
               fontSize: '11px',
               fontFamily: 'inherit',
             });
@@ -2881,14 +3490,16 @@ export default defineContentScript({
           const copy = document.createElement('button');
           copy.type = 'button';
           copy.textContent = '复制译文';
+          // 强调色与圆角取自玻璃主题：深色模式下 #007aff 会偏暗，主题会自动切到 #0a84ff。
+          const copyTheme = themeColors();
           Object.assign(copy.style, {
             display: 'block',
             marginTop: '8px',
             padding: '4px 10px',
             border: '0',
-            borderRadius: '8px',
-            background: 'rgba(0,122,255,0.12)',
-            color: '#007aff',
+            borderRadius: copyTheme.radiusSm,
+            background: copyTheme.accentSoft,
+            color: copyTheme.accent,
             fontSize: '12px',
             fontWeight: '600',
             cursor: 'pointer',
@@ -2961,6 +3572,8 @@ export default defineContentScript({
       if (!sitePolicyLoaded || siteDisabled) return;
       if (document.getElementById('ot-toolbar')) return;
 
+      // 玻璃材质统一取自 content-ui 的主题：工具栏与气泡/面板/通知同一套语言。
+      const glass = themeColors();
       const bar = document.createElement('div');
       bar.id = 'ot-toolbar';
       bar.dataset.haofanUi = 'true';
@@ -2976,11 +3589,11 @@ export default defineContentScript({
         gap: '6px',
         padding: '5px',
         borderRadius: '999px',
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(18px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-        boxShadow: '0 6px 24px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1)',
-        border: '1px solid rgba(60,60,67,0.12)',
+        background: glass.surface,
+        backdropFilter: glass.backdrop,
+        WebkitBackdropFilter: glass.backdrop,
+        boxShadow: `${glass.highlight}, ${glass.shadow}`,
+        border: `0.5px solid ${glass.border}`,
         cursor: 'grab',
         userSelect: 'none',
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif',
@@ -3000,6 +3613,8 @@ export default defineContentScript({
         border: 'none',
         padding: '0',
         background: 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)',
+        backdropFilter: glass.backdrop,
+        WebkitBackdropFilter: glass.backdrop,
         color: '#fff',
         fontWeight: '600',
         fontSize: '16px',
@@ -3009,8 +3624,28 @@ export default defineContentScript({
         justifyContent: 'center',
         cursor: 'pointer',
         boxShadow: '0 3px 10px rgba(0,122,255,0.35)',
-        transition: 'transform 0.15s ease, background 0.2s ease',
+        transition: 'transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease',
         fontFamily: 'inherit',
+      });
+      // 主按钮的悬浮反馈：此前只有齿轮与显隐按钮有 hover，主操作反而没有视觉反馈。
+      // hover 提亮 + 轻微上浮，active 按压下沉，明确「这是可点的主操作」。
+      btn.addEventListener('mouseenter', () => {
+        btn.style.background = 'linear-gradient(180deg, #3d99ff 0%, #1284ff 100%)';
+        btn.style.boxShadow = '0 4px 14px rgba(0,122,255,0.45)';
+        btn.style.transform = 'translateY(-1px)';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.background = 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)';
+        btn.style.boxShadow = '0 3px 10px rgba(0,122,255,0.35)';
+        btn.style.transform = 'translateY(0)';
+      });
+      btn.addEventListener('pointerdown', () => {
+        btn.style.transform = 'scale(0.94)';
+        btn.style.filter = 'brightness(0.94)';
+      });
+      btn.addEventListener('pointerup', () => {
+        btn.style.transform = 'translateY(0) scale(1)';
+        btn.style.filter = '';
       });
 
       const gear = document.createElement('button');
@@ -3036,24 +3671,60 @@ export default defineContentScript({
         transition: 'background 0.15s ease, color 0.15s ease',
         fontFamily: 'inherit',
       });
+      // 深浅色由 glass 主题统一决定；齿轮默认色也随主题（不再写死灰色）。
+      gear.style.color = glass.text2;
       gear.addEventListener('mouseenter', () => {
-        gear.style.background = 'rgba(60,64,67,0.08)';
-        gear.style.color = '#1d1d1f';
+        gear.style.background = glass.accentSoft;
+        gear.style.color = glass.text;
       });
       gear.addEventListener('mouseleave', () => {
         gear.style.background = 'transparent';
-        gear.style.color = '#6e6e73';
+        gear.style.color = glass.text2;
       });
 
-      // 深色模式适配：工具条底色与齿轮颜色跟随系统外观
-      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
-      if (prefersDark) {
-        bar.style.setProperty('background', 'rgba(28,28,30,0.92)', 'important');
-        bar.style.setProperty('border-color', 'rgba(84,84,88,0.5)', 'important');
-        gear.style.color = '#aeaeb2';
-      }
+      // 译文显隐按钮：一键在「看原文 / 看译文」之间切换，纯 CSS 不重译（0 Token）。
+      const hideBtn = document.createElement('button');
+      hideBtn.type = 'button';
+      hideBtn.id = 'ot-hide-btn';
+      hideBtn.textContent = '\u{1F441}\uFE0E'; // 👁（文本变体，避免 emoji 渲染）
+      hideBtn.title = '隐藏译文（快捷键 Alt+S）';
+      hideBtn.setAttribute('aria-label', hideBtn.title);
+      hideBtn.setAttribute('aria-pressed', 'false');
+      Object.assign(hideBtn.style, {
+        width: '36px',
+        height: '36px',
+        borderRadius: '50%',
+        border: 'none',
+        padding: '0',
+        background: 'transparent',
+        color: glass.text2,
+        fontSize: '15px',
+        lineHeight: '1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'background 0.15s ease, color 0.15s ease, opacity 0.15s ease',
+        fontFamily: 'inherit',
+      });
+      hideBtn.addEventListener('mouseenter', () => {
+        hideBtn.style.background = glass.accentSoft;
+        hideBtn.style.color = glass.text;
+      });
+      hideBtn.addEventListener('mouseleave', () => {
+        hideBtn.style.background = 'transparent';
+        hideBtn.style.color = glass.text2;
+      });
+      hideBtn.addEventListener('click', () => {
+        if (typeof wasDrag === 'function' && wasDrag()) return;
+        toggleTranslations();
+      });
 
-      bar.append(btn, gear);
+      // 布局：辅助按钮分居两侧，「译」主按钮居中且略大——用户随手点工具条中央
+      // 命中的仍是主操作（翻译），具体功能点两侧小按钮，主次分明。
+      btn.style.width = '42px';
+      btn.style.height = '42px';
+      bar.append(hideBtn, btn, gear);
       try {
         document.documentElement.appendChild(bar);
       } catch {
@@ -3101,7 +3772,8 @@ export default defineContentScript({
       // 拖拽位移超过阈值时 suppressNextClick 忽略本次点击。
       bar.addEventListener('click', (event) => {
         if (wasDrag()) return;
-        if ((event.target as Element | null)?.closest?.('#ot-settings-btn')) return;
+        // 齿轮与「译文显隐」按钮是独立功能，不能被容器的「点任意处翻译」吞掉。
+        if ((event.target as Element | null)?.closest?.('#ot-settings-btn, #ot-hide-btn')) return;
         if (busy) {
           // 取消当前任务并复位交互状态，让下一次点击能立即开始新任务
           // （「翻译中再点 = 取消，再点 = 重译」的既有语义）。
@@ -3161,6 +3833,8 @@ export default defineContentScript({
     }
 
     function setToolbarLoading(loading: boolean) {
+      // 加载底色随主题（深浅色自适应），见 loading 分支。
+      const glassForLoading = themeColors();
       const bar = document.getElementById('ot-toolbar');
       const btn = document.getElementById('ot-translate-btn');
       if (bar) {
@@ -3181,7 +3855,9 @@ export default defineContentScript({
         btn.style.setProperty('padding', '0 12px', 'important');
         btn.style.setProperty('border-radius', '22px', 'important');
         btn.style.setProperty('font-size', '13px', 'important');
-        btn.style.setProperty('background', '#8fb8ef', 'important');
+        // 加载底色随主题：此前写死 #8fb8ef 与玻璃主题割裂（深色模式下刺眼）。
+        // 用主题 accent 的低饱和变体，深浅色都协调，且与「取消」语义匹配。
+        btn.style.setProperty('background', glassForLoading.accent, 'important');
         btn.style.cursor = 'progress';
         btn.textContent = '';
         const spinner = document.createElement('span');

@@ -14,8 +14,12 @@ export interface SettingsSiteCtx {
   host: string;
   autoTranslate: boolean;
   paused: boolean;
+  always: boolean;
+  never: boolean;
   onAuto: (enabled: boolean) => void;
   onPause: (paused: boolean) => void;
+  onAlways: (enabled: boolean) => void;
+  onNever: (enabled: boolean) => void;
 }
 
 export interface ConfigFormApi {
@@ -25,7 +29,7 @@ export interface ConfigFormApi {
    */
   update: (next?: AppConfig) => void;
   /** 外部同步站点开关状态（可只传其一） */
-  updateSiteState: (auto?: boolean, paused?: boolean) => void;
+  updateSiteState: (auto?: boolean, paused?: boolean, always?: boolean, never?: boolean) => void;
   /** 销毁表单时停止响应后续 storage 同步，避免页内面板反复打开产生旧监听。 */
   dispose: () => void;
   /** 导入等外部操作覆盖配置后调用：清除未保存的本地脏标记，让表单跟随新值。 */
@@ -42,6 +46,12 @@ export function buildConfigForm(
   const formMarkup = `
     <form class="ot-form" autocomplete="off">
 
+      <!-- 无 Key 引导条：面向普通用户，有 Key 或免 Key 引擎时自动隐藏 -->
+      <div data-f="keyGuide" class="ot-key-guide" hidden>
+        <strong>此引擎需要 API Key</strong>
+        <span>想零配置先用起来？把上面的「翻译引擎」切到「免 Key 体验」分组里的任意引擎（MyMemory / Apertium 欧洲语对 / Ollama 本地），装完就能翻译。想要更准更快，再到服务商官网申请 Key 粘贴到下方。</span>
+      </div>
+
       <!-- ═══ ① 翻译引擎 ═══ -->
       <section class="ot-form-section">
         <h2>翻译引擎</h2>
@@ -53,10 +63,13 @@ export function buildConfigForm(
             <select data-f="model"></select>
             <input data-f="modelText" type="text" placeholder="如 gpt-4o" hidden />
           </label>
-          <label class="ot-field ot-field-wide">API Key
-            <input data-f="apiKey" type="password" autocomplete="new-password" placeholder="保存在本地，直发所选服务商" />
+          <label class="ot-field ot-field-wide ot-field-block">API Key
+            <span class="ot-key-input-row">
+              <input data-f="apiKey" type="password" autocomplete="new-password" placeholder="粘贴服务商给你的 Key，只存在本地" />
+              <button type="button" data-f="keyToggle" class="ot-key-toggle" aria-label="显示 API Key">显示</button>
+            </span>
           </label>
-          <label class="ot-field ot-field-wide">API Base URL
+          <label class="ot-field ot-field-wide ot-field-block">API Base URL
             <input data-f="baseUrl" type="url" inputmode="url" placeholder="https://..." />
           </label>
           <label class="ot-check ot-field-wide" data-custom-vision hidden>
@@ -74,9 +87,9 @@ export function buildConfigForm(
         </div>
       </section>
 
-      <!-- ═══ ② 语言与偏好 ═══ -->
+      <!-- ═══ ② 语言 ═══ -->
       <section class="ot-form-section">
-        <h2>语言与偏好</h2>
+        <h2>语言</h2>
         <div class="ot-field-grid">
           <label class="ot-field">源语言
             <select data-f="sourceLang"></select>
@@ -85,7 +98,7 @@ export function buildConfigForm(
             <select data-f="targetLang"></select>
           </label>
           <label class="ot-field">翻译模式
-            <span>手动 = 点击段落 / 划词才翻译</span>
+            <span>手动：点段落或划词才翻；自动：打开网页整页直翻</span>
             <select data-f="translateMode">
               <option value="manual">手动（推荐）</option>
               <option value="auto">自动整页</option>
@@ -99,7 +112,23 @@ export function buildConfigForm(
               <option value="简洁精炼">简洁精炼</option>
             </select>
           </label>
+        </div>
+      </section>
+
+      <!-- ═══ ③ 译文显示 ═══ -->
+      <section class="ot-form-section">
+        <h2>译文显示</h2>
+        <div class="ot-field-grid">
+          <label class="ot-field">对照模式
+            <span>决定译文和原文怎么摆</span>
+            <select data-f="dualMode">
+              <option value="below">译文在原文下方</option>
+              <option value="translation-only">只显示译文（悬停看原文）</option>
+              <option value="hover-original">译文+悬停高亮原文</option>
+            </select>
+          </label>
           <label class="ot-field">译文样式
+            <span>译文与原文的区分方式</span>
             <select data-f="translationStyle">
               <option value="plain">默认</option>
               <option value="dashed">虚线分隔</option>
@@ -107,7 +136,59 @@ export function buildConfigForm(
               <option value="highlight">高亮块</option>
             </select>
           </label>
+          <label class="ot-field">译文字号
+            <select data-f="translationFontSize">
+              <option value="0">跟随原文</option>
+              <option value="12">12 px</option>
+              <option value="13">13 px</option>
+              <option value="14">14 px</option>
+              <option value="15">15 px</option>
+              <option value="16">16 px</option>
+              <option value="17">17 px</option>
+              <option value="18">18 px</option>
+            </select>
+          </label>
+          <label class="ot-field">译文行高
+            <select data-f="translationLineHeight">
+              <option value="0">默认（1.5）</option>
+              <option value="1.2">紧凑（1.2）</option>
+              <option value="1.4">标准（1.4）</option>
+              <option value="1.6">宽松（1.6）</option>
+              <option value="1.8">很宽松（1.8）</option>
+              <option value="2">2 倍（2.0）</option>
+            </select>
+          </label>
+          <label class="ot-field">译文透明度
+            <span>调低一点更容易分清原文和译文</span>
+            <select data-f="translationOpacity">
+              <option value="0">默认</option>
+              <option value="0.5">50%</option>
+              <option value="0.62">62%</option>
+              <option value="0.75">75%</option>
+              <option value="0.85">85%</option>
+              <option value="1">100%</option>
+            </select>
+          </label>
+          <label class="ot-field">译文颜色
+            <input data-f="translationColor" type="text" list="ot-color-presets" placeholder="跟随原文" />
+            <datalist id="ot-color-presets">
+              <option value="#1d1d1f"></option>
+              <option value="#3a3a3c"></option>
+              <option value="#007aff"></option>
+              <option value="#e0342c"></option>
+              <option value="#34c759"></option>
+              <option value="#8e8e93"></option>
+            </datalist>
+          </label>
+        </div>
+      </section>
+
+      <!-- ═══ ④ 界面与朗读 ═══ -->
+      <section class="ot-form-section">
+        <h2>界面与朗读</h2>
+        <div class="ot-field-grid">
           <label class="ot-field">界面主题
+            <span>弹窗与译文浮层跟随的配色</span>
             <select data-f="themeMode">
               <option value="auto">跟随系统</option>
               <option value="light">浅色</option>
@@ -132,25 +213,34 @@ export function buildConfigForm(
             <input type="checkbox" data-site-ctx="pause" ${siteCtx.paused ? 'checked' : ''} />
             <span><strong>暂停本站翻译</strong><small>立即停止并清理译文</small></span>
           </label>
+          <label class="ot-check" id="ot-full-always">
+            <input type="checkbox" data-site-ctx="always" ${siteCtx.always ? 'checked' : ''} />
+            <span><strong>始终翻译此站</strong><small>加入白名单，手动模式下也自动翻译</small></span>
+          </label>
+          <label class="ot-check" id="ot-full-never">
+            <input type="checkbox" data-site-ctx="never" ${siteCtx.never ? 'checked' : ''} />
+            <span><strong>永不翻译此站</strong><small>加入排除列表，敏感页面优先跳过</small></span>
+          </label>
         </div>
       </section>` : ''}
 
-      <!-- ═══ ③ 功能开关 ═══ -->
+      <!-- ═══ ⑤ 功能开关 ═══ -->
       <section class="ot-form-section">
         <h2>功能开关</h2>
-        <div class="ot-switch-grid">
-          <label class="ot-check"><input data-f="streaming" type="checkbox" /><span><strong>流式输出</strong></span></label>
-          <label class="ot-check"><input data-f="contextAware" type="checkbox" /><span><strong>上下文感知</strong></span></label>
-          <label class="ot-check"><input data-f="qualityCheck" type="checkbox" /><span><strong>质量自检</strong></span></label>
-          <label class="ot-check"><input data-f="sentenceCache" type="checkbox" /><span><strong>句子级缓存</strong></span></label>
-          <label class="ot-check"><input data-f="cacheEnabled" type="checkbox" /><span><strong>翻译缓存</strong></span></label>
-          <label class="ot-check"><input data-f="glossaryEnabled" type="checkbox" /><span><strong>术语库</strong></span></label>
-          <label class="ot-check"><input data-f="hoverTranslate" type="checkbox" /><span><strong>悬停翻译</strong></span></label>
-          <label class="ot-check"><input data-f="inputTranslate" type="checkbox" /><span><strong>输入框翻译</strong></span></label>
-          <label class="ot-check"><input data-f="autoLearnTerms" type="checkbox" /><span><strong>术语自学习</strong></span></label>
+        <div class="ot-switches">
+          <label class="ot-check"><input data-f="streaming" type="checkbox" /><span><strong>流式输出</strong><small>译文边生成边显示，不用等整段出来</small></span></label>
+          <label class="ot-check"><input data-f="contextAware" type="checkbox" /><span><strong>上下文感知</strong><small>结合整段语境翻译，代词和术语更准</small></span></label>
+          <label class="ot-check"><input data-f="qualityCheck" type="checkbox" /><span><strong>质量自检</strong><small>自动核对数字、链接、代码有没有被翻丢</small></span></label>
+          <label class="ot-check"><input data-f="sentenceCache" type="checkbox" /><span><strong>句子级缓存</strong><small>相同的句子只翻一次，更省额度</small></span></label>
+          <label class="ot-check"><input data-f="cacheEnabled" type="checkbox" /><span><strong>翻译缓存</strong><small>30 天内翻过的内容直接复用</small></span></label>
+          <label class="ot-check"><input data-f="glossaryEnabled" type="checkbox" /><span><strong>术语库</strong><small>内置品牌与技术词对照，品牌名不乱翻</small></span></label>
+          <label class="ot-check"><input data-f="hoverTranslate" type="checkbox" /><span><strong>悬停翻译</strong><small>鼠标停在段落上就出译文，不用点击</small></span></label>
+          <label class="ot-check"><input data-f="inputTranslate" type="checkbox" /><span><strong>输入框翻译</strong><small>在输入框写外文，一键翻成目标语言</small></span></label>
+          <label class="ot-check"><input data-f="autoLearnTerms" type="checkbox" /><span><strong>术语自学习</strong><small>你确认过的译文会被记住，越用越合口味</small></span></label>
         </div>
         <div class="ot-field-grid">
           <label class="ot-field ot-field-wide">术语注入上限
+            <span>每段最多带入多少条术语，防止提示词过长拖慢翻译</span>
             <select data-f="glossaryTermLimit">
               <option value="0">关闭</option>
               <option value="6">6 条</option>
@@ -182,10 +272,10 @@ export function buildConfigForm(
           <label class="ot-field">长文路由阈值（字符）
             <input data-f="strongThreshold" type="number" min="200" step="100" />
           </label>
-          <label class="ot-field ot-field-wide">系统提示词
+          <label class="ot-field ot-field-wide ot-field-block">系统提示词
             <textarea data-f="systemPrompt" rows="3" placeholder="留空使用内置提示词"></textarea>
           </label>
-          <label class="ot-field ot-field-wide">我的术语表 <span>每行：源词=译文</span>
+          <label class="ot-field ot-field-wide ot-field-block">我的术语表 <span>每行：源词=译文</span>
             <textarea data-f="customGlossary" rows="3" placeholder="GitHub=GitHub\nrepository=代码仓库"></textarea>
           </label>
         </div>
@@ -202,6 +292,7 @@ export function buildConfigForm(
   const modelField = mount.querySelector('[data-f=modelField]') as HTMLElement;
   const baseInput = mount.querySelector('[data-f=baseUrl]') as HTMLInputElement;
   const keyInput = mount.querySelector('[data-f=apiKey]') as HTMLInputElement;
+  const keyToggle = mount.querySelector('[data-f=keyToggle]') as HTMLButtonElement | null;
   const sourceSel = mount.querySelector('[data-f=sourceLang]') as HTMLSelectElement;
   const targetSel = mount.querySelector('[data-f=targetLang]') as HTMLSelectElement;
   const toneSel = mount.querySelector('[data-f=tone]') as HTMLSelectElement;
@@ -221,6 +312,11 @@ export function buildConfigForm(
   const hoverTranslateChk = mount.querySelector('[data-f=hoverTranslate]') as HTMLInputElement;
   const inputTranslateChk = mount.querySelector('[data-f=inputTranslate]') as HTMLInputElement;
   const translationStyleSel = mount.querySelector('[data-f=translationStyle]') as HTMLSelectElement;
+  const dualModeSel = mount.querySelector('[data-f=dualMode]') as HTMLSelectElement;
+  const translationFontSizeSel = mount.querySelector('[data-f=translationFontSize]') as HTMLSelectElement;
+  const translationLineHeightSel = mount.querySelector('[data-f=translationLineHeight]') as HTMLSelectElement;
+  const translationOpacitySel = mount.querySelector('[data-f=translationOpacity]') as HTMLSelectElement;
+  const translationColorInput = mount.querySelector('[data-f=translationColor]') as HTMLInputElement;
   const themeModeSel = mount.querySelector('[data-f=themeMode]') as HTMLSelectElement;
   const ttsVoiceSel = mount.querySelector('[data-f=ttsVoiceName]') as HTMLSelectElement;
   const fallbackInput = mount.querySelector('[data-f=fallbackProviders]') as HTMLInputElement;
@@ -277,25 +373,52 @@ export function buildConfigForm(
     }
   }
 
+  // 引擎下拉按「免 Key 体验 / 接自己的 API」分组：新用户第一眼就看到零配置入口，
+  // 想更准更快的再往下找自己要接的引擎。免 Key 引擎不再重复标注「免 Key」。
+  const keylessGroup = document.createElement('optgroup');
+  keylessGroup.label = '免 Key 体验（零配置，装完就能用）';
+  const byokGroup = document.createElement('optgroup');
+  byokGroup.label = '接自己的 API（更准更快）';
   PROVIDERS.forEach((p) => {
     const o = document.createElement('option');
     o.value = p.id;
-    o.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
-    providerSel.appendChild(o);
+    o.dataset.baseName = p.name;
+    if (p.needsKey) o.dataset.needsKey = 'true';
+    (p.needsKey ? byokGroup : keylessGroup).appendChild(o);
   });
+  providerSel.append(keylessGroup, byokGroup);
+
+  // 需 Key 引擎实时标注「已配 Key / 未配 Key」：填没填、填到哪一家，下拉里直接看得到。
+  const refreshProviderLabels = () => {
+    providerSel.querySelectorAll('option').forEach((option) => {
+      const el = option as HTMLOptionElement;
+      if (el.dataset.needsKey !== 'true') {
+        el.textContent = el.dataset.baseName || el.textContent || '';
+        return;
+      }
+      const hasKey = Boolean(getProviderApiKey(cfg, el.value).trim());
+      el.textContent = hasKey
+        ? `${el.dataset.baseName}（已配 Key）`
+        : `${el.dataset.baseName}（未配 Key）`;
+      if (hasKey) delete el.dataset.missingKey;
+      else el.dataset.missingKey = 'true';
+    });
+    const selected = providerSel.options[providerSel.selectedIndex] as HTMLOptionElement | null;
+    providerSel.classList.toggle('missing-key', selected?.dataset.missingKey === 'true');
+  };
   const refreshSelectTitles = () => {
     providerSel.title = providerSel.options[providerSel.selectedIndex]?.textContent || '';
     modelSel.title = modelSel.options[modelSel.selectedIndex]?.textContent || modelSel.value;
     sourceSel.title = sourceSel.value;
     targetSel.title = targetSel.value;
   };
+  // 「长文强模型」路由只能用大模型通道：传统翻译引擎没有模型名可选。
   PROVIDERS.forEach((p) => {
-    if (p.id !== 'google') {
-      const so = document.createElement('option');
-      so.value = p.id;
-      so.textContent = p.name + (p.needsKey ? '' : '（免 Key）');
-      strongProviderSel.appendChild(so);
-    }
+    if (p.type !== 'llm') return;
+    const so = document.createElement('option');
+    so.value = p.id;
+    so.textContent = p.name;
+    strongProviderSel.appendChild(so);
   });
 
   LANGUAGES.forEach((l) => {
@@ -334,6 +457,19 @@ export function buildConfigForm(
     baseInput.value = p?.baseUrl || '';
     baseInput.readOnly = providerId !== 'custom';
     customVisionRow.hidden = providerId !== 'custom';
+  }
+
+  // 无 Key 引导条：引擎需要 Key 且当前没填时显示。
+  // 按下拉里「当前选中」的引擎判断（不是已保存的 cfg.provider）——
+  // 用户刚切到需 Key 引擎、还没保存时也要立刻给出指引。
+  function syncKeyGuide() {
+    const keyGuide = mount.querySelector('[data-f="keyGuide"]') as HTMLElement | null;
+    if (!keyGuide) return;
+    const selected = providerSel.value || cfg.provider;
+    const prov = PROVIDERS.find((x) => x.id === selected);
+    const needsKey = Boolean(prov?.needsKey);
+    const hasKey = Boolean(keyInput.value.trim() || getProviderApiKey(cfg, selected).trim());
+    keyGuide.hidden = !(needsKey && !hasKey);
   }
 
   // checkbox 勾选样式：不用 :has()（旧浏览器不支持），由 JS 同步 class。
@@ -408,6 +544,11 @@ export function buildConfigForm(
     setIfDiff('hoverTranslate', hoverTranslateChk, cfg.hoverTranslate !== false);
     setIfDiff('inputTranslate', inputTranslateChk, cfg.inputTranslate !== false);
     setIfDiff('translationStyle', translationStyleSel, cfg.translationStyle || 'plain');
+    setIfDiff('dualMode', dualModeSel, cfg.dualMode || 'below');
+    setIfDiff('translationFontSize', translationFontSizeSel, String(cfg.translationFontSize ?? 0));
+    setIfDiff('translationLineHeight', translationLineHeightSel, String(cfg.translationLineHeight ?? 0));
+    setIfDiff('translationOpacity', translationOpacitySel, String(cfg.translationOpacity ?? 0));
+    setIfDiff('translationColor', translationColorInput, cfg.translationColor || '');
     setIfDiff('themeMode', themeModeSel, cfg.themeMode || 'auto');
     // 人声下拉按当前目标语言动态填充后再回填所选值
     refreshVoiceOptions();
@@ -425,7 +566,9 @@ export function buildConfigForm(
     );
     setIfDiff('strongModel', strongModelInput, cfg.strongModel || '');
     setIfDiff('strongThreshold', strongThresholdInput, String(cfg.strongThreshold ?? 1200));
+    syncKeyGuide();
     syncCheckState();
+    refreshProviderLabels();
     refreshSelectTitles();
   }
 
@@ -497,6 +640,27 @@ export function buildConfigForm(
       if (touched.has('hoverTranslate')) next.hoverTranslate = hoverTranslateChk.checked;
       if (touched.has('inputTranslate')) next.inputTranslate = inputTranslateChk.checked;
       if (touched.has('translationStyle')) next.translationStyle = translationStyleSel.value;
+      if (touched.has('dualMode')) {
+        const mode = dualModeSel.value;
+        next.dualMode = mode === 'translation-only' || mode === 'hover-original' ? mode : 'below';
+      }
+      if (touched.has('translationFontSize')) {
+        const v = Number(translationFontSizeSel.value);
+        next.translationFontSize = Number.isFinite(v) && v >= 0 ? Math.min(48, Math.round(v)) : 0;
+      }
+      if (touched.has('translationLineHeight')) {
+        const v = Number(translationLineHeightSel.value);
+        next.translationLineHeight = Number.isFinite(v) && v >= 0 ? Math.min(4, v) : 0;
+      }
+      if (touched.has('translationOpacity')) {
+        const v = Number(translationOpacitySel.value);
+        next.translationOpacity =
+          Number.isFinite(v) && v >= 0.2 && v <= 1 ? v : v === 0 ? 0 : 0.85;
+      }
+      if (touched.has('translationColor')) {
+        const c = translationColorInput.value.trim();
+        next.translationColor = /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '';
+      }
       if (touched.has('ttsVoiceName')) next.ttsVoiceName = ttsVoiceSel.value;
       if (touched.has('themeMode')) {
         const mode = themeModeSel.value;
@@ -553,6 +717,17 @@ export function buildConfigForm(
       void save();
     }, delay);
   }
+
+  // Key 输入框默认掩码：允许用户切到明文核对有没有粘错（Key 只存本地，仍不上传任何中间服务）。
+  keyToggle?.addEventListener('click', () => {
+    const reveal = keyInput.type === 'password';
+    keyInput.type = reveal ? 'text' : 'password';
+    keyToggle.textContent = reveal ? '隐藏' : '显示';
+    keyToggle.setAttribute('aria-label', reveal ? '隐藏 API Key' : '显示 API Key');
+    keyInput.focus();
+  });
+  // 一边输入一边消掉「需要 Key」提示，用户能立刻确认填进去了
+  keyInput.addEventListener('input', syncKeyGuide);
 
   providerSel.addEventListener('change', () => {
     markDirty('provider');
@@ -639,6 +814,11 @@ export function buildConfigForm(
     hoverTranslateChk,
     inputTranslateChk,
     translationStyleSel,
+    dualModeSel,
+    translationFontSizeSel,
+    translationLineHeightSel,
+    translationOpacitySel,
+    translationColorInput,
     themeModeSel,
     ttsVoiceSel,
     translateModeSel,
@@ -812,9 +992,13 @@ export function buildConfigForm(
   // 站点偏好开关（页面内完整设置面板专用）
   const autoSiteInput = mount.querySelector('[data-site-ctx="auto"]') as HTMLInputElement | null;
   const pauseSiteInput = mount.querySelector('[data-site-ctx="pause"]') as HTMLInputElement | null;
-  if (siteCtx && autoSiteInput && pauseSiteInput) {
-    autoSiteInput.addEventListener('change', () => siteCtx.onAuto(autoSiteInput.checked));
-    pauseSiteInput.addEventListener('change', () => siteCtx.onPause(pauseSiteInput.checked));
+  const alwaysSiteInput = mount.querySelector('[data-site-ctx="always"]') as HTMLInputElement | null;
+  const neverSiteInput = mount.querySelector('[data-site-ctx="never"]') as HTMLInputElement | null;
+  if (siteCtx) {
+    autoSiteInput?.addEventListener('change', () => siteCtx.onAuto(autoSiteInput.checked));
+    pauseSiteInput?.addEventListener('change', () => siteCtx.onPause(pauseSiteInput.checked));
+    alwaysSiteInput?.addEventListener('change', () => siteCtx.onAlways(alwaysSiteInput.checked));
+    neverSiteInput?.addEventListener('change', () => siteCtx.onNever(neverSiteInput.checked));
   }
 
   fill();
@@ -859,10 +1043,12 @@ export function buildConfigForm(
       }
       fill();
     },
-    updateSiteState: (auto, paused) => {
+    updateSiteState: (auto, paused, always, never) => {
       if (disposed) return;
       if (auto !== undefined && autoSiteInput) autoSiteInput.checked = auto;
       if (paused !== undefined && pauseSiteInput) pauseSiteInput.checked = paused;
+      if (always !== undefined && alwaysSiteInput) alwaysSiteInput.checked = always;
+      if (never !== undefined && neverSiteInput) neverSiteInput.checked = never;
       syncCheckState();
     },
     resetDirty: (next?: AppConfig) => {

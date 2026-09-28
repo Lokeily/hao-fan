@@ -1,6 +1,6 @@
 import { storage } from 'wxt/utils/storage';
 import { DEFAULT_CONFIG, type AppConfig } from './config.ts';
-import { EMPTY_USAGE_TOTALS, type UsageTotals } from './usage.ts';
+import { EMPTY_USAGE_TOTALS, type MonthUsage, type UsageTotals } from './usage.ts';
 
 // 全局配置。API Key 仅持久化在 storage.local，并只随翻译请求发送给所选服务商。
 export const configItem = storage.defineItem<AppConfig>('local:config', {
@@ -9,6 +9,11 @@ export const configItem = storage.defineItem<AppConfig>('local:config', {
 
 export const usageItem = storage.defineItem<UsageTotals>('local:usageStats', {
   defaultValue: EMPTY_USAGE_TOTALS,
+});
+
+// 月度 Token 预算用量（按自然月累计，跨月自动归零；供 popup 预算进度与告警展示）。
+export const monthUsageItem = storage.defineItem<MonthUsage | null>('local:monthUsage', {
+  defaultValue: null,
 });
 
 // 与模型配置分开保存，避免修改 API / 语言偏好时覆盖用户的站点暂停列表。
@@ -22,9 +27,29 @@ export const autoSitesItem = storage.defineItem<string[] | null>('local:autoSite
   defaultValue: null,
 });
 
+// ===== 0.2.2 网站规则增强：始终翻译白名单 / 敏感页面排除 =====
+// 与 disabledSitesItem / autoSitesItem 并存：三者分别表达
+// 暂停（黑名单） / 总是自动（白名单自动翻译） / 敏感页面从不翻译（URL 子串）。
+// 分开存储避免互相覆盖，读取时合并判定（见 utils/site-policy.ts）。
+export const alwaysSitesItem = storage.defineItem<string[]>('local:alwaysSites', {
+  defaultValue: [],
+});
+
+export const neverSitesItem = storage.defineItem<string[]>('local:neverSites', {
+  defaultValue: [],
+});
+
 // 首次使用引导：还没填 API Key 时提示一次「去设置」，提示过就不再打扰。
 // 用户后来清空 Key 也不会二次弹窗——工具栏与设置面板里始终能重新进入设置。
 export const setupNoticeShownItem = storage.defineItem<boolean>('local:setupNoticeShown', {
+  defaultValue: false,
+});
+
+// 首启引导（onboarding）是否已完成：从未配置过任何 Key 的新用户，
+// 首次打开弹窗会看到欢迎面板（免费体验 / 配置 AI 引擎二选一），
+// 完成选择后置位，不再打扰。与 setupNoticeShownItem 不同：后者只是「去设置」提示，
+// 前者是真正的分步引导，面向完全没接触过 API Key 概念的普通用户。
+export const onboardingDoneItem = storage.defineItem<boolean>('local:onboardingDone', {
   defaultValue: false,
 });
 

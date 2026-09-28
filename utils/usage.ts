@@ -65,3 +65,24 @@ export function accumulateUsage(current: UsageTotals, stats: TranslationStats): 
   next.updatedAt = Date.now();
   return next;
 }
+
+// ===== 月度预算 =====
+// BYOK 模式用户自付 API 费用，最怕"不知不觉烧钱"：记录当月实际 Token 用量，
+// 跨月自动归零。存储结构 { yearMonth: 'YYYY-MM', usedTokens }。
+export interface MonthUsage {
+  yearMonth: string;
+  usedTokens: number;
+}
+
+export function currentYearMonth(now = Date.now()): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function addMonthUsage(current: MonthUsage | null, tokens: number, now = Date.now()): MonthUsage {
+  const ym = currentYearMonth(now);
+  if (!current || current.yearMonth !== ym) {
+    return { yearMonth: ym, usedTokens: Math.max(0, tokens) };
+  }
+  return { ...current, usedTokens: current.usedTokens + Math.max(0, tokens) };
+}

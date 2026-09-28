@@ -1,6 +1,6 @@
 ﻿import { browser } from 'wxt/browser';
 import { buildConfigForm } from '../../utils/ui.ts';
-import { configItem, disabledSitesItem } from '../../utils/storage.ts';
+import { configItem, disabledSitesItem, onboardingDoneItem } from '../../utils/storage.ts';
 import { getProvider } from '../../utils/providers.ts';
 import { getProviderApiKey, normalizeConfig } from '../../utils/config.ts';
 import { isSiteDisabled, siteKeyOf, withSiteDisabled } from '../../utils/site-policy.ts';
@@ -85,6 +85,20 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
             <div><span id="ot-local">0</span><small>本地跳过</small></div>
             <div><span id="ot-hits">0</span><small>缓存 / 术语</small></div>
           </div>
+          <div id="ot-budget" class="ot-budget" hidden>
+            <div class="ot-budget-head">
+              <span>本月 Token 预算</span>
+              <span id="ot-budget-text">—</span>
+            </div>
+            <div class="ot-budget-track" aria-hidden="true">
+              <div id="ot-budget-bar" class="ot-budget-bar" style="width: 0%"></div>
+            </div>
+            <div class="ot-budget-row">
+              <input id="ot-budget-input" type="number" min="0" step="1000" placeholder="0 = 不限" aria-label="月度 Token 预算" />
+              <button id="ot-budget-save" type="button">保存</button>
+            </div>
+            <p class="ot-budget-hint">按自然月累计实际消耗，跨月自动归零。设置后用到 <span id="ot-budget-warn">80</span>% 会变红提醒。</p>
+          </div>
           <div id="ot-stats-detail" class="ot-stats-detail">尚无翻译记录</div>
         </section>
         <div class="ot-img-row">
@@ -98,6 +112,21 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
 
       <div class="ot-panel hidden" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
         <div id="ot-form-mount"></div>
+      </div>
+
+      <div id="ot-welcome" class="ot-welcome" role="dialog" aria-modal="true" aria-labelledby="ot-welcome-title" hidden>
+        <div class="ot-welcome-card">
+          <div class="ot-welcome-brand" aria-hidden="true">
+            <img src="${logoUrl}" alt="" />
+          </div>
+          <h2 id="ot-welcome-title">欢迎使用好翻</h2>
+          <p class="ot-welcome-sub">你的网页翻译助手。选一种方式开始：</p>
+          <button type="button" id="ot-welcome-free" class="ot-btn-primary ot-welcome-btn">免费体验 · 不填 Key</button>
+          <p class="ot-welcome-free-note">用 Google 翻译，零配置、零费用、开箱即用</p>
+          <button type="button" id="ot-welcome-config" class="ot-btn-secondary ot-welcome-btn">配置自己的 AI 引擎</button>
+          <p class="ot-welcome-config-note">接入 DeepSeek / 智谱 / 混元等，质量更高</p>
+          <button type="button" id="ot-welcome-skip" class="ot-welcome-skip">先跳过，我自己逛逛</button>
+        </div>
       </div>
     </div>
   `;
@@ -141,6 +170,80 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       activateTab(tabs[nextIndex], true);
     });
   });
+
+  // ===== 首启引导（onboarding）=====
+  // 面向完全没接触过 API Key 概念的普通用户：从未配过任何 Key 且未引导过时，
+  // 弹窗打开即显示欢迎面板，给「免费体验（免 Key）」与「配置 AI 引擎」两条清晰路径。
+  // 完成任一路径（或点跳过）后置位，不再打扰；老用户/已配 Key 用户完全不受影响。
+  const welcomeEl = document.getElementById('ot-welcome') as HTMLElement | null;
+  const welcomeFreeBtn = document.getElementById('ot-welcome-free') as HTMLButtonElement | null;
+  const welcomeConfigBtn = document.getElementById('ot-welcome-config') as HTMLButtonElement | null;
+  const welcomeSkipBtn = document.getElementById('ot-welcome-skip') as HTMLButtonElement | null;
+
+  function hasAnyConfiguredKey(cfg: ReturnType<typeof normalizeConfig>): boolean {
+    return Object.values(cfg.apiKeys).some((k) => typeof k === 'string' && k.trim().length > 0);
+  }
+
+  function finishOnboarding() {
+    onboardingDoneItem.setValue(true).catch(() => {});
+  }
+
+  async function maybeShowWelcome() {
+    try {
+      if (await onboardingDoneItem.getValue()) return;
+      const cfg = normalizeConfig(await configItem.getValue());
+      // 已配过 Key（任何引擎）视为老用户，不打扰
+      if (hasAnyConfiguredKey(cfg)) {
+        finishOnboarding();
+        return;
+      }
+      if (welcomeEl) welcomeEl.hidden = false;
+    } catch {
+      /* 存储不可用时跳过引导，不影响主流程 */
+    }
+  }
+
+  welcomeFreeBtn?.addEventListener('click', async () => {
+    try {
+      // 一键切到 Google 翻译（免 Key、免配置），立即可用
+      const latest = normalizeConfig(await configItem.getValue());
+      const next = {
+        ...latest,
+        provider: 'google',
+        baseUrl: 'https://translate.googleapis.com',
+        model: '',
+      };
+      await configItem.setValue(next);
+      finishOnboarding();
+      if (welcomeEl) welcomeEl.hidden = true;
+      setOutput('已切换到 Google 翻译（免 Key），现在可以翻译了 🎉', 'success');
+      // 设置面板里的表单需要刷新为新引擎
+      try {
+        const mount = document.getElementById('ot-form-mount');
+        if (mount) {
+          mount.textContent = '';
+          buildConfigForm(mount, true);
+        }
+      } catch {
+        /* 表单刷新失败不影响主流程 */
+      }
+    } catch {
+      setOutput('切换失败，请重试或手动在「设置」里选择引擎', 'error');
+    }
+  });
+
+  welcomeConfigBtn?.addEventListener('click', () => {
+    finishOnboarding();
+    if (welcomeEl) welcomeEl.hidden = true;
+    activateTab(tabs[2]!); // 跳到设置 tab
+  });
+
+  welcomeSkipBtn?.addEventListener('click', () => {
+    finishOnboarding();
+    if (welcomeEl) welcomeEl.hidden = true;
+  });
+
+  void maybeShowWelcome();
 
   const input = document.getElementById('ot-input') as HTMLTextAreaElement;
   // 打开弹窗自动聚焦输入框，直接输入即可翻译（多数用户场景）
@@ -327,8 +430,25 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   }
 
   historySearch.addEventListener('input', renderHistory);
+  // 清空二次确认：清空不可恢复，误触代价高。第一次点击变「确认清空？」，
+  // 3 秒内再点才真正执行；期间点其它区域自动复位。
+  let historyClearArmed = false;
+  let historyClearArmTimer: ReturnType<typeof setTimeout> | null = null;
+  const disarmHistoryClear = () => {
+    historyClearArmed = false;
+    if (historyClearArmTimer) clearTimeout(historyClearArmTimer);
+    historyClearArmTimer = null;
+    if (historyClearBtn.isConnected) historyClearBtn.textContent = '清空';
+  };
   historyClearBtn.addEventListener('click', async () => {
     if (!historyEntries.length) return;
+    if (!historyClearArmed) {
+      historyClearArmed = true;
+      historyClearBtn.textContent = '确认清空？';
+      historyClearArmTimer = setTimeout(disarmHistoryClear, 3000);
+      return;
+    }
+    disarmHistoryClear();
     historyClearBtn.disabled = true;
     try {
       await clearHistory();
@@ -336,6 +456,11 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       renderHistory();
     } finally {
       historyClearBtn.disabled = false;
+    }
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (historyClearArmed && !(event.target as Element | null)?.closest?.('#ot-history-clear')) {
+      disarmHistoryClear();
     }
   });
   // 切到历史标签页时刷新（其它入口可能刚写入了新记录）。
@@ -377,6 +502,65 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
     }
   }
 
+  // ===== 月度预算 =====
+  // BYOK 用户自付 API 费：展示「本月已用 / 预算」进度，超阈值变红提醒，防不知不觉烧钱。
+  async function loadBudget() {
+    try {
+      const res = (await browser.runtime.sendMessage({ type: 'GET_BUDGET_STATUS' })) as
+        | {
+            ok?: boolean;
+            budget?: number;
+            warnPercent?: number;
+            monthUsage?: { yearMonth?: string; usedTokens?: number } | null;
+          }
+        | undefined;
+      const budget = Number(res?.budget) || 0;
+      const warnPercent = Number(res?.warnPercent) || 80;
+      const used = Math.max(0, Number(res?.monthUsage?.usedTokens) || 0);
+      const budgetEl = document.getElementById('ot-budget')!;
+      const warnEl = document.getElementById('ot-budget-warn')!;
+      warnEl.textContent = String(warnPercent);
+      const input = document.getElementById('ot-budget-input') as HTMLInputElement;
+      input.value = budget > 0 ? String(budget) : '';
+      if (budget <= 0) {
+        budgetEl.hidden = true;
+        return;
+      }
+      budgetEl.hidden = false;
+      const percent = Math.min(100, Math.round((used / budget) * 100));
+      document.getElementById('ot-budget-text')!.textContent =
+        `${numberFormat.format(used)} / ${numberFormat.format(budget)}（${percent}%）`;
+      const bar = document.getElementById('ot-budget-bar')!;
+      bar.style.width = `${percent}%`;
+      const over = percent >= warnPercent;
+      budgetEl.classList.toggle('ot-budget-over', over);
+      bar.classList.toggle('ot-budget-bar-over', over);
+    } catch {
+      /* 预算读取失败不影响统计面板主体 */
+    }
+  }
+
+  document.getElementById('ot-budget-save')!.addEventListener('click', async () => {
+    const input = document.getElementById('ot-budget-input') as HTMLInputElement;
+    const value = Math.max(0, Math.floor(Number(input.value) || 0));
+    try {
+      const cfg = normalizeConfig(await configItem.getValue());
+      await configItem.setValue({ ...cfg, monthlyTokenBudget: value });
+      await loadBudget();
+    } catch {
+      /* 保存失败保持现状 */
+    }
+  });
+  // 预算输入框回车即保存：与「保存」按钮等效，减少一次点击（数字类输入高频场景）。
+  document.getElementById('ot-budget-input')!.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    (document.getElementById('ot-budget-save') as HTMLButtonElement)?.click();
+  });
+
+  loadBudget();
+  loadUsage();
+
   document.getElementById('ot-stats-reset')!.addEventListener('click', async (event) => {
     const button = event.currentTarget as HTMLButtonElement;
     button.disabled = true;
@@ -384,8 +568,10 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
     try {
       const response = (await browser.runtime.sendMessage({ type: 'RESET_USAGE_STATS' })) as
         { ok?: boolean; stats?: UsageTotals } | undefined;
-      if (response?.ok) renderUsage(response.stats || EMPTY_USAGE_TOTALS);
-      else document.getElementById('ot-stats-detail')!.textContent = '统计清零失败，请重试';
+      if (response?.ok) {
+        renderUsage(response.stats || EMPTY_USAGE_TOTALS);
+        await loadBudget();
+      } else document.getElementById('ot-stats-detail')!.textContent = '统计清零失败，请重试';
     } catch {
       document.getElementById('ot-stats-detail')!.textContent = '统计清零失败，请重试';
     } finally {
