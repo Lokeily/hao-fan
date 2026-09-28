@@ -1191,6 +1191,50 @@ test('fresh install defaults to the keyless MyMemory engine', async ({ page }) =
   await expect(page.locator('#ot-status')).not.toContainText('主引擎不可用');
 });
 
+// ===== Round 15：欢迎引导「免费体验」按钮 =====
+// v0.2.4 起 Google 免 Key 已下线并从引擎注册表移除；此按钮此前仍一键切到 google
+// （不存在的引擎），新用户点击后必然翻译失败。修复后必须切到内置免 Key 通道 MyMemory。
+test('round15: welcome free button switches to the built-in keyless engine (not retired Google)', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/popup-regression.html');
+  // 制造「全新用户」：无任何 Key + 未完成引导 → 欢迎面板出现
+  await page.evaluate(async () => {
+    await (window as any).chrome.storage.local.set({
+      config: {},
+      onboardingDone: false,
+    });
+  });
+  await page.reload();
+  const welcome = page.locator('#ot-welcome');
+  await expect(welcome).toBeVisible();
+  // 按钮文案与引导说明已同步为 MyMemory
+  const freeBtn = page.getByRole('button', { name: '免费体验 · 不填 Key' });
+  await expect(freeBtn).toBeVisible();
+  await expect(page.locator('.ot-welcome-free-note')).toContainText('MyMemory');
+  await freeBtn.click();
+  // 点击后：存储里的 provider 必须是 mymemory（而不是已下线的 google）
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        async () => (await (window as any).chrome.storage.local.get('config')).config?.provider,
+      ),
+    )
+    .toBe('mymemory');
+  // baseUrl 必须是 MyMemory 预设端点，不能是 translate.googleapis.com
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        async () => (await (window as any).chrome.storage.local.get('config')).config?.baseUrl,
+      ),
+    )
+    .toContain('mymemory.translated.net');
+  // 欢迎面板关闭
+  await expect(welcome).toBeHidden();
+  // 成功提示
+  await expect(page.locator('#ot-out')).toContainText('MyMemory');
+});
+
 // ===== 第 10 轮「最终版」：UI 反馈与实用功能回归 =====
 test('round10: primary translate button has hover and press feedback', async ({ page }) => {
   await page.goto('/tests/browser/selection-regression.html');

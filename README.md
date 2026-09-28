@@ -9,11 +9,11 @@
 *An open-source immersive bilingual web translation extension that talks directly to your own AI provider.*
 
 [![Build](https://github.com/Lokeily/hao-fan/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Lokeily/hao-fan/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-0.2.7-blue)
+![Version](https://img.shields.io/badge/version-0.2.8-blue)
 ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox MV2](https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white)
 ![Edge](https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-63%20unit%20%2B%2033%20e2e-brightgreen)
+![Tests](https://img.shields.io/badge/tests-87%20unit%20%2B%2065%20e2e-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 [功能特性](#-功能特性) · [快速开始](#-快速开始) · [安装](#-安装) · [配置参考](#-配置参考) · [隐私与安全](#-隐私与安全) · [参与贡献](#-参与贡献)
@@ -90,7 +90,7 @@
 2. 选择服务商，填入 API Key，设置目标语言，点「测试连接」确认可用
 3. 回到任意英文网页 —— 默认为**手动模式**：点击段落或划选文字即可翻译；也可在设置中切换为「整页自动」。
 
-**想先体验？** 设置中选择「Google 翻译」即可免 Key 使用。
+**想先体验？** 装完即用内置免 Key 通道（MyMemory），零配置直接翻译。
 **追求最省 Token？** 把「翻译模式」切到「手动点击 / 划词」——整页不自动翻译，点哪段译哪段。
 **还没配 Key？** 好翻不会发送任何无效请求，而是弹出一次性引导卡，填好 Key 后自动继续翻译。
 
@@ -125,7 +125,7 @@ npm run build:firefox # Firefox MV2 → .output/firefox-mv2
 
 | 配置 | 说明 | 默认 |
 | --- | --- | --- |
-| 翻译引擎 / 模型 / Base URL | 服务商、模型与自建端点 | deepseek / deepseek-chat |
+| 翻译引擎 / 模型 / Base URL | 服务商、模型与自建端点 | mymemory（免 Key） |
 | 源语言 / 目标语言 | 支持自动检测 | 自动检测 → 中文 |
 | 翻译模式 | `manual` 手动点击·划词 / `auto` 整页自动 | manual |
 | 翻译风格 | 自然流畅 / 正式书面 / 轻松口语 / 简洁精炼 | 自然流畅 |
@@ -143,9 +143,9 @@ npm run build:firefox # Firefox MV2 → .output/firefox-mv2
 | 类别 | 服务 |
 | --- | --- |
 | AI（12 家） | DeepSeek · OpenAI · Google Gemini · OpenRouter · 智谱 GLM · 腾讯混元 · 通义千问 · Kimi · 百川智能 · 豆包 · Ollama（本地）· 任意 OpenAI 兼容自定义接口 |
-| 传统机翻（3 家） | Google 翻译（免 Key）· DeepL · Microsoft 翻译 |
+| 传统机翻 | MyMemory（免 Key）· Apertium（免 Key，欧洲语对）· DeepL · Microsoft 翻译 |
 
-> Google 免 Key 走非官方免费端点，无服务等级保证；正式使用建议配置带 Key 的服务。Ollama 本地模型数据不出本机。
+> MyMemory / Apertium 为免 Key 公共通道，无服务等级保证；正式使用建议配置带 Key 的服务。Ollama 本地模型数据不出本机。
 
 </details>
 

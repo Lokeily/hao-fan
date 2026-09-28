@@ -63,7 +63,7 @@ Edge 商店免费、审核较快（通常 1–7 个工作日），且支持「�
 
 ## 支持的翻译服务
 - AI：DeepSeek、OpenAI、Google Gemini、OpenRouter、智谱 GLM、腾讯混元、通义千问、Kimi、百川智能、豆包、Ollama 本地模型、任意 OpenAI 兼容接口
-- 传统翻译：Google 翻译（免 Key）、DeepL、Microsoft 翻译
+- 传统翻译：MyMemory（免 Key）、Apertium（免 Key，欧洲语对）、DeepL、Microsoft 翻译
 
 ## 隐私
 - API Key 仅保存在浏览器本地，按服务商隔离，直连所选服务商
@@ -109,7 +109,7 @@ Edge 商店免费、审核较快（通常 1–7 个工作日），且支持「�
 ```
 测试入口：点击工具栏图标打开弹窗；在任意网页点击右下角「译」按钮可整页翻译；
 鼠标悬停段落可查看译文；快捷键 Alt+T 翻译当前网页。
-默认服务商为 DeepSeek（需用户自备 API Key），选择「Google 翻译」可免 Key 体验。
+默认服务商为 MyMemory（免 Key，装完即用），无需任何配置即可体验；也可在设置中接自己的 API Key。
 ```
 
 ---

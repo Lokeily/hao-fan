@@ -180,6 +180,18 @@ function isFailoverError(error: unknown): boolean {
   if (error instanceof TypeError) return true; // 网络层错误
   const message = error instanceof Error ? error.message : String(error);
   if (/超时|timeout|network|fetch|Failed to fetch|net::/i.test(message)) return true;
+  // 免 Key 通道「额度耗尽/今日额度用完」是典型可降级错误：主通道限额与用户配置
+  // 无关，切到备用免 Key 通道（或提示接自己的 Key）才是正确体验。
+  // 关键：普通业务错误（401 Key 无效等）不可降级——那是用户配置问题，降级会掩盖真相。
+  // 覆盖 MyMemory 的两种形态：映射后的人话（「今日免费额度已用完」）与
+  // 未映射的原始警告（MYMEMORY WARNING: YOU USED ALL AVAILABLE…）。
+  if (
+    /免费额度|额度已用完|额度耗尽|已用尽|USAGE LIMIT|quota|MYMEMORY WARNING|限流|全部请求失败/i.test(
+      message,
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -835,16 +847,30 @@ export async function translateBatchDetailed(
   stats.sentCharacters = toTranslate.reduce((sum, item) => sum + item.text.length, 0);
 
   if (getProvider(effectiveCfg.provider)?.type === 'mt') {
-    const batch = await translateMTBatch(
-      effectiveCfg.provider,
-      toTranslate.map((item) => item.text),
-      effectiveCfg,
-      signal,
-    );
-    usedProvider = effectiveCfg.provider;
+    // 批量 MT 也必须走故障转移链：默认免 Key 通道（MyMemory）无 SLA，额度用尽/
+    // 超时/网络波动时按序切到备用免 Key 通道，否则整页翻译在没有任何配置的
+    // 新用户面前直接失败（此前只对单条路径生效，批量路径形同虚设）。
+    const textList = toTranslate.map((item) => item.text);
+    const candidates = buildCandidates(effectiveCfg);
+    let batch: MtBatchResult | null = null;
+    let lastMtErr: unknown;
+    for (const c of candidates) {
+      try {
+        signal?.throwIfAborted();
+        batch = await translateMTBatch(c.provider, textList, c, signal);
+        usedProvider = c.provider;
+        lastMtErr = null;
+        break;
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        if (!isFailoverError(error)) throw error;
+        lastMtErr = error;
+      }
+    }
+    if (!batch) throw lastMtErr ?? new Error('翻译失败');
     stats.requests += batch.requests;
     toTranslate.forEach((item, itemIndex) => {
-      const translation = batch.translations[itemIndex] || item.text;
+      const translation = batch!.translations[itemIndex] || item.text;
       item.indexes.forEach((index) => {
         result[index] = translation;
         // 为每个重复出现的原文都写缓存：此前只写首个，其余变体下次仍会重新付费。
@@ -1281,7 +1307,7 @@ async function translateMTBatch(
     return { translations, requests: 1 };
   }
 
-  // Google 的免费端点不保证多文本协议，使用有限并发避免逐条串行。
+  // 免 Key 通道均为公共 API，响应不稳定，使用有限并发避免逐条串行。
   // 单条失败降级为空串（上层会回退原文），不让一条网络抖动拖垮整批。
   const translations = new Array<string>(texts.length);
   let next = 0;
@@ -1299,7 +1325,7 @@ async function translateMTBatch(
     }
   };
   await Promise.all(Array.from({ length: Math.min(6, texts.length) }, () => worker()));
-  if (failed >= texts.length) throw new Error('Google 免 Key 端点全部请求失败，可能已被限流');
+  if (failed >= texts.length) throw new Error(`${getProvider(providerId)?.name || providerId} 免 Key 通道全部请求失败，可能已被限流`);
   return { translations, requests: texts.length };
 }
 

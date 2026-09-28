@@ -779,3 +779,124 @@ test('去重回填缓存：每个变体原文都写入整段缓存（下次不�
     await server.close();
   }
 });
+
+// ===== Round 15：批量 MT 故障转移 & 免 Key 配额识别 =====
+// buildCandidates 会给备用引擎填「预设真实域名」（如 apertium.org），mock server
+// 拦不到真实域名请求。这里包装全局 fetch：把测试内固定的免 Key 真实域名全部
+// 重写到 mock 端口（仅在本轮测试生效），让降级链在测试环境可被观察。
+const REMAP_ORIGINAL_FETCH = globalThis.fetch;
+function remapKeylessHosts(port) {
+  globalThis.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : String(input.url || input);
+    const rewritten = url
+      .replace('https://apertium.org', `http://127.0.0.1:${port}`)
+      .replace('https://api.mymemory.translated.net', `http://127.0.0.1:${port}`);
+    return REMAP_ORIGINAL_FETCH(rewritten === url ? input : rewritten, init);
+  };
+}
+function restoreFetch() {
+  globalThis.fetch = REMAP_ORIGINAL_FETCH;
+}
+
+// 主引擎（MyMemory 免 Key）批量请求失败时，必须像单条路径一样按序切到备用
+// 免 Key 通道（Apertium）。此前批量路径直接 return，故障转移形同虚设。
+test('Round15：批量 MT 主引擎失败时按降级链切到备用引擎（Apertium）', async () => {
+  const server = await startMockServer();
+  remapKeylessHosts(server.port);
+  let myMemoryHits = 0;
+  let apertiumHits = 0;
+  server.setHandler((req) => {
+    if (req.url.includes('/apy/translate')) {
+      apertiumHits++;
+      return { responseStatus: 200, responseData: { translatedText: 'Apertium 译文' } };
+    }
+    myMemoryHits++;
+    // 主引擎一律返回配额耗尽（模拟公共免 Key 池被限流）
+    return {
+      responseData: {
+        translatedText:
+          'MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN 12 HOURS',
+      },
+      responseStatus: 200,
+    };
+  });
+  const cfg = cfgFor(server.port, {
+    provider: 'mymemory',
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    fallbackProviders: ['apertium'],
+    // Apertium 的 baseUrl 需要指向 mock；因为候选构造用 provider.baseUrl 预设值，
+    // 这里覆盖 provider 配置后由 buildCandidates 解析 provider.baseUrl。
+  });
+  try {
+    const result = await translateBatchDetailed(cfg, ['Hello world', 'Second text']);
+    assert.ok(myMemoryHits >= 1, '应先尝试主引擎 MyMemory');
+    assert.ok(apertiumHits >= 1, '主引擎失败后应切到备用 Apertium');
+    assert.equal(result.translations[0], 'Apertium 译文');
+    assert.equal(result.usedProvider, 'apertium', '应回传实际成功引擎供前端提示降级');
+  } finally {
+    await server.close();
+    restoreFetch();
+  }
+});
+
+test('Round15：批量 MT 主引擎成功时不触发降级（不白打备用引擎）', async () => {
+  const server = await startMockServer();
+  remapKeylessHosts(server.port);
+  let apertiumHits = 0;
+  server.setHandler((req) => {
+    if (req.url.includes('/apy/translate')) {
+      apertiumHits++;
+      return { responseStatus: 200, responseData: { translatedText: 'Apertium 译文' } };
+    }
+    return { responseStatus: 200, responseData: { translatedText: 'MyMemory 译文' } };
+  });
+  const cfg = cfgFor(server.port, {
+    provider: 'mymemory',
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    fallbackProviders: ['apertium'],
+  });
+  try {
+    const result = await translateBatchDetailed(cfg, ['Hello world']);
+    assert.equal(apertiumHits, 0, '主引擎成功时不应触发备用');
+    assert.equal(result.translations[0], 'MyMemory 译文');
+    assert.equal(result.usedProvider, 'mymemory');
+  } finally {
+    await server.close();
+    restoreFetch();
+  }
+});
+
+// 单条路径（coreTranslate）也应识别「今日免费额度用完」为可降级错误，
+// 从 MyMemory 切到 Apertium；此前该文案不在 isFailoverError 匹配范围，会直接失败。
+test('Round15：单条翻译 MyMemory 配额耗尽时切到备用免 Key 通道', async () => {
+  const server = await startMockServer();
+  remapKeylessHosts(server.port);
+  let apertiumHits = 0;
+  server.setHandler((req) => {
+    if (req.url.includes('/apy/translate')) {
+      apertiumHits++;
+      return { responseStatus: 200, responseData: { translatedText: 'Apertium 译文' } };
+    }
+    return {
+      responseStatus: 200,
+      responseData: {
+        translatedText:
+          'MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN 12 HOURS',
+      },
+    };
+  });
+  const cfg = cfgFor(server.port, {
+    provider: 'mymemory',
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    fallbackProviders: ['apertium'],
+  });
+  try {
+    const result = await translateOneDetailed(cfg, 'Hello world');
+    assert.ok(apertiumHits >= 1, '配额耗尽应触发降级到 Apertium');
+    assert.equal(result.translation, 'Apertium 译文');
+    assert.equal(result.usedProvider, 'apertium', '单条路径也应回传实际引擎');
+  } finally {
+    await server.close();
+    restoreFetch();
+  }
+});

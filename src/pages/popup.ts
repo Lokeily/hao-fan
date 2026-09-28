@@ -122,7 +122,7 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
           <h2 id="ot-welcome-title">欢迎使用好翻</h2>
           <p class="ot-welcome-sub">你的网页翻译助手。选一种方式开始：</p>
           <button type="button" id="ot-welcome-free" class="ot-btn-primary ot-welcome-btn">免费体验 · 不填 Key</button>
-          <p class="ot-welcome-free-note">用 Google 翻译，零配置、零费用、开箱即用</p>
+          <p class="ot-welcome-free-note">用内置免 Key 通道（MyMemory），零配置、零费用、开箱即用</p>
           <button type="button" id="ot-welcome-config" class="ot-btn-secondary ot-welcome-btn">配置自己的 AI 引擎</button>
           <p class="ot-welcome-config-note">接入 DeepSeek / 智谱 / 混元等，质量更高</p>
           <button type="button" id="ot-welcome-skip" class="ot-welcome-skip">先跳过，我自己逛逛</button>
@@ -205,18 +205,26 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
 
   welcomeFreeBtn?.addEventListener('click', async () => {
     try {
-      // 一键切到 Google 翻译（免 Key、免配置），立即可用
+      // 一键切到内置免 Key 通道（MyMemory，免配置），立即可用。
+      // 注意：不可切 Google——该免 Key 端点已在 v0.2.4 下线（境内不可达），
+      // 且 Google 已从引擎注册表移除。切过去只会得到一个不存在的引擎。
+      const GLOBAL_KEYLESS_ID = 'mymemory';
       const latest = normalizeConfig(await configItem.getValue());
+      const provider = getProvider(GLOBAL_KEYLESS_ID);
       const next = {
         ...latest,
-        provider: 'google',
-        baseUrl: 'https://translate.googleapis.com',
+        provider: GLOBAL_KEYLESS_ID,
+        // 免 Key 引擎无模型，清空模型名，避免残留旧模型影响请求格式
         model: '',
+        // 端点在 UI 里只读、随引擎自动切换；这里直接写预设值，
+        // 避免「mymemory + 旧 DeepSeek 端点」错配（normalizeConfig 也会校正，
+        // 但写入时直接写对更干净）。
+        baseUrl: provider?.baseUrl || 'https://api.mymemory.translated.net',
       };
       await configItem.setValue(next);
       finishOnboarding();
       if (welcomeEl) welcomeEl.hidden = true;
-      setOutput('已切换到 Google 翻译（免 Key），现在可以翻译了 🎉', 'success');
+      setOutput('已切换到内置免 Key 通道（MyMemory），现在可以翻译了 🎉', 'success');
       // 设置面板里的表单需要刷新为新引擎
       try {
         const mount = document.getElementById('ot-form-mount');
