@@ -567,7 +567,7 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   });
 
   loadBudget();
-  loadUsage();
+  loadUsage(); // 首次加载统计；翻译成功后会自动刷新（见翻译按钮回调）
 
   document.getElementById('ot-stats-reset')!.addEventListener('click', async (event) => {
     const button = event.currentTarget as HTMLButtonElement;
@@ -587,7 +587,6 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       button.textContent = '清零';
     }
   });
-  loadUsage();
 
   translateButton.addEventListener('click', async () => {
     const text = input.value.trim();

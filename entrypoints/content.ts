@@ -821,6 +821,13 @@ export default defineContentScript({
         color: currentColor || undefined,
       });
       translationNodes.set(el, node);
+      // 第 17 轮：隐藏态下新插入的译文必须跟随隐藏——否则「已隐藏译文」时
+      // 滚动懒加载 / SPA 动态内容 / 重译产生的新译文节点自带 display:block
+      // !important（外部 CSS 的 !important 压不住内联），会突然显示出来，
+      // 而按钮与根类仍处于「已隐藏」，出现状态失步。
+      if (translationsHidden) {
+        node.style.setProperty('display', 'none', 'important');
+      }
       // 节点上直接挂锚点引用：对照模式批量应用时需要「节点 → 原文锚点」的反查
       //（WeakMap 不可迭代），且避免按 class 猜测锚点出现误判。
       (node as HTMLSpanElement & { otAnchor?: Element }).otAnchor = el;
@@ -1192,23 +1199,27 @@ export default defineContentScript({
     // 来回切换不产生任何请求，也保留已翻译结果。
     let translationsHidden = false;
 
-    function setTranslationsHidden(hidden: boolean): void {
+    function setTranslationsHidden(hidden: boolean, skipNodes = false): void {
       translationsHidden = hidden;
       // 根节点 class 作为状态标记（供样式与测试判定）。
       document.documentElement.classList.toggle('ot-hide-translations', hidden);
       // 必须逐个改内联样式：译文节点自身带 display:block !important，
       // 外部样式表的 !important 无法覆盖内联 !important，只能以同级内联覆盖。
       // 节点数通常几十~几百，偶发切换的遍历开销可忽略（远小于一次翻译请求）。
-      document.querySelectorAll('.ot-translation').forEach((el) => {
-        (el as HTMLElement).style.setProperty(
-          'display',
-          hidden ? 'none' : 'block',
-          'important',
-        );
-      });
+      // skipNodes=true（clearTranslations 路径）：节点即将被整体删除，遍历改
+      // display 纯属浪费，还会先「闪一下可见」再删——用户感知为闪烁。
+      if (!skipNodes) {
+        document.querySelectorAll('.ot-translation').forEach((el) => {
+          (el as HTMLElement).style.setProperty(
+            'display',
+            hidden ? 'none' : 'block',
+            'important',
+          );
+        });
+      }
       const btn = document.getElementById('ot-hide-btn');
       if (btn) {
-        btn.textContent = hidden ? '\u{1F441}\uFE0E' : '\u{1F441}\uFE0E'; // 保持图标，状态由样式与 title 表达
+        // 图标保持不变（眼睛），显隐状态由 title / aria-label / aria-pressed / 透明度表达
         btn.title = hidden ? '显示译文（快捷键 Alt+S）' : '隐藏译文（快捷键 Alt+S）';
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
@@ -1217,6 +1228,18 @@ export default defineContentScript({
     }
 
     function toggleTranslations(): void {
+      // 人体工学：页面还没有任何译文时，隐藏按钮/快捷键点击是无效动作——
+      // 直接进隐藏态会让按钮变暗（opacity 0.45）却没有可隐藏内容，用户困惑。
+      // 此时给出明确引导（0.2.10 优化空态交互）。
+      if (document.querySelectorAll('.ot-translation').length === 0) {
+        if (!translationsHidden) {
+          showStatus('页面上还没有译文，先点「译」翻译本页', true, 2200);
+          return;
+        }
+        // translationsHidden 为 true 但无译文节点（异常/已被外部清除）：复位状态。
+        setTranslationsHidden(false);
+        return;
+      }
       setTranslationsHidden(!translationsHidden);
       showStatus(translationsHidden ? '已隐藏译文（再按 Alt+S 恢复，不会重新翻译）' : '已显示译文', true, 2200);
     }
@@ -1231,6 +1254,10 @@ export default defineContentScript({
         }).catch(() => {});
         activePageJobId = null;
       }
+      // 第 17 轮：收起全部译文 = 一次性「我要看原文」的动作。隐藏态必须一并复位，
+      // 否则「收起 → 再点翻译」时新译文全部处于隐藏态，用户以为翻译没生效。
+      // skipNodes=true：节点即将被删除，无需遍历改 display（避免闪烁）。
+      if (translationsHidden) setTranslationsHidden(false, true);
       // 移除所有译文节点（核心：防止多次点击叠加）
       document.querySelectorAll('.ot-translation').forEach((el) => el.remove());
       // 清除所有已翻译标记（让 collectTextBlocks 可重新收集）

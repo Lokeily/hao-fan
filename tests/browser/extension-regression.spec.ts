@@ -885,6 +885,99 @@ test('toggle translations: hide/show without re-translating (0 extra requests)',
   expect(requestsAfter).toBe(requestsBefore);
 });
 
+// ===== Round 17：显隐状态与新建/收起译文解耦（P0 状态失步）=====
+// 此前「已隐藏译文」时：
+//  ① SPA 动态新增/滚动懒加载/重译产生的译文节点自带 display:block !important
+//    （内联压过外部 CSS 的 !important 兜底）会突然显示，按钮却仍处于「已隐藏」；
+//  ② 点主按钮收起全部译文后隐藏态不复位，再点翻译的新译文全部处于隐藏态，
+//    用户以为翻译没生效。
+// 场景 A 验证 ①（隐藏态下动态新增内容必须跟随隐藏）；
+// 场景 B 验证 ②（收起=复位隐藏态，再翻译立即可见）。
+test('round17: translations inserted while hidden stay hidden (SPA/lazy content)', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  const mainBtn = page.locator('#ot-translate-btn');
+  const hideBtn = page.locator('#ot-hide-btn');
+  const html = page.locator('html');
+
+  // ① 整页翻译（可见态）
+  await mainBtn.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+  const translations = page.locator('.ot-translation');
+  await expect(translations.first()).toBeVisible({ timeout: 60000 });
+
+  // ② 隐藏全部译文 → 现有译文全部不可见（节点保留，未重新翻译）
+  await hideBtn.click();
+  await expect(html).toHaveClass(/ot-hide-translations/);
+  await expect(translations.first()).toBeHidden();
+
+  // ③ 隐藏态下 SPA 动态新增内容（懒加载/虚拟列表同理）→ 新译文必须跟随隐藏。
+  //    P0：修复前新节点自带 display:block !important 会直接冒出来。
+  await page.getByRole('button', { name: 'Add dynamic content' }).click();
+  await expect
+    .poll(async () => await page.locator('#processed-parent .ot-translation').count())
+    .toBeGreaterThan(0);
+  const dynamicTranslation = page.locator('#processed-parent .ot-translation').first();
+  await expect(dynamicTranslation).toBeHidden();
+
+  // ④ 恢复显示 → 新旧译文一起可见（隐藏/恢复不产生新请求，内容一致）
+  await hideBtn.click();
+  await expect(html).not.toHaveClass(/ot-hide-translations/);
+  await expect(translations.first()).toBeVisible();
+  await expect(dynamicTranslation).toBeVisible();
+});
+
+test('round17: clearing all translations also resets the hidden state', async ({ page }) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  const mainBtn = page.locator('#ot-translate-btn');
+  const hideBtn = page.locator('#ot-hide-btn');
+  const html = page.locator('html');
+
+  // ① 翻译 → 隐藏（进入「已隐藏译文」态）
+  await mainBtn.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+  const translations = page.locator('.ot-translation');
+  await expect(translations.first()).toBeVisible({ timeout: 60000 });
+  await hideBtn.click();
+  await expect(html).toHaveClass(/ot-hide-translations/);
+
+  // ② 主按钮收起全部译文（有译文时主按钮语义=收起）→ 收起必须同时复位隐藏态。
+  //    P0：修复前隐藏态残留，「收起 → 再翻译」的新译文全躲在隐藏态。
+  await mainBtn.click();
+  await expect(html).not.toHaveClass(/ot-hide-translations/);
+  await expect(translations).toHaveCount(0);
+
+  // ③ 再点主按钮重新翻译 → 新译文立即可见（核心回归断言）
+  await mainBtn.click();
+  await expect(toolbar).toHaveAttribute('aria-busy', 'false', { timeout: 60000 });
+  await expect(translations.first()).toBeVisible({ timeout: 60000 });
+  await expect(html).not.toHaveClass(/ot-hide-translations/);
+});
+
+// 空态人体工学：页面还没有译文时，隐藏按钮是无效动作——直接进隐藏态会让
+// 按钮变暗（opacity 0.45）却没有可隐藏内容，用户困惑。应引导先翻译。
+test('round17: hiding with no translations yet guides the user instead of toggling', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/dom-regression.html');
+  const toolbar = page.locator('#ot-toolbar');
+  await expect(toolbar).toBeVisible();
+  const hideBtn = page.locator('#ot-hide-btn');
+  const html = page.locator('html');
+
+  // 页面还没有任何译文（未点过翻译）时点隐藏 → 不进隐藏态，给引导提示
+  await hideBtn.click();
+  await expect(html).not.toHaveClass(/ot-hide-translations/);
+  const status = page.locator('#ot-status');
+  await expect(status).toBeVisible();
+  await expect(status).toContainText('还没有译文');
+});
+
 test('quick settings shows keyboard shortcuts so users can discover them', async ({ page }) => {
   await page.goto('/tests/browser/selection-regression.html');
   await page.locator('#ot-settings-btn').click();
