@@ -17,6 +17,15 @@ export async function translateImage(
   const provider = getProvider(cfg.provider);
   const supportsVision = provider?.vision || (provider?.id === 'custom' && cfg.customVision);
   if (!provider || provider.type !== 'llm' || !supportsVision) {
+    // 第 16 轮：把「图片翻译为什么失败 + 怎么解决」一次说清楚。
+    // 免 Key 的 MyMemory/Apertium 只做文本翻译，不接图片；Ollama 本地
+    // 是唯一的免 Key 视觉引擎。列出的示例模型与 providers.ts 里的
+    // vision: true 引擎保持一致，避免出现列表里根本没有的模型。
+    if (!provider?.needsKey && provider?.type === 'mt') {
+      throw new Error(
+        '当前免 Key 引擎只支持文本翻译，不支持图片。想翻译图片：① 接一个支持视觉的模型（如 GPT-4o / 智谱 GLM-4V / 腾讯混元 Vision / 通义千问 VL）；② 或使用 Ollama 本地模型（免费，需本机已装 Ollama）。',
+      );
+    }
     throw new Error(
       '当前引擎不支持图片翻译，请选择支持视觉的模型（如 GPT-4o / Gemini / 智谱 GLM-4V / 通义千问 VL）',
     );

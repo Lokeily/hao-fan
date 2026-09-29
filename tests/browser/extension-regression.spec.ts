@@ -409,7 +409,8 @@ test('gear button opens quick settings panel with live controls', async ({ page 
   await page.locator('#ot-settings-btn').click();
   const panel = page.locator('#ot-settings-panel');
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('快速设置');
+  // 第 16 轮：标题已与完整设置统一为「好翻 · 设置」；保留「设置」关键词断言
+  await expect(panel).toContainText('设置');
 
   // 目标语言选择器存在且含中文选项（option 在未展开的 select 中不可见，改查数量）
   const langSel = panel.getByRole('combobox', { name: '目标语言' });
@@ -1327,6 +1328,48 @@ test('round10: quick settings dropdown marks providers missing an API key', asyn
   // 切到未配 Key 引擎 → 下拉加 missing-key 警示类（橙色边框提示去填 Key）
   await engine.selectOption('openai');
   await expect(engine).toHaveClass(/missing-key/);
+});
+
+// ===== Round 16：快速设置与完整设置一致化 =====
+// 此前快速设置面板的引擎下拉是扁平列表，完整设置面板已按
+// 「免 Key 体验 / 接自己的 API」分组——同一个配置两个入口长得不一样。
+// 修复：快速设置同样按 optgroup 分组，且分组文案与完整设置完全一致。
+test('round16: quick settings groups providers like the full settings panel', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('#ot-settings-btn').click();
+  const panel = page.locator('#ot-settings-panel');
+  await expect(panel).toBeVisible();
+
+  const engine = panel.getByRole('combobox', { name: '翻译引擎' });
+  const groups = engine.locator('optgroup');
+  await expect(groups).toHaveCount(2);
+  await expect(groups.nth(0)).toHaveAttribute(
+    'label',
+    /免 Key 体验（零配置，装完就能用）/,
+  );
+  await expect(groups.nth(1)).toHaveAttribute('label', /接自己的 API（更准更快）/);
+
+  // 免 Key 组：MyMemory / Apertium / Ollama 本地
+  await expect(groups.nth(0)).toContainText('MyMemory');
+  await expect(groups.nth(0)).toContainText('Apertium');
+  await expect(groups.nth(0)).toContainText('Ollama');
+  // 需 Key 组：DeepSeek（mock 已配 Key）
+  await expect(groups.nth(1)).toContainText('DeepSeek');
+  await expect(groups.nth(1)).toContainText('OpenAI');
+
+  // 原有标注行为不回归：option 仍带「免 Key / 已配 Key / 未配 Key」标注
+  await expect(engine.locator('option[value="mymemory"]')).toContainText('（免 Key）');
+  await expect(engine.locator('option[value="deepseek"]')).toContainText('（已配 Key）');
+  await expect(engine.locator('option[value="openai"]')).toContainText('（未配 Key）');
+  await expect(engine.locator('option[value="openai"]')).toHaveAttribute(
+    'data-missing-key',
+    'true',
+  );
+
+  // 面板标题与完整设置统一（不再叫「快速设置」）
+  await expect(panel).toContainText('好翻 · 设置');
 });
 
 test('round10: failed batch marks paragraphs retryable with completion hint', async ({

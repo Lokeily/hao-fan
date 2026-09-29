@@ -3652,8 +3652,9 @@ export default defineContentScript({
       gear.type = 'button';
       gear.id = 'ot-settings-btn';
       gear.textContent = '\u2699\uFE0E'; // ⚙（文本变体，避免 emoji 渲染）
-      gear.title = '快速设置';
-      gear.setAttribute('aria-label', '打开快速设置');
+      // 第 16 轮：入口文案与面板标题统一为「设置」（不再叫「快速设置」）
+      gear.title = '设置';
+      gear.setAttribute('aria-label', '打开设置');
       Object.assign(gear.style, {
         width: '36px',
         height: '36px',

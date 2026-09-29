@@ -865,7 +865,9 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   head.className = 'head';
   const title = document.createElement('div');
   title.className = 'title';
-  title.textContent = '好翻 · 快速设置';
+  // 第 16 轮：标题与完整设置面板统一为「好翻 · 设置」，去掉「快速」字样——
+  // 两个入口表达同一套配置，避免用户误以为这是两个不同的设置系统。
+  title.textContent = '好翻 · 设置';
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'close';
@@ -910,6 +912,13 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
   provLabel.textContent = '翻译引擎';
   const provSel = document.createElement('select');
   provSel.setAttribute('aria-label', '翻译引擎');
+  // 第 16 轮：与完整设置面板对齐——按「免 Key 体验 / 接自己的 API」分组。
+  // 新用户第一眼在快速面板里看到的也是零配置入口，两个入口不再打架。
+  // 分组文案必须与 utils/ui.ts 完全一致，避免「哪里看到的不一样」。
+  const provKeylessGroup = document.createElement('optgroup');
+  provKeylessGroup.label = '免 Key 体验（零配置，装完就能用）';
+  const provByokGroup = document.createElement('optgroup');
+  provByokGroup.label = '接自己的 API（更准更快）';
   opts.providers.forEach((p) => {
     const o = document.createElement('option');
     o.value = p.id;
@@ -923,8 +932,9 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     } else {
       o.textContent = `${p.name}（免 Key）`;
     }
-    provSel.appendChild(o);
+    (p.needsKey ? provByokGroup : provKeylessGroup).appendChild(o);
   });
+  provSel.append(provKeylessGroup, provByokGroup);
   provSel.value = opts.provider;
   // 选中「未配 Key」引擎时加警示类：橙色边框提示去填 Key。
   const syncMissingKeyClass = () => {

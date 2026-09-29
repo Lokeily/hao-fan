@@ -120,11 +120,11 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
             <img src="${logoUrl}" alt="" />
           </div>
           <h2 id="ot-welcome-title">欢迎使用好翻</h2>
-          <p class="ot-welcome-sub">你的网页翻译助手。选一种方式开始：</p>
+          <p class="ot-welcome-sub">网页翻译助手，装完就能用，不用注册。选一种方式开始：</p>
           <button type="button" id="ot-welcome-free" class="ot-btn-primary ot-welcome-btn">免费体验 · 不填 Key</button>
-          <p class="ot-welcome-free-note">用内置免 Key 通道（MyMemory），零配置、零费用、开箱即用</p>
+          <p class="ot-welcome-free-note">内置免 Key 通道（MyMemory）：零配置、零费用、开箱即用；随时可在设置里切换引擎</p>
           <button type="button" id="ot-welcome-config" class="ot-btn-secondary ot-welcome-btn">配置自己的 AI 引擎</button>
-          <p class="ot-welcome-config-note">接入 DeepSeek / 智谱 / 混元等，质量更高</p>
+          <p class="ot-welcome-config-note">接入 DeepSeek / 智谱 / 混元等，翻译更准；去「设置」页填一次 Key 即可</p>
           <button type="button" id="ot-welcome-skip" class="ot-welcome-skip">先跳过，我自己逛逛</button>
         </div>
       </div>
@@ -691,7 +691,17 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
       const prov = getProvider(cfg.provider);
       const supportsVision = prov?.vision || (prov?.id === 'custom' && cfg.customVision);
       if (!supportsVision) {
-        setImageStatus('当前引擎不支持图片，请在设置中选择视觉模型', true);
+        // 第 16 轮：图片翻译失败原因 + 两条出路一次讲清。免 Key 的
+        // MyMemory/Apertium 只做文本翻译；唯一的免 Key 视觉引擎是
+        // Ollama 本地（需本机已装）。列出的视觉模型与 providers.ts 同步。
+        if (!prov?.needsKey) {
+          setImageStatus(
+            '当前引擎（' + (prov?.name || '免 Key 通道') + '）只支持文本翻译。图片翻译需接 GPT-4o / 智谱 GLM-4V / 混元 Vision / 千问 VL，或本机装 Ollama 后选「Ollama（本地）」',
+            true,
+          );
+        } else {
+          setImageStatus('当前引擎不支持图片，请在设置中选择视觉模型', true);
+        }
         return;
       }
       if (!getProviderApiKey(cfg) && prov?.needsKey) {

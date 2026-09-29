@@ -1496,6 +1496,7 @@ details.ot-advanced-section[open] > summary::before {
   margin: 4px 0 10px;
   font-size: 11px;
   color: var(--text-3);
+  line-height: 1.5;
 }
 .ot-welcome-skip {
   margin-top: 12px;
