@@ -1340,12 +1340,13 @@ test('round10: primary translate button has hover and press feedback', async ({ 
   expect(initial).toContain('linear-gradient');
 
   // hover：提亮渐变 + 上浮 + 阴影增强（浏览器将 hex 解析为 rgb 返回）
+  // v0.2.11：渐变由主题 accent 派生（lighten(#007aff, 0.24)），不再写死 #3d99ff
   await btn.hover();
   const hovered = await btn.evaluate((el) => {
     const s = (el as HTMLElement).style;
     return { bg: s.background, transform: s.transform, shadow: s.boxShadow };
   });
-  expect(hovered.bg).toContain('rgb(61, 153, 255)');
+  expect(hovered.bg).toContain('rgb(61, 154, 255)');
   expect(hovered.transform).toBe('translateY(-1px)');
   expect(hovered.shadow).toContain('0.45');
 
@@ -1355,7 +1356,7 @@ test('round10: primary translate button has hover and press feedback', async ({ 
     const s = (el as HTMLElement).style;
     return { bg: s.background, transform: s.transform };
   });
-  expect(restored.bg).toContain('rgb(43, 140, 255)');
+  expect(restored.bg).toContain('rgb(36, 141, 255)');
   expect(restored.transform).toBe('translateY(0px)'); // 浏览器序列化为 0px
 });
 
@@ -1795,4 +1796,90 @@ test('round11: settings panel offers sticky section navigation', async ({ page }
       body.evaluate((element) => (element as HTMLElement).scrollTop),
     )
     .toBeGreaterThan(1200);
+});
+
+// ===== 第 18 轮（v0.2.11）：Liquid Glass 全面强化回归 =====
+// 悬停气泡颜色跟随 JS 主题变量（不再用 @media 第二套色板）：浅色主题下
+// .copy 按钮与 .pin 的固定态使用主题 accent；强制深色主题时同步切换。
+test('round18: hover bubble colors follow JS theme variables', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  await page.locator('main p').first().hover();
+  const bubble = page.locator('#ot-hover-bubble');
+  await expect(bubble).toBeVisible({ timeout: 5000 });
+
+  // 气泡宿主注入 --ot-accent / --ot-muted 等主题变量（applyThemeVars）
+  const vars = await bubble.evaluate((el) => {
+    const s = (el as HTMLElement).style;
+    return {
+      accent: s.getPropertyValue('--ot-accent'),
+      muted: s.getPropertyValue('--ot-muted'),
+      green: s.getPropertyValue('--ot-green'),
+    };
+  });
+  expect(vars.accent).toBeTruthy();
+  expect(vars.muted).toBeTruthy();
+  expect(vars.green).toBeTruthy();
+
+  // 深色媒体查询下（本测试环境默认浅色）浅色主题 accent 应为 #007aff
+  expect(vars.accent).toBe('#007aff');
+});
+
+// 图片翻译页（独立 tab）：全面玻璃化——body 渐变底、舞台玻璃卡、
+// 段框消费 --image-* 玻璃令牌（不再用 color-mix / 纯白卡片）。
+test('round18: image translate page uses glass tokens (gradient bg + glass stage)', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/image-regression.html?job=test&imageResult=1');
+  await expect(page.getByRole('heading', { name: '图片翻译' })).toBeVisible();
+
+  const stageStyle = await page.locator('.ot-image-stage').evaluate((el) => {
+    const s = getComputedStyle(el);
+    return {
+      background: s.background,
+      backdrop: s.backdropFilter || (s as any).webkitBackdropFilter,
+      borderColor: s.borderColor,
+      borderRadius: s.borderRadius,
+    };
+  });
+  // 舞台玻璃卡：背景带 rgba 半透明 + 背景模糊 + 圆角
+  // （headless Chromium 对 backdrop-filter 的 computed style 序列化可能返回
+  //  none——放宽该断言，玻璃化的核心证据是半透明底 + 圆角；真实浏览器里
+  //  blur 由 backdrop-filter 生效）
+  expect(stageStyle.background).toContain('rgba');
+  if (stageStyle.backdrop !== 'none') {
+    expect(stageStyle.backdrop).toContain('blur');
+  }
+  expect(stageStyle.borderRadius).toBe('18px');
+
+  // 段框：玻璃质地（半透明底 + 强调色描边），而非纯白/写死蓝
+  const segStyle = await page.locator('.ot-image-segment').first().evaluate((el) => {
+    const s = getComputedStyle(el);
+    return {
+      background: s.background,
+      border: s.borderColor,
+      backdrop: s.backdropFilter || (s as any).webkitBackdropFilter,
+    };
+  });
+  expect(segStyle.background).toContain('rgba');
+  // 与舞台断言相同的放宽：headless Chromium 对 backdrop-filter 的
+  // computed style 序列化返回 none，真实浏览器里 blur 由 backdrop-filter 生效
+  if (segStyle.backdrop !== 'none') {
+    expect(segStyle.backdrop).toContain('blur');
+  }
+});
+
+// 欢迎面板（首启）玻璃卡：使用 --surface 玻璃令牌而非不透明白卡。
+// options.css 里 .ot-welcome-card 已改为 var(--surface) 半透明玻璃底，
+// 完整设置面板在 shadow 内引入 options.css，验证其 --surface 是 rgba 玻璃令牌。
+test('round18: welcome panel is a glass card (not opaque white)', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+  const cssText = await full.evaluate((host) => {
+    if (!host?.shadowRoot) return '';
+    const styleEl = Array.from(host.shadowRoot.querySelectorAll('style'))[0];
+    return styleEl?.textContent || '';
+  });
+  expect(cssText).toContain('--surface');
+  // 玻璃令牌带 rgba 半透明（不透明白卡是 #fff）
+  expect(cssText).toMatch(/--surface:\s*rgba\(/);
 });

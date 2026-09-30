@@ -20,7 +20,10 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   const defensiveDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   document.body.style.setProperty('width', '360px');
   document.body.style.setProperty('margin', '0');
-  document.body.style.setProperty('background', defensiveDark ? '#000000' : '#f2f2f7');
+  // 玻璃底：半透明 + 背景模糊，让弹窗浮在网页之上（Liquid Glass）。
+  document.body.style.setProperty('background', defensiveDark ? 'rgba(0, 0, 0, 0.72)' : 'rgba(246, 246, 250, 0.72)');
+  document.body.style.setProperty('backdrop-filter', 'blur(30px) saturate(180%)');
+  document.body.style.setProperty('-webkit-backdrop-filter', 'blur(30px) saturate(180%)');
   document.body.style.setProperty('color', defensiveDark ? '#f5f5f7' : '#1d1d1f');
   document.body.style.setProperty(
     'font-family',

@@ -1,6 +1,9 @@
 // 图片翻译结果浮层（从 entrypoints/content.ts 拆分）。
 // 在页面图片旁叠加译文标记框与结果面板；返回清理函数，由调用方管理生命周期。
+// 视觉走与气泡/设置面板同一套 Liquid Glass JS 主题（applyGlassShell/applyThemeVars），
+// 深浅色由用户主题强制设置统一决定，不再依赖 CSS media query 的第二套色板。
 import type { ImageSegment } from './vision-parser.ts';
+import { applyGlassShell, applyThemeVars, themeColors } from './content-ui.ts';
 
 export interface ImageOverlayResult {
   segments: ImageSegment[];
@@ -33,6 +36,10 @@ export function mountImageResultOverlay(
 
   const panel = document.createElement('div');
   panel.className = 'ot-img-panel';
+  // JS 主题玻璃外壳：与气泡/设置面板同一套材质（半透明底 + 模糊 + 高光描边 + 弥散阴影）。
+  const theme = themeColors();
+  applyGlassShell(panel, theme, '18px');
+  applyThemeVars(panel, theme);
   const head = document.createElement('div');
   head.className = 'ot-img-head';
   const title = document.createElement('span');

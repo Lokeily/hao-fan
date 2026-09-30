@@ -9,7 +9,7 @@
 *An open-source immersive bilingual web translation extension that talks directly to your own AI provider.*
 
 [![Build](https://github.com/Lokeily/hao-fan/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Lokeily/hao-fan/actions/workflows/build.yml)
-![Version](https://img.shields.io/badge/version-0.2.10-blue)
+![Version](https://img.shields.io/badge/version-0.2.11-blue)
 ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox MV2](https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white)
 ![Edge](https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white)

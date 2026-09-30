@@ -71,6 +71,11 @@ export function createTranslationNode(
   // 垂直呼吸：上与原文留一点间隙、下与「下一段原文」明确分隔。
   // 此前 2px/5px 在密集段落里几乎贴在一起，用户反馈"并拢不容易看"。
   host.style.setProperty('margin', '3px 0 9px', 'important');
+  // 编辑按钮玻璃色：跟随系统深浅（译文节点嵌入页面文档流，不参与浮层主题强制）。
+  const darkEdit = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  host.style.setProperty('--ot-edit-bg', darkEdit ? 'rgba(255, 255, 255, 0.16)' : 'rgba(28, 28, 30, 0.72)');
+  host.style.setProperty('--ot-edit-bg-hover', darkEdit ? 'rgba(255, 255, 255, 0.26)' : 'rgba(28, 28, 30, 0.92)');
+  host.style.setProperty('--ot-edit-fg', darkEdit ? '#1d1d1f' : '#fff');
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
@@ -79,8 +84,7 @@ export function createTranslationNode(
     :host { color-scheme: light dark; --ot-line: rgba(0, 122, 255, 0.42); }
     @media (prefers-color-scheme: dark) {
       :host { --ot-line: rgba(10, 132, 255, 0.55); }
-    }
-    .text {
+    }    .text {
       display: block;
       box-sizing: border-box;
       width: 100%;
@@ -136,8 +140,8 @@ export function createTranslationNode(
       border-radius: 50%;
       display: grid;
       place-items: center;
-      background: rgba(28, 28, 30, 0.72);
-      color: #fff;
+      background: var(--ot-edit-bg, rgba(28, 28, 30, 0.72));
+      color: var(--ot-edit-fg, #fff);
       font-size: 12px;
       line-height: 1;
       cursor: pointer;
@@ -149,7 +153,7 @@ export function createTranslationNode(
       -webkit-backdrop-filter: blur(6px);
     }
     :host(:hover) .edit-btn { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
-    .edit-btn:hover { background: rgba(28, 28, 30, 0.92); }
+    .edit-btn:hover { background: var(--ot-edit-bg-hover, rgba(28, 28, 30, 0.92)); }
     .edit-btn:focus-visible { opacity: 1; outline: 2px solid rgba(0,122,255,0.6); outline-offset: 2px; }
     :host([data-edited="true"]) .edit-btn::after {
       content: "";
@@ -315,12 +319,13 @@ export function createNoticeHost(
       font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       letter-spacing: 0;
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: background 0.15s ease, transform 0.1s ease, filter 0.15s ease;
     }
-    button:hover { opacity: .9; }
+    button:hover { filter: brightness(1.08); }
+    button:active { transform: scale(0.97); }
     button:focus-visible { outline: 3px solid var(--ot-accent-soft, rgba(0, 122, 255, .35)); outline-offset: 2px; }
     button.secondary { background: var(--ot-surface-2, rgba(120, 120, 128, .16)); color: var(--ot-text, #1d1d1f); }
-    button.secondary:hover { background: var(--ot-accent-soft, rgba(120, 120, 128, .26)); }
+    button.secondary:hover { background: var(--ot-accent-soft, rgba(120, 120, 128, .26)); filter: none; }
   `;
   const backdrop = document.createElement('div');
   backdrop.className = 'backdrop';
@@ -490,6 +495,12 @@ export interface ThemeColors {
   /** 强调色（苹果系统蓝）与其次级填充 */
   accent: string;
   accentSoft: string;
+  /** 成功/开启态绿色（iOS 开关开启色） */
+  green: string;
+  /** 危险/警示红 */
+  danger: string;
+  /** 警示橙（预算超阈 / 未配 Key 警示） */
+  warning: string;
 }
 
 export type ThemeMode = 'auto' | 'light' | 'dark';
@@ -528,6 +539,9 @@ export function themeColors(): ThemeColors {
         radiusSm: '9px',
         accent: '#0a84ff',
         accentSoft: 'rgba(10, 132, 255, 0.22)',
+        green: '#30d158',
+        danger: '#ff453a',
+        warning: '#ff9f0a',
       }
     : {
         surface: 'rgba(255, 255, 255, 0.72)',
@@ -547,6 +561,9 @@ export function themeColors(): ThemeColors {
         radiusSm: '9px',
         accent: '#007aff',
         accentSoft: 'rgba(0, 122, 255, 0.14)',
+        green: '#34c759',
+        danger: '#ff3b30',
+        warning: '#ff9500',
       };
 }
 
@@ -571,6 +588,9 @@ export function applyThemeVars(host: HTMLElement, theme: ThemeColors): void {
   set('--ot-radius-sm', theme.radiusSm);
   set('--ot-accent', theme.accent);
   set('--ot-accent-soft', theme.accentSoft);
+  set('--ot-green', theme.green);
+  set('--ot-danger', theme.danger);
+  set('--ot-warning', theme.warning);
 }
 
 /**
@@ -821,9 +841,13 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
       transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
-    .switch input:checked + .track { background: #34c759; }
+    .switch input:checked + .track { background: ${theme.green}; }
     .switch input:checked + .track .knob { transform: translateX(18px); }
     .switch input:focus-visible + .track { outline: 3px solid rgba(0,122,255,0.35); outline-offset: 1px; }
+    /* 按压反馈：按下时轨道略暗、圆点略缩（苹果开关的触感） */
+    .switch input:active + .track { filter: brightness(0.92); }
+    .switch input:active + .track .knob { transform: scale(0.92); }
+    .switch input:active:checked + .track .knob { transform: translateX(18px) scale(0.92); }
 
     .kbd-hint {
       display: flex;
@@ -849,16 +873,13 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
     .full {
       display: block; width: 100%; min-height: 36px; margin-top: 2px;
       border: 0; border-radius: 10px;
-      background: rgba(0, 122, 255, 0.12);
-      color: #007aff; font-size: 13px; font-weight: 600;
+      background: ${theme.accentSoft};
+      color: ${theme.accent}; font-size: 13px; font-weight: 600;
       font-family: inherit; cursor: pointer;
-      transition: background 0.15s ease;
+      transition: background 0.15s ease, transform 0.1s ease;
     }
-    .full:hover { background: rgba(0, 122, 255, 0.2); }
-    @media (prefers-color-scheme: dark) {
-      .full { color: #0a84ff; background: rgba(10,132,255,0.2); }
-      .full:hover { background: rgba(10,132,255,0.3); }
-    }
+    .full:hover { background: ${theme.text === '#f5f5f7' ? 'rgba(10,132,255,0.3)' : 'rgba(0,122,255,0.2)'}; }
+    .full:active { transform: scale(0.98); }
   `;
 
   const head = document.createElement('div');
@@ -1126,7 +1147,7 @@ export function createHoverBubble(
     }
     .loading {
       padding: 10px 12px;
-      color: #8e8e93;
+      color: ${theme.muted};
       font-size: 12px;
       animation: ot-fade 1s ease-in-out infinite alternate;
     }
@@ -1141,13 +1162,14 @@ export function createHoverBubble(
       border: 0;
       border-radius: 7px;
       background: transparent;
-      color: #aeaeb2;
+      color: ${theme.text2};
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
     }
-    .pin:hover { background: rgba(60,64,67,0.1); }
-    .pin[data-pinned="true"] { color: #007aff; }
+    .pin:hover { background: ${theme.accentSoft}; color: ${theme.text}; }
+    .pin[data-pinned="true"] { color: ${theme.accent}; }
     .actions {
       display: flex;
       justify-content: flex-end;
@@ -1158,26 +1180,17 @@ export function createHoverBubble(
       padding: 2px 8px;
       border-radius: 6px;
       background: transparent;
-      color: #007aff;
+      color: ${theme.accent};
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
+      transition: background 0.15s ease;
     }
-    .copy:hover { background: rgba(0, 122, 255, 0.08); }
-    @media (prefers-color-scheme: dark) {
-      .src { color: #8e8e93; }
-      .dst { color: #f5f5f7; }
-      .loading { color: #8e8e93; }
-      .pin { color: #8e8e93; }
-      .pin:hover { background: rgba(255,255,255,0.1); }
-      .pin[data-pinned="true"] { color: #0a84ff; }
-    .copy { color: #0a84ff; }
-    .copy:hover { background: rgba(10, 132, 255, 0.14); }
-    }
+    .copy:hover { background: ${theme.accentSoft}; }
     .skip-hint {
       padding: 0 12px;
-      color: #8e8e93;
+      color: ${theme.muted};
       font-size: 10px;
       line-height: 1.4;
     }

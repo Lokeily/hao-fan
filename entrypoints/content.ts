@@ -1151,15 +1151,21 @@ export default defineContentScript({
           // 等多段拼接）较长，右对齐在多行时右侧参差难读。
           textAlign: 'left',
           overflowWrap: 'break-word',
+          // 入场轻微上浮：状态条从下方 2px 处滑入（与玻璃浮层同一套动效语言）。
+          transform: 'translateY(2px)',
         });
         document.documentElement.appendChild(statusEl);
       }
       statusEl.textContent = text;
       statusEl.style.opacity = '1';
+      statusEl.style.transform = 'translateY(0)';
       if (statusTimer) clearTimeout(statusTimer);
       if (transient) {
         statusTimer = setTimeout(() => {
-          if (statusEl) statusEl.style.opacity = '0';
+          if (statusEl) {
+            statusEl.style.opacity = '0';
+            statusEl.style.transform = 'translateY(2px)';
+          }
         }, durationMs);
       }
     }
@@ -3639,7 +3645,7 @@ export default defineContentScript({
         borderRadius: '50%',
         border: 'none',
         padding: '0',
-        background: 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)',
+        background: `linear-gradient(180deg, ${lighten(glass.accent, 0.14)} 0%, ${glass.accent} 100%)`,
         backdropFilter: glass.backdrop,
         WebkitBackdropFilter: glass.backdrop,
         color: '#fff',
@@ -3656,14 +3662,17 @@ export default defineContentScript({
       });
       // 主按钮的悬浮反馈：此前只有齿轮与显隐按钮有 hover，主操作反而没有视觉反馈。
       // hover 提亮 + 轻微上浮，active 按压下沉，明确「这是可点的主操作」。
+      // 渐变底色随 JS 主题的强调色派生（浅 #007aff / 深 #0a84ff），不再写死一版。
+      const mainIdleBg = `linear-gradient(180deg, ${lighten(glass.accent, 0.14)} 0%, ${glass.accent} 100%)`;
+      const mainHoverBg = `linear-gradient(180deg, ${lighten(glass.accent, 0.24)} 0%, ${lighten(glass.accent, 0.08)} 100%)`;
       btn.addEventListener('mouseenter', () => {
-        btn.style.background = 'linear-gradient(180deg, #3d99ff 0%, #1284ff 100%)';
-        btn.style.boxShadow = '0 4px 14px rgba(0,122,255,0.45)';
+        btn.style.background = mainHoverBg;
+        btn.style.boxShadow = `0 4px 14px ${glass.accent}73`;
         btn.style.transform = 'translateY(-1px)';
       });
       btn.addEventListener('mouseleave', () => {
-        btn.style.background = 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)';
-        btn.style.boxShadow = '0 3px 10px rgba(0,122,255,0.35)';
+        btn.style.background = mainIdleBg;
+        btn.style.boxShadow = `0 3px 10px ${glass.accent}59`;
         btn.style.transform = 'translateY(0)';
       });
       btn.addEventListener('pointerdown', () => {
@@ -3915,7 +3924,11 @@ export default defineContentScript({
         btn.style.setProperty('padding', '0', 'important');
         btn.style.setProperty('border-radius', '50%', 'important');
         btn.style.setProperty('font-size', '16px', 'important');
-        btn.style.setProperty('background', 'linear-gradient(180deg, #2b8cff 0%, #007aff 100%)', 'important');
+        btn.style.setProperty(
+          'background',
+          `linear-gradient(180deg, ${lighten(glassForLoading.accent, 0.14)} 0%, ${glassForLoading.accent} 100%)`,
+          'important',
+        );
         btn.style.cursor = 'pointer';
         btn.textContent = '译';
         btn.title = toolbarIdleTitle();
@@ -3936,4 +3949,20 @@ export default defineContentScript({
 function showImageResult(srcUrl: string | undefined, result: any) {
   activeImageCleanup?.();
   activeImageCleanup = mountImageResultOverlay(srcUrl, result);
+}
+
+// ===== 颜色工具：hex 强调色按比例提亮，生成渐变主按钮底色 =====
+// 工具栏主按钮的 hover 渐变此前写死浅色蓝（#3d99ff/#1284ff），深色主题下偏亮、
+// 且与用户强制主题脱钩。改为从 JS 主题的 accent 派生：提亮 14% 为常态顶色、
+// 提亮 24% 为 hover 顶色，深浅色自动跟随主题。
+function lighten(hex: string, ratio: number): string {
+  const n = hex.replace('#', '');
+  const full = n.length === 3 ? n.split('').map((c) => c + c).join('') : n;
+  const num = parseInt(full.slice(0, 6), 16);
+  if (Number.isNaN(num)) return hex;
+  const r = (num >> 16) & 0xff;
+  const g = (num >> 8) & 0xff;
+  const b = num & 0xff;
+  const mix = (c: number) => Math.round(c + (255 - c) * ratio);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }

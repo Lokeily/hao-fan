@@ -504,6 +504,8 @@ h1 {
   width: 100%;
   padding: 14px 16px 18px;
 }
+/* 弹窗主体玻璃底由 popup.ts 内联注入（半透明 + backdrop-filter），
+   这里不再重复设置，避免旧浏览器 :has() 不支持导致整条规则失效。 */
 
 .ot-popup-head {
   display: flex;
@@ -1010,11 +1012,15 @@ h1 {
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .ot-file:hover {
   background: rgba(0, 122, 255, 0.2);
+}
+
+.ot-file:active {
+  transform: scale(0.97);
 }
 
 .ot-img-caption {
@@ -1151,12 +1157,16 @@ h1 {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .ot-backup-btn:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.ot-backup-btn:active {
+  transform: scale(0.97);
 }
 
 .ot-backup-btn.is-primary {
@@ -1226,11 +1236,15 @@ h1 {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .ot-cache-clear:hover {
   background: rgba(255, 59, 48, 0.08);
+}
+
+.ot-cache-clear:active {
+  transform: scale(0.97);
 }
 
 .ot-cache-clear:disabled {
@@ -1375,12 +1389,17 @@ h1 {
   cursor: pointer;
   transition:
     background 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .ot-migrate-btn:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.ot-migrate-btn:active {
+  transform: scale(0.97);
 }
 
 .ot-migrate-btn:disabled {
@@ -1460,12 +1479,15 @@ details.ot-advanced-section[open] > summary::before {
 .ot-welcome-card {
   width: 100%;
   max-width: 300px;
-  background: var(--bg-fallback, #ffffff);
+  /* 玻璃卡：不再是不透明白卡，与全套 UI 材质一致 */
+  background: var(--surface);
   color: var(--text);
   border: 1px solid var(--card-border);
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 20px 20px 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   text-align: center;
 }
 .ot-welcome-brand img {
