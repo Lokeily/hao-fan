@@ -6,6 +6,7 @@
 <title>与众不同 — 好翻 Haofan</title>
 <meta name="description" content="好翻与传统云端翻译扩展的本质区别：直连架构让你的翻译请求与 API Key 完全由自己掌控。开源 MIT、零遥测、无额度限制。" />
 <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
+<script>(function(){try{var t=localStorage.getItem('hf-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="stylesheet" href="assets/css/site.css" />
 </head>
 <body>
@@ -78,7 +79,7 @@
         <tr><td>源码开放</td><td class="col-hf"><span class="yes">✓ MIT 完整开源</span>，每一行行为可审计，社区可验证</td><td><span class="no">闭源黑盒</span>，数据处理方式无从考证</td></tr>
         <tr><td>隐私遥测</td><td class="col-hf"><span class="yes">✓ 零遥测</span>：无广告追踪、无行为统计、无使用上报</td><td><span class="no">普遍包含埋点统计</span>与用户画像分析</td></tr>
         <tr><td>使用成本</td><td class="col-hf">用自己的服务商套餐；配 Ollama 本地模型则完全免费且无上限</td><td>免费额度有限，重度使用需订阅付费</td></tr>
-        <tr><td>引擎自由度</td><td class="col-hf">12 家 AI + 3 家传统机翻 + 任意 OpenAI 兼容接口，随时切换</td><td>仅限产品内置的固定引擎列表</td></tr>
+        <tr><td>引擎自由度</td><td class="col-hf">10 家 AI + Ollama 本地模型 + 4 家传统机翻 + 任意 OpenAI 兼容接口，共 16 项，随时切换</td><td>仅限产品内置的固定引擎列表</td></tr>
       </tbody>
     </table>
   </div>
@@ -117,7 +118,7 @@
     <div class="ico" style="background:rgba(0,200,150,.12);color:#00a37c"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
     <div>
       <h3>③ 开源可审计：信任建立在代码上</h3>
-      <p>隐私声明谁都会写，但只有开源能让你亲自验证。63 项单元测试 + 33 项浏览器回归守护每一个安全声明：</p>
+      <p>隐私声明谁都会写，但只有开源能让你亲自验证。91 项单元测试 + 77 项浏览器回归守护每一个安全声明：</p>
       <ul>
         <li>全仓零 innerHTML：译文一律 textContent + Shadow DOM，无 XSS 面</li>
         <li>Prompt Injection 双层防护有专项测试锁定行为</li>
