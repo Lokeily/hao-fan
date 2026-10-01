@@ -11,7 +11,7 @@
   try {
     var saved = localStorage.getItem(THEME_KEY);
     if (saved) applyTheme(saved);
-  } catch (e) { /* 隐私模式下不可用，跟随系统 */ }
+  } catch { /* 隐私模式下不可用，跟随系统 */ }
   var tbtn = document.querySelector('.theme-toggle');
   if (tbtn) {
     tbtn.addEventListener('click', function () {
@@ -20,8 +20,16 @@
       var resolved = cur || (sysDark ? 'dark' : 'light');
       var next = resolved === 'dark' ? 'light' : 'dark';
       applyTheme(next);
-      try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
     });
+  }
+
+  // ===== 导航滚动状态：滚过首屏顶后浮出分隔线与投影 =====
+  var nav = document.querySelector('.nav');
+  if (nav) {
+    var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 8); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
   }
 
   // ===== 移动端菜单 =====
@@ -32,8 +40,8 @@
       var o = links.classList.toggle('open');
       toggle.setAttribute('aria-expanded', String(o));
     });
-    links.addEventListener('click', function (e) {
-      if (e.target.closest('a')) links.classList.remove('open');
+    links.addEventListener('click', function (event) {
+      if (event.target.closest('a')) links.classList.remove('open');
     });
   }
 
@@ -190,6 +198,6 @@
         var asset = (rel.assets || []).find(function (x) { return x.name === f; });
         if (asset) a.href = asset.browser_download_url;
       });
-    } catch (e) { /* 保持 releases/latest 兜底 */ }
+    } catch { /* 保持 releases/latest 兜底 */ }
   })();
 })();

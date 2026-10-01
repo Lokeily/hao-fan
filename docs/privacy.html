@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>隐私政策 — 好翻 Haofan</title>
 <meta name="description" content="好翻（Haofan）隐私政策：本扩展采用本地优先架构，不收集、不上传任何浏览内容与行为数据；API Key 仅存本机浏览器。依据《个人信息保护法》等法律法规制定。" />
+<meta name="theme-color" content="#f5f7fb" />
 <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
+<script>(function(){try{var t=localStorage.getItem('hf-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="stylesheet" href="assets/css/site.css" />
 </head>
 <body>
@@ -13,18 +15,22 @@
 <nav class="nav">
   <div class="container nav-inner">
     <a class="brand" href="./"><img src="assets/img/icon-128.png" alt="好翻 logo" /><span>好翻<i>Haofan</i></span></a>
-    <div class="nav-right">
+    <div class="nav-links" id="navLinks">
+      <a class="op" href="./">首页</a>
+      <a class="op" href="features.html">功能特性</a>
+      <a class="op" href="compare.html">与众不同</a>
+      <a class="op" href="install.html">安装指南</a>
+      <a class="nav-gh" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a class="nav-cta" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">免费下载</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-toggle" aria-label="切换浅色 / 深色主题" title="切换主题">
+        <svg class="sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
       <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false"><span></span><span></span><span></span></button>
-      <div class="nav-links" id="navLinks">
-        <a class="op" href="./">首页</a>
-        <a class="op" href="features.html">功能特性</a>
-        <a class="op" href="compare.html">与众不同</a>
-        <a class="op" href="install.html">安装指南</a>
-        <a class="nav-gh" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
-        </a>
-        <a class="nav-cta" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">免费下载</a>
-      </div>
     </div>
   </div>
 </nav>
@@ -39,13 +45,13 @@
 </header>
 
 <main class="container doc">
-  <p class="meta-line">生效日期：2026 年 8 月 23 日 ｜ 版本：v0.2.0 ｜ 适用产品：好翻浏览器扩展（open-translator-cn）及本官网</p>
+  <p class="meta-line">最后更新：2026 年 10 月 2 日 ｜ 适配版本：v0.2.16 ｜ 适用产品：好翻浏览器扩展（open-translator-cn）及本官网</p>
 
   <section class="reveal">
     <h2>一、引言与处理者身份</h2>
     <p>「好翻」（Haofan，以下简称"本扩展"）是一款依据 MIT 许可证开源的浏览器翻译扩展，由开源社区（以下称"我们"）维护。我们高度重视个人信息保护，按照<b>《中华人民共和国个人信息保护法》《中华人民共和国网络安全法》《中华人民共和国数据安全法》</b>等法律法规的要求，制定本政策。</p>
     <p>由于本扩展为开源软件且不设中心化运营服务器，<b>我们不作为你的个人信息处理者收集任何个人信息</b>；本政策主要向你说明：扩展在本机处理了哪些数据、哪些数据会在<b>你主动配置并由你授权</b>的情况下发送给你自行选择的第三方服务商，以及你可以如何管理这些数据。</p>
-    <blockquote>💡 一句话总结：<b>你的网页内容不会被发送给"好翻"——因为根本不存在"好翻服务器"。翻译请求从你的浏览器直连你自己选择的服务商。</b></blockquote>
+    <blockquote>一句话总结：<b>你的网页内容不会被发送给"好翻"——因为根本不存在"好翻服务器"。翻译请求从你的浏览器直连你自己选择的服务商。</b></blockquote>
   </section>
 
   <section class="reveal">
@@ -70,6 +76,7 @@
         <tr><td>API Key（按服务商分别保存）</td><td>用于向该服务商发起翻译请求时的身份认证</td><td>直至你删除修改或卸载扩展；设置页可修改</td></tr>
         <tr><td>翻译缓存</td><td>相同文本免重复请求，节省费用</td><td>30 天自动过期，上限 2000 条 LRU；设置页可一键清空</td></tr>
         <tr><td>翻译历史</td><td>弹窗「历史」标签页供你查询回填</td><td>上限 200 条；可一键清空</td></tr>
+        <tr><td>图片翻译任务（IndexedDB）</td><td>保存图片翻译结果供结果页展示与导出</td><td>最长 24 小时自动清理；结果页可手动删除</td></tr>
         <tr><td>偏好设置 / 站点列表 / 术语表</td><td>记住你的个性化配置</td><td>直至修改或卸载；支持导出备份</td></tr>
         <tr><td>工具栏位置等界面偏好</td><td>恢复你的使用习惯</td><td>同上</td></tr>
       </tbody>
@@ -88,7 +95,7 @@
     </ul>
     <h3>4.1 可选服务商及其隐私政策入口（以你在设置中的选择为准）</h3>
     <p>DeepSeek、智谱 GLM、腾讯混元、通义千问、Kimi、百度百川、字节豆包、OpenAI、Google Gemini、OpenRouter、DeepL、Microsoft Translator、Ollama（本地运行，数据不出本机）、自定义 OpenAI 兼容端点（由你自己部署和掌控）。各服务商的最新隐私政策请在其官方网站查阅。</p>
-    <blockquote>⚠️ 特别提示：请仔细阅读你所选服务商的隐私政策后再行配置。若你对某些服务商的数据处理方式不满意，可选择其他服务商或本地模型。</blockquote>
+    <blockquote>特别提示：请仔细阅读你所选服务商的隐私政策后再行配置。若你对某些服务商的数据处理方式不满意，可选择其他服务商或本地模型。</blockquote>
   </section>
 
   <section class="reveal">
@@ -133,6 +140,11 @@
 </main>
 
 <footer>
+  <div class="container">
+    <div class="foot-legal">
+      好翻（Haofan / Open Translator CN）是一款依据 MIT 许可证开源发布的浏览器翻译扩展。翻译结果由你在设置中选择并配置的第三方服务商生成，好翻不对其准确性作出保证。本网站为静态页面，不使用 Cookie，不部署统计或广告追踪脚本。
+    </div>
+  </div>
   <div class="container foot-grid">
     <div class="foot-brand">
       <a class="brand" href="./"><img src="assets/img/icon-128.png" alt="" /><span>好翻 Haofan</span></a>
@@ -153,6 +165,7 @@
         <li><a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub 仓库</a></li>
         <li><a href="https://github.com/Lokeily/hao-fan/issues" target="_blank" rel="noopener">问题反馈</a></li>
         <li><a href="https://github.com/Lokeily/hao-fan/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">参与贡献</a></li>
+        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/SECURITY.md" target="_blank" rel="noopener">安全策略</a></li>
       </ul>
     </div>
     <div>
@@ -160,11 +173,14 @@
       <ul>
         <li><a href="privacy.html">隐私政策</a></li>
         <li><a href="terms.html">服务条款</a></li>
-        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT 许可证</a></li>
       </ul>
     </div>
   </div>
-  <div class="copyright container">© 2026 好翻 Haofan contributors · 基于 MIT 协议开源 · 由社区驱动维护<br />本扩展为开源工具，按「现状」提供；翻译结果由用户所配置的第三方服务商生成。</div>
+  <div class="container copyright">
+    <span>© 2026 好翻 Haofan contributors · 基于 MIT 许可证开源</span>
+    <span class="cp-links"><a href="privacy.html">隐私政策</a><a href="terms.html">服务条款</a><a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub</a></span>
+  </div>
 </footer>
 
 <script src="assets/js/site.js"></script>

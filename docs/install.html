@@ -5,65 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>安装指南 — 好翻 Haofan</title>
 <meta name="description" content="好翻安装指南：Chrome / Edge / Firefox 三平台下载与加载步骤，首次配置引导、免 Key 体验方法与常见问题排查。" />
+<meta name="theme-color" content="#f5f7fb" />
 <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
 <script>(function(){try{var t=localStorage.getItem('hf-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="stylesheet" href="assets/css/site.css" />
-<style>
-.plat-switch{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:34px}
-.plat-switch a{padding:9px 20px;border-radius:999px;border:1px solid var(--border);background:var(--surface);
-  font-size:14px;color:var(--text2);transition:.18s}
-.plat-switch a:hover{border-color:var(--accent);color:var(--accent)}
-.trouble{max-width:780px;margin:40px auto 0}
-.trouble details.q .a{font-size:14px}
-</style>
 </head>
 <body>
 
 <nav class="nav">
   <div class="container nav-inner">
     <a class="brand" href="./"><img src="assets/img/icon-128.png" alt="好翻 logo" /><span>好翻<i>Haofan</i></span></a>
-    <div class="nav-right">
+    <div class="nav-links" id="navLinks">
+      <a class="op" href="./">首页</a>
+      <a class="op" href="features.html">功能特性</a>
+      <a class="op" href="compare.html">与众不同</a>
+      <a class="op active" href="install.html">安装指南</a>
+      <a class="nav-gh" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a class="nav-cta" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">免费下载</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-toggle" aria-label="切换浅色 / 深色主题" title="切换主题">
+        <svg class="sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
       <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false"><span></span><span></span><span></span></button>
-      <div class="nav-links" id="navLinks">
-        <a class="op" href="./">首页</a>
-        <a class="op" href="features.html">功能特性</a>
-        <a class="op" href="compare.html">与众不同</a>
-        <a class="op active" href="install.html">安装指南</a>
-        <a class="nav-gh" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
-        </a>
-        <a class="nav-cta" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">免费下载</a>
-      </div>
     </div>
   </div>
 </nav>
 
 <header class="page-head hero-bg" id="download-now">
-  <div class="orb o2" aria-hidden="true"></div>
+  <div class="orb b o2" aria-hidden="true"></div>
   <div class="container">
     <span class="kicker">Install</span>
     <h1>三分钟完成安装</h1>
-    <p class="sub">下载对应浏览器的 ZIP → 解压 → 开发者模式加载 → 右下角出现「译」按钮即成功。全程无需任何账号。</p>
-    <div style="margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    <p class="sub">下载对应浏览器的 ZIP，解压，开发者模式加载——右下角出现「译」按钮即安装成功。全程无需注册任何账号。</p>
+    <div style="margin-top:26px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
       <a class="btn btn-primary" data-dl="chrome" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener"><span class="mini chrome" aria-hidden="true"></span>Chrome / Edge 版</a>
-      <a class="btn btn-primary" data-dl="firefox" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener"><span class="mini firefox" aria-hidden="true"></span>Firefox 版</a>
+      <a class="btn btn-ghost" data-dl="firefox" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener"><span class="mini firefox" aria-hidden="true"></span>Firefox 版</a>
     </div>
-    <p style="font-size:12.5px;color:var(--muted);margin-top:10px">按钮自动指向最新版本的产物文件；也可前往 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener" style="color:var(--accent)">Releases 页面</a>手动选择。</p>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:14px">按钮自动指向最新版本的产物文件；也可前往 <a href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener" style="color:var(--accent)">Releases 页面</a>手动选择。</p>
   </div>
 </header>
 
 <main class="container" style="padding-bottom:30px" data-stagger>
 
   <div class="plat-switch">
-    <a href="#chrome">🌐 Chrome / Edge</a>
-    <a href="#firefox">🦊 Firefox</a>
-    <a href="#setup">🔑 首次配置</a>
-    <a href="#trouble">🛠 疑难排查</a>
+    <a href="#chrome">Chrome / Edge</a>
+    <a href="#firefox">Firefox</a>
+    <a href="#setup">首次配置</a>
+    <a href="#trouble">疑难排查</a>
   </div>
 
-  <div class="sec-head" id="chrome">
+  <div class="sec-head" id="chrome" style="margin-top:40px">
     <span class="kicker">Chrome · Edge</span>
-    <h2 style="font-size:26px">Chrome 与 Edge 安装（MV3）</h2>
+    <h2 style="font-size:28px">Chrome 与 Edge 安装（MV3）</h2>
   </div>
   <div class="timeline">
     <div class="tl-item" data-n="1">
@@ -86,9 +83,9 @@
     </div>
   </div>
 
-  <div class="sec-head" id="firefox" style="margin-top:56px">
+  <div class="sec-head" id="firefox" style="margin-top:60px">
     <span class="kicker">Firefox</span>
-    <h2 style="font-size:26px">Firefox 安装（MV2）</h2>
+    <h2 style="font-size:28px">Firefox 安装（MV2）</h2>
   </div>
   <div class="timeline">
     <div class="tl-item" data-n="1">
@@ -106,13 +103,13 @@
     </div>
   </div>
 
-  <blockquote style="border-left:3px solid var(--amber);background:rgba(255,159,10,.08);padding:12px 16px;border-radius:0 10px 10px 0;max-width:760px;margin:8px auto 0;font-size:13.5px;color:var(--text2)" class="reveal">
-    ⚠️ Firefox 的「临时载入」为平台限制：<b>重启浏览器后扩展会消失</b>，需重新载入一次。签名版与商店上架正在推进中。
+  <blockquote style="border-left:3px solid var(--amber);background:rgba(255,159,10,.08);padding:13px 17px;border-radius:0 12px 12px 0;max-width:780px;margin:10px auto 0;font-size:13.5px;color:var(--text2)" class="reveal">
+    注意：Firefox 的「临时载入」为平台限制——<b>重启浏览器后扩展会消失</b>，需重新载入一次。签名版与商店上架正在推进中。
   </blockquote>
 
-  <div class="sec-head" id="setup" style="margin-top:56px">
+  <div class="sec-head" id="setup" style="margin-top:60px">
     <span class="kicker">Setup</span>
-    <h2 style="font-size:26px">首次配置：三十秒开始翻译</h2>
+    <h2 style="font-size:28px">首次配置：三十秒开始翻译</h2>
   </div>
   <div class="timeline">
     <div class="tl-item" data-n="1">
@@ -124,18 +121,18 @@
       <p>推荐 DeepSeek / 智谱 GLM 等国内服务商（注册即送额度）。粘贴 Key 后点击「测试连接」确认可用。</p>
     </div>
     <div class="tl-item" data-n="3">
-      <h3>没有 Key？装完即用免 Key 体验</h3>
-      <p>默认引擎 MyMemory 零配置、装完就能翻译；无需任何注册即可立刻体验完整功能。正式使用时建议换回带 Key 的 AI 引擎获得更高质量。</p>
+      <h3>没有 Key？免 Key 通道开箱即用</h3>
+      <p>默认引擎 MyMemory 零配置、安装即可翻译，无需任何注册即可体验完整功能。正式使用时建议更换为带 Key 的 AI 引擎获得更高质量。</p>
     </div>
     <div class="tl-item" data-n="4">
       <h3>开始阅读</h3>
-      <p>回到任意英文网页，点右下角「译」。译文会逐段出现在原文下方；工具栏的「读」按钮还能在对照 / 只译 / 悬停三种阅读模式间切换。按 <kbd>Alt</kbd>+<kbd>T</kbd> 也可一键触发。</p>
+      <p>回到任意英文网页，点右下角「译」。译文会逐段出现在原文下方；工具栏的「读」按钮可在对照 / 只译 / 悬停三种阅读模式间切换。按 <kbd>Alt</kbd>+<kbd>T</kbd> 也可一键触发。</p>
     </div>
   </div>
 
-  <div class="sec-head" id="trouble" style="margin-top:56px">
+  <div class="sec-head" id="trouble" style="margin-top:60px">
     <span class="kicker">Troubleshoot</span>
-    <h2 style="font-size:26px">疑难排查</h2>
+    <h2 style="font-size:28px">疑难排查</h2>
   </div>
   <div class="trouble">
     <details class="q">
@@ -167,12 +164,17 @@
     <div class="cta reveal">
       <h2>安装完成？去读一篇外文文章试试</h2>
       <p>你会立刻注意到区别：译文就在原文下面，视线不用来回跳。</p>
-      <a class="btn" href="./">返回首页了解更多 →</a>
+      <a class="btn" href="./">返回首页了解更多</a>
     </div>
   </div>
 </section>
 
 <footer>
+  <div class="container">
+    <div class="foot-legal">
+      好翻（Haofan / Open Translator CN）是一款依据 MIT 许可证开源发布的浏览器翻译扩展。翻译结果由你在设置中选择并配置的第三方服务商生成，好翻不对其准确性作出保证。本网站为静态页面，不使用 Cookie，不部署统计或广告追踪脚本。
+    </div>
+  </div>
   <div class="container foot-grid">
     <div class="foot-brand">
       <a class="brand" href="./"><img src="assets/img/icon-128.png" alt="" /><span>好翻 Haofan</span></a>
@@ -193,6 +195,7 @@
         <li><a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub 仓库</a></li>
         <li><a href="https://github.com/Lokeily/hao-fan/issues" target="_blank" rel="noopener">问题反馈</a></li>
         <li><a href="https://github.com/Lokeily/hao-fan/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">参与贡献</a></li>
+        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/SECURITY.md" target="_blank" rel="noopener">安全策略</a></li>
       </ul>
     </div>
     <div>
@@ -200,14 +203,16 @@
       <ul>
         <li><a href="privacy.html">隐私政策</a></li>
         <li><a href="terms.html">服务条款</a></li>
-        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT 许可证</a></li>
       </ul>
     </div>
   </div>
-  <div class="copyright container">© 2026 好翻 Haofan contributors · 基于 MIT 协议开源 · 由社区驱动维护<br />本扩展为开源工具，按「现状」提供；翻译结果由用户所配置的第三方服务商生成。</div>
+  <div class="container copyright">
+    <span>© 2026 好翻 Haofan contributors · 基于 MIT 许可证开源</span>
+    <span class="cp-links"><a href="privacy.html">隐私政策</a><a href="terms.html">服务条款</a><a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub</a></span>
+  </div>
 </footer>
 
 <script src="assets/js/site.js"></script>
 </body>
 </html>
-

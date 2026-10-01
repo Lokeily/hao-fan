@@ -4,7 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>功能特性 — 好翻 Haofan</title>
-<meta name="description" content="好翻全部功能详解（v0.2.16）：沉浸式双语对照、流式输出、图片翻译（译文直接画在图上）、阅读模式三态、词典预览卡、失败卡片、朗读 TTS、翻译历史、多引擎路由与五层省 Token 机制。" />
+<meta name="description" content="好翻全部功能详解（v0.2.16）：沉浸式双语对照、流式输出、图片翻译、阅读模式三态、词典预览卡、失败卡片、朗读 TTS、翻译历史、多引擎路由与五层省 Token 机制。" />
+<meta name="theme-color" content="#f5f7fb" />
 <link rel="icon" type="image/png" href="assets/img/icon-128.png" />
 <script>(function(){try{var t=localStorage.getItem('hf-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="stylesheet" href="assets/css/site.css" />
@@ -14,38 +15,38 @@
 <nav class="nav">
   <div class="container nav-inner">
     <a class="brand" href="./"><img src="assets/img/icon-128.png" alt="好翻 logo" /><span>好翻<i>Haofan</i></span></a>
-    <div class="nav-right">
-      <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false"><span></span><span></span><span></span></button>
-      <div class="nav-links" id="navLinks">
-        <a class="op" href="./">首页</a>
-        <a class="op active" href="features.html">功能特性</a>
-        <a class="op" href="compare.html">与众不同</a>
-        <a class="op" href="install.html">安装指南</a>
-        <a class="nav-gh" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-          GitHub
-        </a>
-        <a class="nav-cta" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">免费下载</a>
-      </div>
+    <div class="nav-links" id="navLinks">
+      <a class="op" href="./">首页</a>
+      <a class="op active" href="features.html">功能特性</a>
+      <a class="op" href="compare.html">与众不同</a>
+      <a class="op" href="install.html">安装指南</a>
+      <a class="nav-gh" href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a class="nav-cta" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">免费下载</a>
+    </div>
+    <div class="nav-actions">
       <button class="theme-toggle" aria-label="切换浅色 / 深色主题" title="切换主题">
         <svg class="sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         <svg class="moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
+      <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </div>
 </nav>
 
-<header class="page-head hero-bg" id="top-download">
-  <div class="orb o2" aria-hidden="true"></div>
+<header class="page-head hero-bg">
+  <div class="orb b o2" aria-hidden="true"></div>
   <div class="container">
     <span class="kicker">Features</span>
     <h1>每一项功能，都为「读懂」服务</h1>
-    <p class="sub">这是好翻 v0.2.16 的全部能力清单——从提取到渲染的完整流水线，四处即译入口，三态阅读模式，以及五层省钱机制。</p>
+    <p class="sub">这是好翻 v0.2.16 的全部能力清单——从提取到渲染的完整流水线、四处即译入口、三态阅读模式，以及五层成本控制机制。</p>
   </div>
 </header>
 
 <main class="container" style="padding-bottom:30px" data-stagger>
 
-  <div class="feat-group-title">📖 核心翻译体验</div>
+  <div class="feat-group-title">核心翻译体验</div>
 
   <div class="feat-block">
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h20v12H2z"/><path d="M6 8h8M6 12h5M14 12h4"/></svg></div>
@@ -55,9 +56,9 @@
       <ul>
         <li>双栏 / 多列 / 网格卡片布局中，译文始终留在各自栏内，不串位</li>
         <li>渲染后几何校验 + 自动降级：多列、浮动、绝对定位场景译文不再漂移</li>
-        <li>无语义块的纯文本容器按行拆分，且带覆盖率校验——拆不干净就整块翻，宁可少拆也不漏译</li>
-        <li>SPA 动态内容自动补译：弹窗、无限滚动、Tab 显隐都能跟上，8 秒冷却防烧 Token</li>
-        <li>遵守站点「禁止翻译」标记（<code>translate="no"</code> / <code>notranslate</code>），品牌名和代码串不误译</li>
+        <li>无语义块的纯文本容器按行拆分，并带覆盖率校验——拆不干净就整块翻译，宁可少拆也不漏译</li>
+        <li>SPA 动态内容自动补译：弹窗、无限滚动、Tab 显隐都能跟上，8 秒冷却防止无谓消耗</li>
+        <li>遵守站点「禁止翻译」标记（<code>translate="no"</code> / <code>notranslate</code>），品牌名与代码串不误译</li>
       </ul>
     </div>
   </div>
@@ -70,7 +71,7 @@
       <ul>
         <li>15 秒空闲超时兜底；通道异常自动回退普通请求，保证不漏译</li>
         <li>放弃等待时主动通知后台取消生成，同一文本绝不双份计费</li>
-        <li>整页翻译走批量协议：一次请求译多段，比逐条流式省得多</li>
+        <li>整页翻译走批量协议：一次请求译多段，比逐条流式节省得多</li>
       </ul>
     </div>
   </div>
@@ -83,7 +84,7 @@
       <ul>
         <li>划词：选中文字出现圆形「译」按钮，结果浮层带原文对照</li>
         <li>悬停：段落停留出玻璃质感气泡，可固定钉住、可拖拽换位——放到哪就记住哪，下次停在原位</li>
-        <li>输入框：聚焦即出按钮，译文浮层便于写邮件 / 发帖前润色</li>
+        <li>输入框：聚焦即出按钮，译文浮层便于写邮件、发帖前润色</li>
         <li>手动模式下点击段落直接翻译，整页零打扰</li>
       </ul>
     </div>
@@ -93,19 +94,19 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
     <div>
       <h3>图片翻译：译文直接画在图上</h3>
-      <p>右键网页图片或上传本地图片，译文经 Canvas 擦字重排直接长在图上——海报、截图、商品图翻译后是「一张被翻译过的图」。</p>
+      <p>右键网页图片或上传本地图片，译文经 Canvas 擦字重排直接生成于图上——海报、截图、商品图翻译后是一张真正的译文图片。</p>
       <ul>
-        <li>三阶段管线：视觉模型 OCR 定位 → 复用完整主管线翻译 → 采样底色擦掉原文、译文按原位重排</li>
-        <li>字号从大到小自适应塞进原框，CJK 逐字换行 / 拉丁整词换行，按背景明暗自动选黑字或白字</li>
-        <li>结果页支持「仅译文 / 原文+译文」切换、悬停看原文、一键保存 PNG；刷新页面结果不丢（24 小时保留）</li>
-        <li>页内右键翻译直接画在网页图片上，图片缩放时自动跟随不错位</li>
-        <li>视觉模型自动挑选：发图时自动切换到该厂商的视觉模型（GPT-4o / GLM-4V / 混元 Vision / 千问 VL 等），不用手动改配置；Ollama 本地模型是免 Key 视觉方案</li>
+        <li>三阶段管线：视觉模型 OCR 定位 → 复用完整主管线翻译 → 采样底色擦去原文、译文按原位重排</li>
+        <li>字号从大到小自适应排入原框，CJK 逐字换行 / 拉丁整词换行，按背景明暗自动选字色</li>
+        <li>结果页支持「仅译文 / 原文 + 译文」切换、悬停查看原文、一键保存 PNG；刷新页面结果不丢失（24 小时保留）</li>
+        <li>页内右键翻译直接绘制于网页图片之上，图片缩放时自动跟随不错位</li>
+        <li>视觉模型自动挑选：发图时自动切换到该厂商的视觉模型（GPT-4o / GLM-4V / 混元 Vision / 千问 VL 等）；Ollama 本地模型为免 Key 视觉方案</li>
         <li>图片翻译计入用量统计，月度预算对图片同样生效</li>
       </ul>
     </div>
   </div>
 
-  <div class="feat-group-title">🧠 智能与质量</div>
+  <div class="feat-group-title">智能与质量</div>
 
   <div class="feat-block violet">
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
@@ -115,7 +116,7 @@
       <ul>
         <li>长文的代词指代（it / they / 该方法）前后一致</li>
         <li>跨段术语口径统一，不会一段一个叫法</li>
-        <li>上下文作为「数据」注入用户消息而非系统提示，防页面标题注入攻击</li>
+        <li>上下文作为「数据」注入用户消息而非系统提示，防范页面标题注入攻击</li>
       </ul>
     </div>
   </div>
@@ -127,10 +128,10 @@
       <p>译后自动校验关键信息保真度，这是「接近人工翻译」的安全网。</p>
       <ul>
         <li>校验数字、URL、邮箱、占位符（%s、{name}）、代码 token 是否保留</li>
-        <li>缺失时追加保真指令自动校正重试一次，仍缺失则标记 🚩 提示而不误导</li>
+        <li>缺失时追加保真指令自动校正重试一次，仍缺失则标记提示而不误导</li>
         <li>比较前做等价归一化：千分位、全角、日期改写不误报</li>
         <li>纯数字不遮罩：iPhone 15 的「15」原样保留，标题不会缺字</li>
-        <li>翻译失败不写缓存：失败结果一律不入 30 天缓存池，杜绝「坏缓存」导致该段永远漏译</li>
+        <li>翻译失败不写入缓存：失败结果一律不入 30 天缓存池，杜绝「坏缓存」导致该段永远漏译</li>
       </ul>
     </div>
   </div>
@@ -141,8 +142,8 @@
       <h3>多引擎智能路由</h3>
       <p>不同场景自动选择最合适的引擎，故障时无缝切换。</p>
       <ul>
-        <li>主引擎 401/403/限流/额度不足时，按顺序自动切换备用引擎——单条与批量整页路径都生效</li>
-        <li>超过阈值的长文自动路由到「强模型」，短文继续用便宜模型</li>
+        <li>主引擎 401/403/限流/额度不足时，按顺序自动切换备用引擎——单条与批量整页路径均生效</li>
+        <li>超过阈值的长文自动路由到「强模型」，短文继续使用经济模型</li>
         <li>16 项引擎随时切换，含任意 OpenAI 兼容自建端点；免 Key 通道 MyMemory → Apertium 真正兜底</li>
       </ul>
     </div>
@@ -152,11 +153,11 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
     <div>
       <h3>译文可编辑 · 术语自学习</h3>
-      <p>你对译文的每一次修正，都会变成词库里的一条规则。</p>
+      <p>你对译文的每一次修正，都会沉淀为词库中的一条规则。</p>
       <ul>
         <li>悬停译文即可编辑，Enter 提交、Esc 还原</li>
         <li>LLM 对比原文与修改稿，自动抽取术语写入个人词库并即时生效</li>
-        <li>短术语才入库，避免整句污染词表</li>
+        <li>仅短术语入库，避免整句污染词表</li>
       </ul>
     </div>
   </div>
@@ -164,27 +165,27 @@
   <div class="feat-block rose">
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div>
     <div>
-      <h3>中文识别增强 · 杜绝中译中</h3>
-      <p>不该翻的绝不浪费一次请求，也不产生「中文翻译中文」的尴尬。</p>
+      <h3>中文识别增强 · 杜绝「中译中」</h3>
+      <p>不该翻译的绝不浪费一次请求，也不会产生「中文翻译中文」的结果。</p>
       <ul>
         <li>两字 UI 词与中英混排句不再被误送翻译</li>
         <li>检测到段落已是目标语言，本地直接跳过并提示</li>
-        <li>英 → 法/德/西等拉丁系目标一律送模型，避免「同字母系统」误判整页漏译</li>
+        <li>英 → 法/德/西等拉丁系目标一律送模型，避免「同字母系统」误判导致整页漏译</li>
       </ul>
     </div>
   </div>
 
-  <div class="feat-group-title">✨ 阅读掌控</div>
+  <div class="feat-group-title">阅读掌控</div>
 
   <div class="feat-block violet">
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
     <div>
       <h3>阅读模式 · 三态切换</h3>
-      <p>工具栏一键循环：<b>对照</b>（原文+译文）→ <b>只译</b>（沉浸读译文）→ <b>悬停</b>（鼠标停留才出译文）。</p>
+      <p>工具栏一键循环：<b>对照</b>（原文 + 译文）→ <b>只译</b>（沉浸读译文）→ <b>悬停</b>（鼠标停留才出译文）。</p>
       <ul>
-        <li>纯显示层切换：不重新翻译、不发请求、不花 Token</li>
+        <li>纯显示层切换：不重新翻译、不发请求、不产生消耗</li>
         <li>切换立即作用于页面上所有已渲染译文</li>
-        <li>选择持久化，刷新页面后仍保留</li>
+        <li>选择持久化保存，刷新页面后仍保留</li>
       </ul>
     </div>
   </div>
@@ -193,11 +194,11 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
     <div>
       <h3>默认手动模式 · 点哪译哪</h3>
-      <p>进入网页不再自动整页翻译——点击段落或划词即译，掌控权交还用户（可切回整页自动）。</p>
+      <p>进入网页不自动整页翻译——点击段落或划词即译，掌控权交还用户（可切回整页自动）。</p>
       <ul>
         <li>整页不自动翻译，Token 开销完全由你掌控</li>
-        <li>右键菜单新增「显示 / 隐藏译文」，0 请求一键切换</li>
-        <li>划词面板「切换原文/译文」按钮：对照或纯净模式随手换</li>
+        <li>右键菜单新增「显示 / 隐藏译文」，零请求一键切换</li>
+        <li>划词面板「切换原文/译文」按钮：对照或纯净模式随手切换</li>
         <li><kbd>Alt</kbd>+<kbd>T</kbd> 快捷键一键翻译整页（可在浏览器中自定义）</li>
       </ul>
     </div>
@@ -207,7 +208,7 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg></div>
     <div>
       <h3>预置样式主题 · 一键统一</h3>
-      <p>译文显示区提供三套预置主题，一套填好五件套，不必逐项手调。</p>
+      <p>译文显示区提供三套预置主题，一次选择即完成字号、行高、透明度、颜色、下划线五项配置。</p>
       <ul>
         <li><b>极简无痕</b>：译文与正文融为一体，适合通读</li>
         <li><b>学习对照</b>：原文译文界限分明，适合精读</li>
@@ -221,23 +222,23 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
     <div>
       <h3>失败卡片 · 引擎健康指示</h3>
-      <p>出错不弹窗打断阅读，状态好坏一眼可见。</p>
+      <p>出错不弹窗打断阅读，引擎状态一目了然。</p>
       <ul>
-        <li>失败段落就地渲染玻璃小卡：写明失败原因 + 一键「重试」，成功后自动消失</li>
-        <li>可重试错误不再弹模态框，由卡片就地承担原因与重试</li>
+        <li>失败段落就地呈现玻璃小卡：写明失败原因 + 一键「重试」，成功后自动消失</li>
+        <li>可重试错误不再弹模态框，由卡片就地承担原因与重试入口</li>
         <li>设置页引擎下拉下方实时状态胶囊：免 Key =「装完即用」、已配 Key =「可用」、未配 =「需粘贴 Key」</li>
-        <li>译文右下角小「译」角标：悬停浮现，点击直达完整设置</li>
+        <li>译文右下角「译」角标：悬停浮现，点击直达完整设置</li>
       </ul>
     </div>
   </div>
 
-  <div class="feat-group-title">🔊 听读与记录</div>
+  <div class="feat-group-title">听读与记录</div>
 
   <div class="feat-block">
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg></div>
     <div>
       <h3>朗读译文（TTS）</h3>
-      <p>划词面板、悬停气泡、输入框结果一键朗读，外语学习与听读场景利器。</p>
+      <p>划词面板、悬停气泡、输入框结果一键朗读，外语学习与听读场景的利器。</p>
       <ul>
         <li>按目标语言自动匹配发音，<b>优先在线高质量语音</b>（Edge 神经 / Google 网络）</li>
         <li>设置面板可自选朗读人声，跟随配置跨设备迁移</li>
@@ -254,22 +255,22 @@
       <ul>
         <li>记录划词 / 输入框 / 弹窗三类主动翻译，悬停噪声不入册</li>
         <li>关键词搜索、点击回填重译、一键清空</li>
-        <li>本地存储上限 200 条，同原文+译文去重置顶</li>
+        <li>本地存储上限 200 条，同原文 + 译文去重置顶</li>
       </ul>
     </div>
   </div>
 
-  <div class="feat-group-title">🎨 界面与设置</div>
+  <div class="feat-group-title">界面与设置</div>
 
   <div class="feat-block violet">
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4" opacity=".5"/><rect x="7" y="7" width="10" height="10" rx="3"/></svg></div>
     <div>
       <h3>Liquid Glass 玻璃界面</h3>
-      <p>全套界面与 Apple 最新设计语言同材质：半透明玻璃底 + 高光内描边 + 三层弥散阴影。</p>
+      <p>全套界面与 Apple 最新设计语言同材质：半透明玻璃底、高光内描边与多层弥散阴影。</p>
       <ul>
         <li>悬停气泡、翻译结果区、图片翻译页、欢迎面板、弹窗全面玻璃化</li>
         <li>状态条入场 / 退场动画，全部按钮带按压反馈</li>
-        <li>深浅色随系统切换，玻璃材质在两种主题下都清晰</li>
+        <li>深浅色随系统切换，玻璃材质在两种主题下均保持清晰</li>
       </ul>
     </div>
   </div>
@@ -278,10 +279,10 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></div>
     <div>
       <h3>完整设置面板 · 分区导航</h3>
-      <p>七个分组、吸顶导航、滚动实时高亮当前分组——配置再多也找得到。</p>
+      <p>七个分组、吸顶导航、滚动实时高亮当前分组——配置项再多也找得到。</p>
       <ul>
-        <li>免费体验 / 接自己的 API 分组清晰，每个开关都有人话说明</li>
-        <li>页内快速设置与完整设置结构一致，两处入口一个心智</li>
+        <li>免费体验 / 接自己的 API 分组清晰，每个开关均有明确说明</li>
+        <li>页内快速设置与完整设置结构一致，两处入口同一心智</li>
         <li>界面主题：跟随系统 / 强制浅色 / 强制深色，所有界面统一生效</li>
         <li>跳转偏移自动跟随导航高度，窄屏换行后分组标题不再被遮挡</li>
       </ul>
@@ -292,16 +293,16 @@
     <div class="ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
     <div>
       <h3>设置备份 · 剪贴板迁移</h3>
-      <p>换机迁移、备份恢复，一个 JSON 文件搞定。</p>
+      <p>换机迁移、备份恢复，一份 JSON 文件完成。</p>
       <ul>
         <li>引擎、语言偏好、翻译模式、术语表、系统提示词、站点列表全量打包</li>
         <li>API Key 默认剥离，需要时可显式勾选包含</li>
-        <li>导入严格校验字段类型，脏数据无法进入存储；复制全部设置到剪贴板，换版本一键带走</li>
+        <li>导入严格校验字段类型，脏数据无法进入存储；复制全部设置到剪贴板，更换版本一键带走</li>
       </ul>
     </div>
   </div>
 
-  <div class="feat-group-title" id="save">💰 五层省 Token 机制</div>
+  <div class="feat-group-title" id="save">成本控制：五层省 Token 机制</div>
 
   <div class="compare-wrap">
     <table class="compare">
@@ -311,12 +312,12 @@
         <tr><td><b>整段 LRU 缓存</b></td><td>相同文本 30 天有效，上限 2000 条，可在设置中清空；失败结果一律不写入</td><td>重复阅读零请求</td></tr>
         <tr><td><b>术语库命中</b></td><td>整条命中个人术语表直接返回，不发请求</td><td>专有名词零 Token</td></tr>
         <tr><td><b>目标语言跳过</b></td><td>检测到段落已是目标语言，本地直接跳过并提示</td><td>杜绝「中译中」</td></tr>
-        <tr><td><b>动态冷却 + 数字补丁</b></td><td>行情/时钟类元素仅数字变化时就地替换译文数字，8 秒冷却合并抖动</td><td>高频刷新不再烧钱</td></tr>
+        <tr><td><b>动态冷却 + 数字补丁</b></td><td>行情/时钟类元素仅数字变化时就地替换译文数字，8 秒冷却合并抖动</td><td>高频刷新不再产生消耗</td></tr>
       </tbody>
     </table>
   </div>
-  <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:14px" class="reveal">
-    另有「手动模式」：整页不自动翻译，点哪段译哪段，Token 开销完全由你掌控。
+  <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:16px" class="reveal">
+    另有「手动模式」：整页不自动翻译，点哪段译哪段，消耗完全由你掌控。
   </p>
 
 </main>
@@ -325,13 +326,18 @@
   <div class="container">
     <div class="cta reveal">
       <h2>功能再多，不如亲自一试</h2>
-      <p>内置免 Key 通道（MyMemory）让你三十秒上手，装完即用。</p>
-      <a class="btn" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">立即免费下载 →</a>
+      <p>内置免 Key 通道（MyMemory）让你三十秒上手，安装即可使用。</p>
+      <a class="btn" href="https://github.com/Lokeily/hao-fan/releases/latest" target="_blank" rel="noopener">立即免费下载</a>
     </div>
   </div>
 </section>
 
 <footer>
+  <div class="container">
+    <div class="foot-legal">
+      好翻（Haofan / Open Translator CN）是一款依据 MIT 许可证开源发布的浏览器翻译扩展。翻译结果由你在设置中选择并配置的第三方服务商生成，好翻不对其准确性作出保证。本网站为静态页面，不使用 Cookie，不部署统计或广告追踪脚本。
+    </div>
+  </div>
   <div class="container foot-grid">
     <div class="foot-brand">
       <a class="brand" href="./"><img src="assets/img/icon-128.png" alt="" /><span>好翻 Haofan</span></a>
@@ -352,6 +358,7 @@
         <li><a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub 仓库</a></li>
         <li><a href="https://github.com/Lokeily/hao-fan/issues" target="_blank" rel="noopener">问题反馈</a></li>
         <li><a href="https://github.com/Lokeily/hao-fan/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">参与贡献</a></li>
+        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/SECURITY.md" target="_blank" rel="noopener">安全策略</a></li>
       </ul>
     </div>
     <div>
@@ -359,11 +366,14 @@
       <ul>
         <li><a href="privacy.html">隐私政策</a></li>
         <li><a href="terms.html">服务条款</a></li>
-        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        <li><a href="https://github.com/Lokeily/hao-fan/blob/main/LICENSE" target="_blank" rel="noopener">MIT 许可证</a></li>
       </ul>
     </div>
   </div>
-  <div class="copyright container">© 2026 好翻 Haofan contributors · 基于 MIT 协议开源 · 由社区驱动维护<br />本扩展为开源工具，按「现状」提供；翻译结果由用户所配置的第三方服务商生成。</div>
+  <div class="container copyright">
+    <span>© 2026 好翻 Haofan contributors · 基于 MIT 许可证开源</span>
+    <span class="cp-links"><a href="privacy.html">隐私政策</a><a href="terms.html">服务条款</a><a href="https://github.com/Lokeily/hao-fan" target="_blank" rel="noopener">GitHub</a></span>
+  </div>
 </footer>
 
 <script src="assets/js/site.js"></script>
