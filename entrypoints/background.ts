@@ -492,6 +492,12 @@ export default defineBackground(() => {
       title: '翻译本页（好翻）',
       contexts: ['page'],
     });
+    // B7 右键菜单增强：翻译完想快速看原文/看译文，不必去翻工具栏。
+    browser.contextMenus?.create({
+      id: 'ot-toggle-translations',
+      title: '显示 / 隐藏译文（好翻）',
+      contexts: ['page'],
+    });
     browser.contextMenus?.create({
       id: 'ot-translate-image',
       title: '翻译图片（好翻）',
@@ -560,6 +566,11 @@ export default defineBackground(() => {
     if (info.menuItemId === 'ot-translate-page') {
       ensureContent(tab.id).then(() =>
         browser.tabs.sendMessage(tab.id!, { type: 'TRANSLATE_PAGE' }).catch(() => {}),
+      );
+    } else if (info.menuItemId === 'ot-toggle-translations') {
+      // B7 右键增强：显示/隐藏译文（0 请求，纯前端显隐）
+      ensureContent(tab.id).then(() =>
+        browser.tabs.sendMessage(tab.id!, { type: 'TOGGLE_TRANSLATIONS' }).catch(() => {}),
       );
     } else if (info.menuItemId === 'ot-translate-image' && info.srcUrl) {
       // 右键图片：在后台翻译，再把结果发回内容脚本，在原网页图片旁悬浮展示

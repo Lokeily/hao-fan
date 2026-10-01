@@ -58,6 +58,8 @@ export function buildConfigForm(
         <div class="ot-field-grid">
           <label class="ot-field">翻译引擎
             <select data-f="provider"></select>
+            <!-- B5 引擎健康指示：当前引擎的 Key 就绪状态实时胶囊，随下拉切换更新 -->
+            <span class="ot-provider-health" data-f="providerHealth" role="status" hidden></span>
           </label>
           <label class="ot-field" data-f="modelField">模型
             <select data-f="model"></select>
@@ -119,6 +121,16 @@ export function buildConfigForm(
       <section class="ot-form-section">
         <h2>译文显示</h2>
         <div class="ot-field-grid">
+          <!-- B6 样式一键统一：预置主题套件，一键填充下面五项；选「自定义」不覆盖手动调整 -->
+          <label class="ot-field ot-field-wide">预置样式主题
+            <span>一套搭好的译文外观，选完即用；想微调就选「自定义」再改下面各项</span>
+            <select data-f="styleTheme">
+              <option value="custom">自定义（手动微调）</option>
+              <option value="minimal">极简无痕</option>
+              <option value="study">学习对照</option>
+              <option value="focus">专注模式</option>
+            </select>
+          </label>
           <label class="ot-field">对照模式
             <span>决定译文和原文怎么摆</span>
             <select data-f="dualMode">
@@ -317,6 +329,8 @@ export function buildConfigForm(
   const translationLineHeightSel = mount.querySelector('[data-f=translationLineHeight]') as HTMLSelectElement;
   const translationOpacitySel = mount.querySelector('[data-f=translationOpacity]') as HTMLSelectElement;
   const translationColorInput = mount.querySelector('[data-f=translationColor]') as HTMLInputElement;
+  // B6 样式一键统一：预置主题套件下拉（纯 UI 层，不持久化）
+  const styleThemeSel = mount.querySelector('[data-f=styleTheme]') as HTMLSelectElement;
   const themeModeSel = mount.querySelector('[data-f=themeMode]') as HTMLSelectElement;
   const ttsVoiceSel = mount.querySelector('[data-f=ttsVoiceName]') as HTMLSelectElement;
   const fallbackInput = mount.querySelector('[data-f=fallbackProviders]') as HTMLInputElement;
@@ -405,6 +419,25 @@ export function buildConfigForm(
     });
     const selected = providerSel.options[providerSel.selectedIndex] as HTMLOptionElement | null;
     providerSel.classList.toggle('missing-key', selected?.dataset.missingKey === 'true');
+    // B5 引擎健康指示：胶囊 = 当前选中引擎的 Key 就绪状态（免 Key = 绿，已配 = 绿，
+    // 未配 = 橙警示）。连通性交给「测试连接」按钮，这里只给即刻可判断的信息。
+    const healthEl = mount.querySelector<HTMLElement>('[data-f=providerHealth]');
+    if (healthEl) {
+      if (selected?.dataset.needsKey === 'true' && !selected?.dataset.missingKey) {
+        healthEl.textContent = '已配 Key，可用';
+        healthEl.dataset.state = 'ok';
+        healthEl.hidden = false;
+      } else if (selected?.dataset.needsKey !== 'true') {
+        const baseName = selected?.dataset.baseName || '';
+        healthEl.textContent = baseName === 'Ollama（本地）' ? '本地引擎，无需 Key' : '免 Key 通道，装完即用';
+        healthEl.dataset.state = 'ok';
+        healthEl.hidden = false;
+      } else {
+        healthEl.textContent = '未配 Key：翻译前需在下方粘贴';
+        healthEl.dataset.state = 'warn';
+        healthEl.hidden = false;
+      }
+    }
   };
   const refreshSelectTitles = () => {
     providerSel.title = providerSel.options[providerSel.selectedIndex]?.textContent || '';
@@ -412,6 +445,44 @@ export function buildConfigForm(
     sourceSel.title = sourceSel.value;
     targetSel.title = targetSel.value;
   };
+
+  // B6 样式一键统一：预置主题 → 五件套方案。styleTheme 不持久化，
+  // 是「一次性批量填入」的 UI 助手；load 时按当前配置反推匹配项。
+  const STYLE_THEMES = {
+    minimal: { style: 'plain', fontSize: '0', lineHeight: '0', opacity: '0.5', color: '' },
+    study: { style: 'underline', fontSize: '0', lineHeight: '1.6', opacity: '0.85', color: '#007aff' },
+    focus: { style: 'highlight', fontSize: '15', lineHeight: '1.6', opacity: '1', color: '' },
+  } as const;
+  type StyleThemeId = keyof typeof STYLE_THEMES;
+  const applyStyleTheme = (id: StyleThemeId) => {
+    const t = STYLE_THEMES[id];
+    translationStyleSel.value = t.style;
+    translationFontSizeSel.value = t.fontSize;
+    translationLineHeightSel.value = t.lineHeight;
+    translationOpacitySel.value = t.opacity;
+    translationColorInput.value = t.color;
+    // 主题套件修改的字段全部标记 dirty，保存时写回存储。
+    markDirty('translationStyle', 'translationFontSize', 'translationLineHeight', 'translationOpacity', 'translationColor');
+    void save();
+  };
+  const syncStyleThemeFromConfig = () => {
+    if (!styleThemeSel) return;
+    const cur = {
+      style: translationStyleSel.value,
+      fontSize: translationFontSizeSel.value,
+      lineHeight: translationLineHeightSel.value,
+      opacity: translationOpacitySel.value,
+      color: translationColorInput.value,
+    };
+    const match = (Object.keys(STYLE_THEMES) as StyleThemeId[]).find(
+      (id) => JSON.stringify(STYLE_THEMES[id]) === JSON.stringify(cur),
+    );
+    styleThemeSel.value = match ?? 'custom';
+  };
+  styleThemeSel?.addEventListener('change', () => {
+    const id = styleThemeSel.value as StyleThemeId | 'custom';
+    if (id !== 'custom') applyStyleTheme(id);
+  });
   // 「长文强模型」路由只能用大模型通道：传统翻译引擎没有模型名可选。
   PROVIDERS.forEach((p) => {
     if (p.type !== 'llm') return;
@@ -549,6 +620,7 @@ export function buildConfigForm(
     setIfDiff('translationLineHeight', translationLineHeightSel, String(cfg.translationLineHeight ?? 0));
     setIfDiff('translationOpacity', translationOpacitySel, String(cfg.translationOpacity ?? 0));
     setIfDiff('translationColor', translationColorInput, cfg.translationColor || '');
+    syncStyleThemeFromConfig();
     setIfDiff('themeMode', themeModeSel, cfg.themeMode || 'auto');
     // 人声下拉按当前目标语言动态填充后再回填所选值
     refreshVoiceOptions();
@@ -826,6 +898,8 @@ export function buildConfigForm(
     el.addEventListener('change', () => {
       const f = el.getAttribute('data-f') || '';
       markDirty(f === 'modelText' ? 'model' : f);
+      // B6：手改任意样式项 → 主题下拉回退「自定义」（主题是一次性批量填入的助手）
+      if (f.startsWith('translation')) syncStyleThemeFromConfig();
       save();
       refreshSelectTitles();
     }),

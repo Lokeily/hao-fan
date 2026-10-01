@@ -62,6 +62,11 @@ export const settingsPanelPosItem = storage.defineItem<{ x: number; y: number } 
   'local:settingsPanelPos',
   { defaultValue: null },
 );
+// B2 气泡位置记忆：用户拖到哪就记住哪，下次打开气泡停在原位置。
+export const hoverBubblePosItem = storage.defineItem<{ x: number; y: number } | null>(
+  'local:hoverBubblePos',
+  { defaultValue: null },
+);
 
 // ===== 一次性迁移：v0.2.0 起翻译模式默认改为「手动」=====
 // 老版本保存的全量快照里带着 translateMode:'auto'，仅修改 DEFAULT_CONFIG

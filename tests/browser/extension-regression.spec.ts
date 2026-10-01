@@ -1883,3 +1883,66 @@ test('round18: welcome panel is a glass card (not opaque white)', async ({ page 
   // 玻璃令牌带 rgba 半透明（不透明白卡是 #fff）
   expect(cssText).toMatch(/--surface:\s*rgba\(/);
 });
+
+// ===== 第 19 轮：B8 阅读模式 / B9 失败卡片回归 =====
+test('round19: read-mode button cycles dual mode, applies to existing translations, persists', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const readBtn = page.locator('#ot-read-btn');
+  await expect(readBtn).toBeVisible();
+
+  // 初始 = 默认 below（双语对照）
+  await expect(readBtn).toHaveText('对照');
+
+  // 点一次 → translation-only（只译文）
+  await readBtn.click();
+  await expect(readBtn).toHaveText('只译');
+  // 已渲染译文立即生效：原文被隐藏（悬停才显示），通过样式类断言
+  // （生产 CSS 通过类切换，测试页无 content.css，故断言类名而非计算样式）。
+  await page.locator('#ot-translate-btn').click();
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+  const firstTrans = page.locator('.ot-translation').first();
+  // translation-only 模式下译文节点挂 ot-dual-translation-only 类
+  await expect(firstTrans).toHaveClass(/ot-dual-translation-only/);
+  // 配置持久化：dualMode 已写回 storage（异步写入，轮询等待）
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        const cfg = await (window as any).chrome.storage.local.get('config');
+        return cfg.config?.dualMode;
+      }),
+    )
+    .toBe('translation-only');
+
+  // 再点两次回到 below（对照）
+  await readBtn.click();
+  await expect(readBtn).toHaveText('悬停');
+  await readBtn.click();
+  await expect(readBtn).toHaveText('对照');
+  await expect(firstTrans).toHaveClass(/ot-dual-below/);
+});
+
+test('round19: failed batch renders an inline fail card with a working retry', async ({
+  page,
+}) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  // 先模拟整批失败（可重试错误）
+  await page.locator('html').evaluate((element) => {
+    element.dataset.batchMode = 'fail';
+  });
+  await page.locator('#ot-translate-btn').click();
+  // 失败卡出现：段落内就地渲染，含失败原因与「重试」按钮
+  await expect(page.locator('.ot-fail-card').first()).toBeVisible({ timeout: 60000 });
+  await expect(page.locator('.ot-fail-card').first()).toContainText('重试');
+  await expect(page.locator('.ot-fail-card').first()).toContainText('请求超时');
+
+  // 恢复成功模式后点击重试：译文出现，失败卡消失
+  await page.locator('html').evaluate((element) => {
+    delete element.dataset.batchMode;
+  });
+  await page.locator('.ot-fail-card').first().getByRole('button', { name: '重试' }).click();
+  await expect(page.locator('.ot-translation').first()).toBeVisible({ timeout: 60000 });
+  await expect(page.locator('.ot-fail-card')).toHaveCount(0, { timeout: 60000 });
+});
+

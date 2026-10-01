@@ -1,6 +1,7 @@
 ﻿// 内容脚本的纯 UI 构建辅助（从 entrypoints/content.ts 拆分）。
 // 只负责「用原生 DOM 构造隔离良好的界面元素」，不持有页面翻译状态，
 // 因此可独立维护与测试。
+import { browser } from 'wxt/browser';
 
 // ===== 译文嵌入节点 =====
 // 直接在原文文字下方插入译文节点，形成原文与译文的对照显示，嵌入文档流
@@ -169,13 +170,57 @@ export function createTranslationNode(
       /* 深色默认 0.9 更亮；用户自定义透明度（--ot-opacity）优先 */
       .text { opacity: var(--ot-opacity, 0.9); }
     }
+    /* B3 译文角标：右下角小「译」，与编辑按钮反位（左下），不遮挡正文可读区 */
+    .badge {
+      position: absolute;
+      bottom: -2px;
+      left: -2px;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--ot-edit-bg, rgba(28, 28, 30, 0.72));
+      color: var(--ot-edit-fg, #fff);
+      font: 600 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(2px) scale(0.9);
+      transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 1;
+    }
+    :host(:hover) .badge { opacity: 0.85; transform: translateY(0) scale(1); pointer-events: auto; }
+    .badge:hover { opacity: 1; background: var(--ot-edit-bg-hover, rgba(28, 28, 30, 0.92)); }
+    .badge:focus-visible { opacity: 1; outline: 2px solid rgba(0,122,255,0.6); outline-offset: 2px; }
   `;
   const text = document.createElement('span');
   text.className = 'text';
   // 空译文（流式渲染中）显示"…"占位，让用户明确感知翻译进度。
   text.textContent = translation || '…';
   if (!translation) text.classList.add('is-pending');
-  shadow.append(style, text);
+  // B3 译文角标：译文右下角小「译」标，首次见到时一眼知道这行字从哪来；
+  // 点击打开完整设置页（换引擎/调样式）。纯 hover 展示，不遮译文正文。
+  const badge = document.createElement('button');
+  badge.type = 'button';
+  badge.className = 'badge';
+  badge.textContent = '译';
+  badge.title = '好翻译文 · 点击打开设置（换引擎 / 调样式）';
+  badge.setAttribute('aria-label', '打开好翻设置');
+  badge.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      void browser.runtime.openOptionsPage();
+    } catch {
+      window.open(browser.runtime.getURL('/options.html'), '_blank');
+    }
+  });
+  shadow.append(style, text, badge);
 
   if (options?.onEdit) {
     const editBtn = document.createElement('button');
@@ -1100,11 +1145,20 @@ export function createSettingsPanel(opts: SettingsPanelOptions): SettingsPanel {
 export function createHoverBubble(
   source: string,
   onPinnedChange: (pinned: boolean) => void,
-  options?: { getTargetLang?: () => string; getVoiceName?: () => string },
+  options?: {
+    getTargetLang?: () => string;
+    getVoiceName?: () => string;
+    onDrag?: (x: number, y: number) => void;
+  },
 ): {
   host: HTMLElement;
   setTranslation: (t: string, opts?: { localSkipped?: boolean }) => void;
   setSource: (s: string) => void;
+  setDictionary: (entry: {
+    word: string;
+    phonetic?: string;
+    senses: { partOfSpeech: string; definition: string; example?: string }[];
+  } | null) => void;
 } {
   const host = document.createElement('div');
   host.id = 'ot-hover-bubble';
@@ -1195,6 +1249,48 @@ export function createHoverBubble(
       line-height: 1.4;
     }
     .actions + .skip-hint { padding-bottom: 6px; }
+    /* B1 词典卡：悬停英文单词/短语时，译文下方给出词典式释义 */
+    .dict {
+      padding: 0 12px 10px;
+      border-top: 0.5px solid ${theme.hairline};
+      margin-top: 2px;
+    }
+    .dict-word {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 6px 0 2px;
+      font-size: 14px;
+      font-weight: 700;
+      color: ${theme.text};
+    }
+    .dict-phonetic {
+      font-size: 12px;
+      font-weight: 400;
+      color: ${theme.text2};
+    }
+    .dict-sense {
+      display: flex;
+      gap: 6px;
+      padding: 2px 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: ${theme.text2};
+    }
+    .dict-pos {
+      flex: 0 0 auto;
+      font-weight: 600;
+      color: ${theme.accent};
+      font-style: italic;
+    }
+    .dict-def { color: ${theme.text}; }
+    .dict-example {
+      display: block;
+      color: ${theme.muted};
+      font-size: 11px;
+      font-style: italic;
+      padding: 1px 0 0 22px;
+    }
   `;
   const src = document.createElement('div');
   src.className = 'src';
@@ -1209,6 +1305,10 @@ export function createHoverBubble(
   skipHint.className = 'skip-hint';
   skipHint.textContent = '原文已是目标语言，未翻译';
   skipHint.hidden = true;
+  // B1 词典卡容器：默认隐藏，setDictionary 有词条时才显示。
+  const dict = document.createElement('div');
+  dict.className = 'dict';
+  dict.hidden = true;
   const actions = document.createElement('div');
   actions.className = 'actions';
   // 朗读：与划词面板/输入框结果同一交互（compact 图标形态适配小气泡）。
@@ -1250,10 +1350,15 @@ export function createHoverBubble(
   pin.addEventListener('click', () => {
     pinned = !pinned;
     pin.dataset.pinned = String(pinned);
-    pin.title = pinned ? '取消固定' : '固定译文';
+    pin.title = pinned ? '取消固定（拖动气泡可换位置）' : '固定译文';
     onPinnedChange(pinned);
   });
-  shadow.append(style, src, dst, skipHint, actions, pin);
+  // B2 位置记忆：固定态下 src（原文）区作为拖拽手柄，用户把气泡拖到喜欢的位置，
+  // onDrag 回调把坐标写进 storage；下次固定时由调用方读回恢复。
+  if (options?.onDrag) {
+    makeDraggable(host, src, (x, y) => options.onDrag?.(x, y));
+  }
+  shadow.append(style, src, dst, skipHint, dict, actions, pin);
 
   return {
     host,
@@ -1264,6 +1369,42 @@ export function createHoverBubble(
     },
     setSource: (s2) => {
       src.textContent = s2;
+    },
+    setDictionary: (entry) => {
+      dict.replaceChildren();
+      if (!entry || entry.senses.length === 0) {
+        dict.hidden = true;
+        return;
+      }
+      const wordLine = document.createElement('div');
+      wordLine.className = 'dict-word';
+      wordLine.textContent = entry.word;
+      if (entry.phonetic) {
+        const ph = document.createElement('span');
+        ph.className = 'dict-phonetic';
+        ph.textContent = `/${entry.phonetic}/`;
+        wordLine.appendChild(ph);
+      }
+      dict.appendChild(wordLine);
+      for (const sense of entry.senses.slice(0, 3)) {
+        const row = document.createElement('div');
+        row.className = 'dict-sense';
+        const pos = document.createElement('span');
+        pos.className = 'dict-pos';
+        pos.textContent = sense.partOfSpeech || '释义';
+        const def = document.createElement('span');
+        def.className = 'dict-def';
+        def.textContent = sense.definition;
+        row.append(pos, def);
+        dict.appendChild(row);
+        if (sense.example) {
+          const ex = document.createElement('span');
+          ex.className = 'dict-example';
+          ex.textContent = `e.g. ${sense.example}`;
+          dict.appendChild(ex);
+        }
+      }
+      dict.hidden = false;
     },
   };
 }

@@ -21,6 +21,7 @@ import {
   neverSitesItem,
   toolbarPosItem,
   settingsPanelPosItem,
+  hoverBubblePosItem,
   setupNoticeShownItem,
 } from '../utils/storage.ts';
 import { applyManualDefaultMigration } from '../utils/storage.ts';
@@ -57,6 +58,8 @@ import fullSettingsCss from '../styles/options.css?raw';
 import { LANGUAGES } from '../utils/languages.ts';
 import { PROVIDERS } from '../utils/providers.ts';
 import { createSpeakButton, stopSpeaking } from '../utils/speech.ts';
+// B1 词典预览卡：悬停英文短词时查 Free Dictionary API 出词典式释义。
+import { looksLikeDictionaryQuery, lookupDictionary } from '../utils/translator.ts';
 import '../styles/content.css';
 
 let activeImageCleanup: (() => void) | null = null;
@@ -235,6 +238,8 @@ export default defineContentScript({
         });
         applyDualModeToExisting();
         applyTypographyToExisting();
+        // B8：配置回读后阅读模式按钮文案同步。
+        refreshToolbarReadLabel();
       });
       void configItem
         .getValue()
@@ -1094,6 +1099,9 @@ export default defineContentScript({
       markTranslated(el);
       // 第 10 轮：重试成功后清除失败标记（保留会给整页完成文案误报失败数）。
       el.removeAttribute('data-retryable');
+      // B9：重试成功后清掉失败卡片，避免「已成功还挂着失败卡」。
+      el.removeAttribute('data-fail-card');
+      el.querySelector(':scope > .ot-fail-card')?.remove();
       return 'inserted';
     }
 
@@ -1274,6 +1282,8 @@ export default defineContentScript({
       document
         .querySelectorAll('[data-retryable="true"]')
         .forEach((el) => el.removeAttribute('data-retryable'));
+      // B9：收起全部译文时失败卡片一并清掉（卡片挂在锚点段落内，随段落清空）。
+      clearFailCards();
       // 清除排队中标记
       document
         .querySelectorAll(`.${PENDING_CLASS}`)
@@ -1585,8 +1595,10 @@ export default defineContentScript({
       } catch (error) {
         if (jobId && activePageJobId !== jobId) return;
         const message = error instanceof Error ? error.message : '翻译失败';
-        showNotice(message, jobId || 'page-translation');
         const canRetry = isRetryableTranslationError(error);
+        // B9：可重试错误由「失败卡」就地承担原因 + 重试入口，不再弹模态框
+        // （模态会盖住就地卡片/遮罩全文，重试按钮根本点不到）；不可重试才保留模态。
+        if (!canRetry) showNotice(message, jobId || 'page-translation');
         if (!canRetry && jobId) blockedPageJobId = jobId;
         const retryable = canRetry
           ? items.filter((item) => {
@@ -1597,6 +1609,8 @@ export default defineContentScript({
               // 第 10 轮：失败段落标记可重试，提示用户可点击重译（手动模式点击段落
               // 会重新走 manualTranslateBlock；自动模式滚动到视口自动重试）。
               (item.el as HTMLElement).dataset.retryable = 'true';
+              // B9 失败卡片：可重试段落就地给出原因 + 一键重试，不再只靠状态条。
+              renderFailCard(item.el, message);
               return true;
             })
           : [];
@@ -1612,6 +1626,128 @@ export default defineContentScript({
         // 失败时允许后续动态扫描重试；成功时 markTranslated 已移除此标记。
         items.forEach((x) => (x.el as HTMLElement).classList.remove(PENDING_CLASS));
       }
+    }
+
+    // ===== B9 失败卡片：失败段落就地给原因 + 重试入口 =====
+    // 在失败段的原文正下方插入一张玻璃小卡，写明失败原因与重试按钮，
+    // 一键重走该段的翻译管线（点击段落重试的既有语义被保留，卡片把入口显式化）。
+    function renderFailCard(el: Element, rawMessage: string) {
+      const host = el as HTMLElement;
+      if (!host.isConnected || host.querySelector(':scope > .ot-fail-card')) return;
+      if (host.getAttribute('data-fail-card') === '1') return;
+      host.setAttribute('data-fail-card', '1');
+      const glass = themeColors();
+      const card = document.createElement('div');
+      card.className = 'ot-fail-card';
+      Object.assign(card.style, {
+        position: 'relative',
+        marginTop: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        padding: '6px 10px',
+        borderRadius: '9px',
+        background: glass.surface,
+        color: glass.text,
+        border: `0.5px solid ${glass.border}`,
+        boxShadow: glass.shadow,
+        font: '12px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif',
+        maxWidth: '340px',
+        zIndex: '1',
+        userSelect: 'none',
+      });
+      // 失败原因：截断到可读长度；网络/超时类错误额外引导（滚动或点击重试）。
+      const reason = document.createElement('span');
+      reason.style.flex = '1 1 auto';
+      reason.style.minWidth = '0';
+      reason.style.overflow = 'hidden';
+      reason.style.textOverflow = 'ellipsis';
+      reason.style.whiteSpace = 'nowrap';
+      const msg = rawMessage || '翻译失败';
+      reason.textContent = msg.length > 46 ? `${msg.slice(0, 46)}…` : msg;
+      card.appendChild(reason);
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = '重试';
+      Object.assign(retry.style, {
+        flex: '0 0 auto',
+        border: 'none',
+        borderRadius: '7px',
+        padding: '3px 10px',
+        background: glass.accent,
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'filter 0.15s ease',
+      });
+      retry.addEventListener('mouseenter', () => (retry.style.filter = 'brightness(1.1)'));
+      retry.addEventListener('mouseleave', () => (retry.style.filter = ''));
+      retry.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        retry.disabled = true;
+        retry.textContent = '重试中…';
+        // 失败段落已被懒观察器注册（data-retryable 后 observeForLazyTranslation 会
+        // 加 OBSERVED_CLASS）与 manualTranslateBlock 的守卫冲突：先解除观察与排队
+        // 注册，否则重试必被拦截（元素不可连接 / 已观察 / 已排队）。
+        viewportObserver?.unobserve(host);
+        lazyPending.delete(host);
+        host.classList.remove(OBSERVED_CLASS, PENDING_CLASS);
+        void manualTranslateBlock(host) // 复用手动翻译管线（含 guard/kill/计数）
+          .catch(() => {})
+          .finally(() => {
+            // 成功后卡片是惰性清理的：manualTranslateBlock 成功路径会走
+            // applyTranslation → markTranslated → remove fail-card 标记。
+            if (host.isConnected && host.getAttribute('data-fail-card') === '1') {
+              retry.disabled = false;
+              retry.textContent = '重试';
+            }
+          });
+      });
+      card.appendChild(retry);
+      host.appendChild(card);
+      // 一键「收起全部」时整段内容会清掉，卡片随锚点一起消失；无需单独清理。
+    }
+
+    function clearFailCards() {
+      document.querySelectorAll('[data-fail-card="1"]').forEach((el) => {
+        el.removeAttribute('data-fail-card');
+        el.querySelector(':scope > .ot-fail-card')?.remove();
+      });
+    }
+
+    // ===== B8 阅读模式：工具栏三态循环切换对照方式 =====
+    const DUAL_MODES_SEQ = ['below', 'translation-only', 'hover-original'] as const;
+    const DUAL_MODE_LABEL: Record<(typeof DUAL_MODES_SEQ)[number], { label: string; title: string }> = {
+      below: { label: '对照', title: '阅读模式：双语对照（译文在原文下方）' },
+      'translation-only': { label: '只译', title: '阅读模式：只看译文（悬停显示原文）' },
+      'hover-original': { label: '悬停', title: '阅读模式：译文 + 悬停查看原文' },
+    };
+    function nextDualMode(current: string): (typeof DUAL_MODES_SEQ)[number] {
+      const idx = DUAL_MODES_SEQ.indexOf(current as (typeof DUAL_MODES_SEQ)[number]);
+      return DUAL_MODES_SEQ[(idx + 1) % DUAL_MODES_SEQ.length];
+    }
+    function applyDualModeToEverything() {
+      currentDualMode = nextDualMode(currentDualMode);
+      applyDualModeToExisting();
+      refreshToolbarReadLabel();
+      // 持久化：阅读模式是「改配置」而非临时显隐，刷新后仍保留。
+      void configItem
+        .getValue()
+        .catch(() => null)
+        .then((cfg) => {
+          if (!cfg) return;
+          void configItem.setValue({ ...cfg, dualMode: currentDualMode }).catch(() => {});
+        });
+    }
+    function refreshToolbarReadLabel() {
+      const btn = document.getElementById('ot-read-btn') as HTMLButtonElement | null;
+      if (!btn) return;
+      btn.textContent = DUAL_MODE_LABEL[currentDualMode].label;
+      btn.title = DUAL_MODE_LABEL[currentDualMode].title;
+      btn.setAttribute('aria-label', DUAL_MODE_LABEL[currentDualMode].title);
     }
 
     // ===== 整页翻译（沉浸式叠加层：译文贴在原文正下方，不改动原网页）=====
@@ -2421,6 +2557,20 @@ export default defineContentScript({
         }
         const actions = document.createElement('div');
         actions.className = 'actions';
+        // B4 划词快捷操作：一键在「原文 / 译文」之间切换（0 请求，纯显隐）。
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'action';
+        toggleBtn.textContent = '切换原文/译文';
+        toggleBtn.title = '在原文与译文之间切换显示';
+        toggleBtn.addEventListener('click', () => {
+          const srcEl = existingPanel.querySelector('.source') as HTMLElement | null;
+          const resEl = existingPanel.querySelector('.result') as HTMLElement | null;
+          if (!srcEl || !resEl) return;
+          const srcShown = srcEl.style.display !== 'none';
+          srcEl.style.display = srcShown ? 'none' : '';
+          resEl.style.display = srcShown ? '' : 'none';
+        });
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
         copyBtn.className = 'action';
@@ -2433,6 +2583,7 @@ export default defineContentScript({
           } catch { copyBtn.textContent = '复制失败'; }
         });
         actions.appendChild(createSpeakButton(() => translation, () => currentTargetLang));
+        actions.appendChild(toggleBtn);
         actions.appendChild(copyBtn);
         existingPanel.appendChild(actions);
         return;
@@ -2502,7 +2653,19 @@ export default defineContentScript({
         const speakBtn = createSpeakButton(() => translation, () => currentTargetLang, { getVoiceName: () => currentTtsVoice });
         speakBtn.className = 'action';
         speakBtn.style.minHeight = '28px';
+        // B4 划词快捷操作：切换原文/译文显隐（0 请求）。
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'action';
+        toggleBtn.textContent = '切换原文/译文';
+        toggleBtn.title = '在原文与译文之间切换显示';
+        toggleBtn.addEventListener('click', () => {
+          const srcShown = source.style.display !== 'none';
+          source.style.display = srcShown ? 'none' : '';
+          result.style.display = srcShown ? '' : 'none';
+        });
         actions.appendChild(speakBtn);
+        actions.appendChild(toggleBtn);
         actions.appendChild(copy);
         panel.appendChild(actions);
       }
@@ -3303,19 +3466,43 @@ export default defineContentScript({
         {
           getTargetLang: () => currentTargetLang,
           getVoiceName: () => currentTtsVoice,
+          onDrag: (x, y) => {
+            void hoverBubblePosItem.setValue({ x, y }).catch(() => {});
+          },
         },
       );
       document.documentElement.appendChild(hoverBubble.host);
       const rect = el.getBoundingClientRect();
       const bw = 280;
-      const left = Math.min(Math.max(8, rect.left + 8), window.innerWidth - bw - 8);
-      const top = Math.min(Math.max(8, rect.bottom + 8), window.innerHeight - 80);
+      // B2 位置记忆：用户把固定气泡拖到过某个位置（存于 storage），
+      // 下次打开时优先用上次位置；没拖过才按元素相邻定位。
+      const savedPos = await hoverBubblePosItem.getValue();
+      const left =
+        savedPos &&
+        savedPos.x >= 0 &&
+        savedPos.y >= 0 &&
+        savedPos.x <= window.innerWidth - 24 &&
+        savedPos.y <= window.innerHeight - 24
+          ? savedPos.x
+          : Math.min(Math.max(8, rect.left + 8), window.innerWidth - bw - 8);
+      const top =
+        savedPos && savedPos.x >= 0 && savedPos.y >= 0 ? savedPos.y : Math.min(Math.max(8, rect.bottom + 8), window.innerHeight - 80);
       hoverBubble.host.style.setProperty('left', `${left}px`, 'important');
       hoverBubble.host.style.setProperty('top', `${top}px`, 'important');
       const cached = sessionTranslations.get(text);
       if (cached !== undefined) {
         hoverBubble.setTranslation(cached);
         return;
+      }
+      // B1 词典预览卡：悬停文本像英文单词/短语时，并发向词典 API 查释义
+      //（免 Key、12s 超时、失败静默回退普通翻译，不阻塞译文）。
+      if (looksLikeDictionaryQuery(text)) {
+        void lookupDictionary(text)
+          .then((entry) => {
+            if (!hoverBubble || hoverEl !== el || !entry) return;
+            hoverBubble.setDictionary(entry);
+          })
+          .catch(() => {});
       }
       void translateOneText(text, {
         onDelta: (partial) => {
@@ -3757,11 +3944,53 @@ export default defineContentScript({
         toggleTranslations();
       });
 
+      // B8 阅读模式按钮：三态循环切换对照方式（对照 / 只译 / 悬停对照），
+      // 0 请求不重译，切换后立即作用于已渲染译文，并持久化到配置。
+      // 做成和眼睛/齿轮一致的 36px 圆钮，避免长文本占据工具条中心——
+      // 中心留给「译」主按钮，维护「随手点中央 = 翻译」的直觉。
+      const readBtn = document.createElement('button');
+      readBtn.type = 'button';
+      readBtn.id = 'ot-read-btn';
+      Object.assign(readBtn.style, {
+        width: '36px',
+        height: '36px',
+        borderRadius: '50%',
+        border: 'none',
+        padding: '0',
+        background: 'transparent',
+        color: glass.text2,
+        fontSize: '11px',
+        fontWeight: '600',
+        lineHeight: '1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        transition: 'background 0.15s ease, color 0.15s ease',
+        fontFamily: 'inherit',
+      });
+      readBtn.addEventListener('mouseenter', () => {
+        readBtn.style.background = glass.accentSoft;
+        readBtn.style.color = glass.text;
+      });
+      readBtn.addEventListener('mouseleave', () => {
+        readBtn.style.background = 'transparent';
+        readBtn.style.color = glass.text2;
+      });
+      readBtn.addEventListener('click', (event) => {
+        if (typeof wasDrag === 'function' && wasDrag()) return;
+        event.stopPropagation();
+        applyDualModeToEverything();
+      });
+      // 初始文案随本地 currentDualMode（可能已被配置回读覆盖）。
+      refreshToolbarReadLabel();
+
       // 布局：辅助按钮分居两侧，「译」主按钮居中且略大——用户随手点工具条中央
       // 命中的仍是主操作（翻译），具体功能点两侧小按钮，主次分明。
       btn.style.width = '42px';
       btn.style.height = '42px';
-      bar.append(hideBtn, btn, gear);
+      bar.append(readBtn, hideBtn, btn, gear);
       try {
         document.documentElement.appendChild(bar);
       } catch {
@@ -3782,6 +4011,8 @@ export default defineContentScript({
         thisSiteAutoOverride =
           Array.isArray(sites) && isSiteDisabled(sites, location.href);
         refreshToolbarIdleLabels();
+        // B8：配置回读后工具栏阅读模式按钮文案同步（工具栏可能晚于配置读取挂载）。
+        refreshToolbarReadLabel();
       });
 
       // 整条工具条可拖动；位移超过阈值视为拖拽，不触发按钮点击。
@@ -3810,7 +4041,7 @@ export default defineContentScript({
       bar.addEventListener('click', (event) => {
         if (wasDrag()) return;
         // 齿轮与「译文显隐」按钮是独立功能，不能被容器的「点任意处翻译」吞掉。
-        if ((event.target as Element | null)?.closest?.('#ot-settings-btn, #ot-hide-btn')) return;
+        if ((event.target as Element | null)?.closest?.('#ot-settings-btn, #ot-hide-btn, #ot-read-btn')) return;
         if (busy) {
           // 取消当前任务并复位交互状态，让下一次点击能立即开始新任务
           // （「翻译中再点 = 取消，再点 = 重译」的既有语义）。

@@ -499,6 +499,36 @@ h1 {
   color: var(--red);
 }
 
+/* B5 引擎健康指示：胶囊随引擎下拉切换，即刻判断当前引擎是否可用 */
+.ot-provider-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  background: var(--bg-soft);
+}
+.ot-provider-health::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.ot-provider-health[data-state="ok"]::before {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.2);
+}
+.ot-provider-health[data-state="warn"]::before {
+  background: var(--warning, #ff9500);
+  box-shadow: 0 0 0 3px rgba(255, 149, 0, 0.2);
+}
+
 /* ===== Popup ===== */
 .ot-popup {
   width: 100%;

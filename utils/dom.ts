@@ -101,6 +101,7 @@ const OWN_SELECTOR = [
   '.ot-selbtn',
   '#ot-status',
   '#ot-toolbar',
+  '.ot-fail-card',
 ].join(',');
 
 /** 与 OWN_SELECTOR 相同，供内容脚本等外部模块引用，避免各自维护不一致的名单 */

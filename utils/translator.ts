@@ -1142,6 +1142,76 @@ function readMyMemoryError(payload: any, fallback: string): string {
   return raw ? raw.slice(0, 120) : fallback;
 }
 
+// ===== B1 词典释义（Free Dictionary API，免 Key）=====
+// 悬停英文单词/短语时，气泡里给出词典式释义（词性 + 中文释义 + 音标）。
+// 只对「像词典词条」的英文短词生效；中文/长句走普通翻译，不触发词典卡。
+export interface DictionarySense {
+  partOfSpeech: string;
+  definition: string;
+  example?: string;
+}
+export interface DictionaryEntry {
+  word: string;
+  phonetic?: string;
+  senses: DictionarySense[];
+}
+const DICTIONARY_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+
+/** 判断文本是否值得走词典查询：纯英文单词/短语（≤ 4 词、≤ 40 字符、无标点/数字）。 */
+export function looksLikeDictionaryQuery(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 40) return false;
+  // 中文/其它脚本 → 不做词典卡（Free Dictionary 只覆盖英文）
+  if (!/^[a-zA-Z][a-zA-Z\s'’-]*$/.test(t)) return false;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 4) return false;
+  // 全大写缩写（USA / CEO）词典没有，跳过
+  if (words.every((w) => w === w.toUpperCase() && w.length <= 4)) return false;
+  return true;
+}
+
+/** 查询英文单词词典释义。网络失败 / 无词条时返回 null（调用方回退普通翻译）。 */
+export async function lookupDictionary(word: string, signal?: AbortSignal): Promise<DictionaryEntry | null> {
+  try {
+    const res = await fetchWithTimeout(
+      DICTIONARY_API + encodeURIComponent(word.trim().toLowerCase()),
+      { signal },
+      12_000,
+    );
+    if (!res.ok) return null;
+    const data = (await readBodyWithTimeout(res.json(), 12_000)) as Array<{
+      word?: string;
+      phonetic?: string;
+      phonetics?: Array<{ text?: string }>;
+      meanings?: Array<{
+        partOfSpeech?: string;
+        definitions?: Array<{ definition?: string; example?: string }>;
+      }>;
+    }>;
+    const first = Array.isArray(data) ? data[0] : undefined;
+    if (!first || !Array.isArray(first.meanings)) return null;
+    const senses: DictionarySense[] = [];
+    for (const meaning of first.meanings) {
+      for (const def of meaning.definitions ?? []) {
+        if (!def.definition) continue;
+        senses.push({
+          partOfSpeech: meaning.partOfSpeech ?? '',
+          definition: def.definition,
+          example: def.example,
+        });
+        if (senses.length >= 3) break; // 最多 3 条，气泡不撑爆
+      }
+      if (senses.length >= 3) break;
+    }
+    if (senses.length === 0) return null;
+    const phonetic =
+      first.phonetic ?? first.phonetics?.find((p) => p.text)?.text ?? undefined;
+    return { word: first.word ?? word, phonetic, senses };
+  } catch {
+    return null; // 网络失败静默回退，不影响主翻译
+  }
+}
+
 /** 单段文本走 MyMemory（含超长分段）。 */
 async function myMemoryTranslate(
   text: string,
