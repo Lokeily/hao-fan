@@ -1188,16 +1188,19 @@ export function createHoverBubble(
     .src {
       padding: 8px 12px 4px;
       color: ${theme.muted};
-      font-size: 11px;
-      line-height: 1.45;
+      /* 第 20 轮：原文 11→11.5px，行高 1.45→1.5（多行原文不再发闷） */
+      font-size: 11.5px;
+      line-height: 1.5;
       max-height: 72px;
       overflow: hidden;
     }
     .dst {
       padding: 0 12px 10px;
       color: ${theme.text};
-      font-size: 13px;
-      line-height: 1.55;
+      /* 第 20 轮：译文 13→13.5px，正文可读性提升 */
+      font-size: 13.5px;
+      line-height: 1.6;
+      overflow-wrap: break-word;
     }
     .loading {
       padding: 10px 12px;
@@ -1260,7 +1263,8 @@ export function createHoverBubble(
       align-items: baseline;
       gap: 8px;
       padding: 6px 0 2px;
-      font-size: 14px;
+      /* 第 20 轮：14→14.5px */
+      font-size: 14.5px;
       font-weight: 700;
       color: ${theme.text};
     }
@@ -1273,7 +1277,8 @@ export function createHoverBubble(
       display: flex;
       gap: 6px;
       padding: 2px 0;
-      font-size: 12px;
+      /* 第 20 轮：12→12.5px */
+      font-size: 12.5px;
       line-height: 1.5;
       color: ${theme.text2};
     }
@@ -1287,7 +1292,8 @@ export function createHoverBubble(
     .dict-example {
       display: block;
       color: ${theme.muted};
-      font-size: 11px;
+      /* 第 20 轮：11→11.5px */
+      font-size: 11.5px;
       font-style: italic;
       padding: 1px 0 0 22px;
     }
