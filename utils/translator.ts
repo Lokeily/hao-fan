@@ -258,8 +258,29 @@ function tokenPresent(token: string, hay: string): boolean {
 
 export function auditTranslation(original: string, translation: string): string[] {
   const found = original.match(PROTECTED_TOKEN_RE);
-  if (!found) return [];
   const trans = translation || '';
+  // 幻觉英文碎片检测（v0.2.17）：目标为 CJK 时，译文里不该出现原文中
+  // 不存在的长英文词。实测 Apple 官网价格小字被翻出 "marre-7Node" 这类
+  // 无中生有的碎片。只警示（⚠ 角标）不替换——避免误杀术语型保留词。
+  if (found && /[\u4e00-\u9fff]/.test(trans)) {
+    const hay2 = toHalfWidth(original).toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+    let foreign = 0;
+    const seenForeign = new Set<string>();
+    for (const token of trans.match(/[A-Za-z][A-Za-z'-]{3,}/g) || []) {
+      const norm = token.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (norm.length < 4 || seenForeign.has(norm)) continue;
+      seenForeign.add(norm);
+      // 词干比较：取词长 60%（至少 4 字符）在原文里找，容忍单复数/时态差异
+      const stem = norm.slice(0, Math.max(4, Math.floor(norm.length * 0.6)));
+      if (!hay2.includes(stem)) {
+        foreign++;
+        if (foreign >= 2) {
+          return ['译文出现原文中没有的英文碎片，结果可能不可靠，请核对'];
+        }
+      }
+    }
+  }
+  if (!found) return [];
   // 比较统一在「半角 + 小写」空间进行
   const hay = toHalfWidth(trans).toLowerCase();
   const missing: string[] = [];
@@ -870,15 +891,23 @@ export async function translateBatchDetailed(
     if (!batch) throw lastMtErr ?? new Error('翻译失败');
     stats.requests += batch.requests;
     toTranslate.forEach((item, itemIndex) => {
-      const translation = batch!.translations[itemIndex] || item.text;
+      const mt = batch!.translations[itemIndex] || '';
+      // MT 单条失败（匿名配额用尽 / 限流 / 超时）返回空：保留原文但绝不写缓存。
+      // 此前「|| item.text」兜底后照写 30 天持久缓存，把「原文=原文」固化，
+      // 之后无论重试多少次都命中坏缓存，页面表现为该段永远漏译（v0.2.14 修复）。
+      const failed = !mt.trim();
       item.indexes.forEach((index) => {
-        result[index] = translation;
-        // 为每个重复出现的原文都写缓存：此前只写首个，其余变体下次仍会重新付费。
+        result[index] = failed ? item.text : mt;
         const raw = texts[index].trim();
-        if (cfg.cacheEnabled && raw) setCachedSync(raw, cfg.targetLang, ck, translation);
+        if (cfg.cacheEnabled && raw && !failed) setCachedSync(raw, cfg.targetLang, ck, mt);
       });
-      if (cfg.qualityCheck) {
-        const miss = auditTranslation(item.text, translation);
+      if (failed) {
+        item.indexes.forEach((index) => {
+          issues[index] = ['免 Key 翻译通道该段未返回结果，已保留原文'];
+        });
+        stats.qualityIssues++;
+      } else if (cfg.qualityCheck) {
+        const miss = auditTranslation(item.text, mt);
         if (miss.length) {
           item.indexes.forEach((index) => (issues[index] = miss));
           stats.qualityIssues++;
@@ -889,7 +918,18 @@ export async function translateBatchDetailed(
   }
 
   const applyResult = (item: (typeof toTranslate)[number], translation: string, miss?: string[] | null) => {
-    const tr = translation.trim() || item.text;
+    const tr = translation.trim();
+    // 模型返回空 = 该条请求级失败：保留原文、标记问题、不写缓存。
+    // 此前「|| item.text」兜底后照写 30 天缓存，把「原文=原文」固化成永久漏译
+    //（对比 translateItemsIndividually 早已做了失败不写缓存，v0.2.14 补齐此处）。
+    if (!tr) {
+      item.indexes.forEach((index) => {
+        result[index] = item.text;
+        issues[index] = ['模型未返回译文，已保留原文'];
+      });
+      stats.qualityIssues++;
+      return;
+    }
     item.indexes.forEach((index) => {
       result[index] = tr;
       if (miss) issues[index] = miss;
@@ -1083,8 +1123,9 @@ export async function translateBatch(
 
 // ===== 免 Key 体验通道（MyMemory / Apertium） =====
 // MyMemory 的匿名调用按 IP 限量；带上 de（联系邮箱）可把每日额度提到约 5 万字符。
-// 该邮箱仅用于服务商统计配额，不会接收任何内容。
-const MYMEMORY_CONTACT = 'haofan-feedback@example.com';
+// 该邮箱仅用于服务商统计配额（随请求明文可见），不会接收任何内容。
+// 上线前修正：example.com 假邮箱无法提升配额，换成维护者真实邮箱。
+const MYMEMORY_CONTACT = 'lokeijmfk@163.com';
 const MYMEMORY_MAX_CHARS = 480;
 
 // MyMemory / Apertium 都不接受 auto 源语言（直接 400/403），

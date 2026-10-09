@@ -18,6 +18,12 @@ import {
 import { fetchWithTimeout, postJson, RequestTimeoutError } from '../utils/requester.ts';
 import { parseImageSegments, parseImageSegmentsResult } from '../utils/vision-parser.ts';
 import {
+  fitFontSize,
+  sampleAverageColor,
+  textColorOn,
+  wrapLines,
+} from '../utils/image-render.ts';
+import {
   batchInstruction,
   createBatchItems,
   parseBatchTranslations,
@@ -313,7 +319,9 @@ test('sanitizes malformed image-model output and clamps overlays', () => {
   many.splice(1, 0, null);
   const parsed = parseImageSegments(`\`\`\`json\n${JSON.stringify(many)}\n\`\`\``);
 
-  assert.equal(parsed.length, 199);
+  // v0.2.15：段数上限 200 → 400（真 OCR 的文字行远多于旧版整段合并的粒度），
+  // 205 条 + 1 个 null 应全部保留。
+  assert.equal(parsed.length, 205);
   assert.equal(parsed[0].x, 0.9);
   assert.equal(parsed[0].y, 0);
   assert.ok(Math.abs(parsed[0].w - 0.1) < Number.EPSILON);
@@ -323,6 +331,51 @@ test('sanitizes malformed image-model output and clamps overlays', () => {
   assert.deepEqual(parseImageSegments('not json'), []);
   assert.equal(parseImageSegmentsResult('not json').valid, false);
   assert.deepEqual(parseImageSegmentsResult('[]'), { segments: [], valid: true });
+});
+
+test('image render: wraps CJK per character but keeps latin words intact', () => {
+  // 假测量：CJK 每字 10px，拉丁字母每字符 5px
+  const measure = (s) =>
+    Array.from(s).reduce((sum, ch) => sum + (/[a-zA-Z]/.test(ch) ? 5 : 10), 0);
+  const lines = wrapLines('限量发售 iPhone 15 Pro 今日开售', measure, 60);
+  assert.ok(lines.length > 1);
+  // 拉丁词不能被劈开：任一行里出现 'iPhone' 必须完整
+  for (const line of lines) {
+    assert.ok(!/iPho$|hone$/.test(line), `unexpected latin split: ${line}`);
+  }
+  assert.equal(wrapLines('Hello world', measure, 1000).length, 1);
+  // 超长不可断单元退化为逐字符硬断，绝不溢出
+  const long = wrapLines('A'.repeat(50), measure, 30);
+  assert.ok(long.length > 1);
+  assert.ok(long.every((line) => measure(line) <= 30));
+});
+
+test('image render: shrinks font size until the block fits its box', () => {
+  const measureAt = (text, size) => text.length * size * 0.6;
+  const fitted = fitFontSize('这是一段很长的译文需要塞进小框里', measureAt, 120, 40, {
+    maxFontSize: 32,
+    minFontSize: 8,
+  });
+  assert.ok(fitted.size >= 8 && fitted.size <= 32);
+  assert.ok(fitted.lines.length * fitted.size * 1.15 <= 40 + 1e-6);
+  // 框够大时应该直接用最大字号，不要无谓缩小
+  const roomy = fitFontSize('短句', measureAt, 400, 200, { maxFontSize: 32, minFontSize: 8 });
+  assert.equal(roomy.size, 32);
+});
+
+test('image render: picks light text on dark patches and dark text on light ones', () => {
+  assert.equal(textColorOn(10, 10, 10), '#ffffff');
+  assert.equal(textColorOn(250, 250, 245), '#111111');
+  // 不能按 RGB 简单平均误判：绿色对亮度贡献大（黑字可读），蓝色贡献小（必须白字）
+  assert.equal(textColorOn(0, 255, 0), '#111111');
+  assert.equal(textColorOn(0, 0, 255), '#ffffff');
+});
+
+test('image render: averages sampled pixels for the erase color', () => {
+  const data = new Uint8ClampedArray([0, 0, 0, 255, 100, 100, 100, 255]);
+  const average = sampleAverageColor(data, 2, 1);
+  assert.deepEqual(average, { r: 50, g: 50, b: 50 });
+  assert.equal(sampleAverageColor(new Uint8ClampedArray(0), 0, 0), null);
 });
 
 test('bounds timeout retries and reports a typed timeout error', async () => {

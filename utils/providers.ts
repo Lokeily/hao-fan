@@ -14,6 +14,10 @@ export interface Provider {
   docUrl: string;
   needsKey: boolean;
   vision?: boolean; // 是否支持图片（视觉）翻译
+  // 该厂商「真正支持图片输入」的模型清单。多数厂商的默认模型不是视觉模型
+  // （智谱默认 glm-4.5-flash、通义默认 qwen-plus、豆包默认 doubao-lite-32k），
+  // 拿默认模型去发图必然 400；发图时由 utils/vision.ts 的 pickVisionModel 自动挑选。
+  visionModels?: string[];
 }
 
 export const PROVIDERS: Provider[] = [
@@ -28,6 +32,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://platform.openai.com/docs/api-reference',
     needsKey: true,
     vision: true,
+    visionModels: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'],
   },
   {
     id: 'gemini',
@@ -39,6 +44,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://ai.google.dev/gemini-api/docs',
     needsKey: true,
     vision: true,
+    visionModels: ['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'],
   },
   {
     id: 'openrouter',
@@ -55,6 +61,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://openrouter.ai/docs',
     needsKey: true,
     vision: true,
+    visionModels: ['openai/gpt-4o-mini', 'google/gemini-pro-1.5'],
   },
 
   // ===== 国内主流大模型（OpenAI 兼容） =====
@@ -79,6 +86,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://docs.bigmodel.cn/cn/guide/develop/openai/introduction',
     needsKey: true,
     vision: true,
+    visionModels: ['glm-4v', 'glm-4.5-flash'],
   },
   {
     id: 'hunyuan',
@@ -97,6 +105,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://cloud.tencent.com/document/product/1729/111007',
     needsKey: true,
     vision: true,
+    visionModels: ['hunyuan-turbos-vision', 'hunyuan-vision'],
   },
   {
     id: 'qwen',
@@ -108,6 +117,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://help.aliyun.com/zh/model-studio/',
     needsKey: true,
     vision: true,
+    visionModels: ['qwen2.5-vl-72b-instruct', 'qwen-vl-max'],
   },
   {
     id: 'kimi',
@@ -141,6 +151,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://www.volcengine.com/docs/82379',
     needsKey: true,
     vision: true,
+    visionModels: ['doubao-vision-pro', 'doubao-vision-lite'],
   },
   {
     id: 'ollama',
@@ -152,6 +163,7 @@ export const PROVIDERS: Provider[] = [
     docUrl: 'https://github.com/ollama/ollama',
     needsKey: false,
     vision: true,
+    visionModels: ['minicpm-v', 'llava', 'bakllava'],
   },
 
   // ===== 免 Key 体验通道（新用户零配置即可翻译）=====

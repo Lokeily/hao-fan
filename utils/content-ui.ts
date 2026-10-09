@@ -17,6 +17,10 @@ export interface TranslationNodeOptions {
   lineHeight?: number;
   opacity?: number;
   color?: string;
+  // v0.2.17 行内形态：极窄锚点（色板名、小徽标，宽度 < 96px）用块级「下方对照」
+  // 会把译文挤成竖排乱码。inline=true 渲染为行内标注（紧跟原文、单行不换行），
+  // 插入锚点元素内部随文字流排列，不再占用独立块。
+  inline?: boolean;
 }
 
 export function createTranslationNode(
@@ -58,20 +62,32 @@ export function createTranslationNode(
   } else {
     host.style.removeProperty('--ot-color');
   }
+  // 两种形态共用的隔离底座：all:initial 挡掉页面样式渗透。
   host.style.setProperty('all', 'initial', 'important');
-  host.style.setProperty('display', 'block', 'important');
-  host.style.setProperty('position', 'relative', 'important');
   host.style.setProperty('box-sizing', 'border-box', 'important');
-  host.style.setProperty('width', 'auto', 'important');
-  host.style.setProperty('max-width', '100%', 'important');
-  host.style.setProperty('min-width', '0', 'important');
-  host.style.setProperty('height', 'auto', 'important');
-  host.style.setProperty('max-height', 'none', 'important');
-  host.style.setProperty('overflow', 'visible', 'important');
-  host.style.setProperty('clear', 'both', 'important');
-  // 垂直呼吸：上与原文留一点间隙、下与「下一段原文」明确分隔。
-  // 此前 2px/5px 在密集段落里几乎贴在一起，用户反馈"并拢不容易看"。
-  host.style.setProperty('margin', '3px 0 9px', 'important');
+  if (options?.inline) {
+    // 行内形态：不换行、不占独立块，跟随原文文字流（色板名 / 小徽标专用）。
+    host.dataset.inline = 'true';
+    host.style.setProperty('display', 'inline-block', 'important');
+    host.style.setProperty('position', 'static', 'important');
+    host.style.setProperty('max-width', 'none', 'important');
+    host.style.setProperty('margin', '0 0 0 6px', 'important');
+    host.style.setProperty('clear', 'none', 'important');
+    host.style.setProperty('vertical-align', 'baseline', 'important');
+  } else {
+    host.style.setProperty('display', 'block', 'important');
+    host.style.setProperty('position', 'relative', 'important');
+    host.style.setProperty('width', 'auto', 'important');
+    host.style.setProperty('max-width', '100%', 'important');
+    host.style.setProperty('min-width', '0', 'important');
+    host.style.setProperty('height', 'auto', 'important');
+    host.style.setProperty('max-height', 'none', 'important');
+    host.style.setProperty('overflow', 'visible', 'important');
+    host.style.setProperty('clear', 'both', 'important');
+    // 垂直呼吸：上与原文留一点间隙、下与「下一段原文」明确分隔。
+    // 此前 2px/5px 在密集段落里几乎贴在一起，用户反馈"并拢不容易看"。
+    host.style.setProperty('margin', '3px 0 9px', 'important');
+  }
   // 编辑按钮玻璃色：跟随系统深浅（译文节点嵌入页面文档流，不参与浮层主题强制）。
   const darkEdit = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   host.style.setProperty('--ot-edit-bg', darkEdit ? 'rgba(255, 255, 255, 0.16)' : 'rgba(28, 28, 30, 0.72)');
@@ -126,6 +142,22 @@ export function createTranslationNode(
       50% { opacity: 0.6; }
     }
     .text:focus { outline: none; opacity: 1; }
+    /* 行内形态：去掉竖线与块级排版，改为底部细线的小标注。
+       不用 nowrap：窄格（色板）里 nowrap 会溢出撞到相邻格子，
+       允许在格内正常换行（此前的事故是块级+边距挤成一字一行，非换行本身）。 */
+    :host([data-inline="true"]) .text {
+      display: inline;
+      width: auto;
+      padding: 0;
+      border-left: 0;
+      border-bottom: 1px solid var(--ot-line);
+    }
+    :host([data-inline="true"][data-style="dashed"]) .text,
+    :host([data-inline="true"][data-style="underline"]) .text,
+    :host([data-inline="true"][data-style="highlight"]) .text {
+      border-left: 0;
+      padding: 0 2px;
+    }
     :host([data-quality="warn"]) .text {
       border-bottom: 1px dashed rgba(255, 159, 10, 0.75);
       cursor: help;
@@ -554,6 +586,11 @@ let themeOverride: ThemeMode = 'auto';
 /** 由内容脚本在配置加载/变化时调用，控制后续新建浮层的深浅色。 */
 export function setThemeOverride(mode: ThemeMode): void {
   themeOverride = mode === 'light' || mode === 'dark' ? mode : 'auto';
+}
+
+/** 当前用户强制主题（auto = 跟随系统）。供 CSS 变量方案判断是否需要内联覆盖。 */
+export function getThemeOverride(): ThemeMode {
+  return themeOverride;
 }
 
 export function themeColors(): ThemeColors {

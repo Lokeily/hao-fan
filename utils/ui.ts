@@ -78,6 +78,18 @@ export function buildConfigForm(
             <input data-f="customVision" type="checkbox" />
             <span><strong>接口支持图片模型</strong><small>仅为兼容视觉输入的自定义接口开启</small></span>
           </label>
+          <!-- 0.2.15 图片翻译：视觉模型 + 图上渲染方式 -->
+          <label class="ot-field ot-field-wide" data-vision-model hidden>图片识别模型
+            <span>留空自动挑本服务商的视觉模型；换了更准/更便宜的视觉模型可在这里手动指定</span>
+            <input data-f="visionModel" type="text" placeholder="留空 = 自动选择" />
+          </label>
+          <label class="ot-field" data-image-render hidden>图上译文
+            <span>译文直接画在图上（擦掉原文、原位重排），可导出 PNG</span>
+            <select data-f="imageRenderMode">
+              <option value="translation">仅译文</option>
+              <option value="bilingual">原文 + 译文</option>
+            </select>
+          </label>
         </div>
         <div class="ot-form-actions">
           <button type="button" data-f="test" class="ot-test-btn">测试连接</button>
@@ -315,6 +327,10 @@ export function buildConfigForm(
   const glossaryInput = mount.querySelector('[data-f=customGlossary]') as HTMLTextAreaElement;
   const customVisionChk = mount.querySelector('[data-f=customVision]') as HTMLInputElement;
   const customVisionRow = mount.querySelector('[data-custom-vision]') as HTMLElement;
+  const visionModelInput = mount.querySelector('[data-f=visionModel]') as HTMLInputElement;
+  const visionModelRow = mount.querySelector('[data-vision-model]') as HTMLElement;
+  const imageRenderSel = mount.querySelector('[data-f=imageRenderMode]') as HTMLSelectElement;
+  const imageRenderRow = mount.querySelector('[data-image-render]') as HTMLElement;
   const streamingChk = mount.querySelector('[data-f=streaming]') as HTMLInputElement;
   const contextChk = mount.querySelector('[data-f=contextAware]') as HTMLInputElement;
   const qualityChk = mount.querySelector('[data-f=qualityCheck]') as HTMLInputElement;
@@ -528,6 +544,11 @@ export function buildConfigForm(
     baseInput.value = p?.baseUrl || '';
     baseInput.readOnly = providerId !== 'custom';
     customVisionRow.hidden = providerId !== 'custom';
+    // 图片翻译相关项只在「当前引擎支持视觉」时出现，避免给不相关用户噪音。
+    const supportsVision =
+      Boolean(p?.vision) || (providerId === 'custom' && customVisionChk.checked);
+    visionModelRow.hidden = !supportsVision;
+    imageRenderRow.hidden = !supportsVision;
   }
 
   // 无 Key 引导条：引擎需要 Key 且当前没填时显示。
@@ -606,6 +627,12 @@ export function buildConfigForm(
     setIfDiff('glossaryEnabled', glossaryChk, cfg.glossaryEnabled !== false);
     setIfDiff('customGlossary', glossaryInput, cfg.customGlossary || '');
     setIfDiff('customVision', customVisionChk, cfg.customVision === true);
+    setIfDiff('visionModel', visionModelInput, cfg.visionModel || '');
+    setIfDiff(
+      'imageRenderMode',
+      imageRenderSel,
+      cfg.imageRenderMode === 'bilingual' ? 'bilingual' : 'translation',
+    );
     setIfDiff('streaming', streamingChk, cfg.streaming !== false);
     setIfDiff('contextAware', contextChk, cfg.contextAware !== false);
     setIfDiff('qualityCheck', qualityChk, cfg.qualityCheck !== false);
@@ -698,6 +725,10 @@ export function buildConfigForm(
       if (touched.has('glossaryEnabled')) next.glossaryEnabled = glossaryChk.checked;
       if (touched.has('customGlossary')) next.customGlossary = glossaryInput.value;
       if (touched.has('customVision')) next.customVision = customVisionChk.checked;
+      if (touched.has('visionModel')) next.visionModel = visionModelInput.value.trim();
+      if (touched.has('imageRenderMode')) {
+        next.imageRenderMode = imageRenderSel.value === 'bilingual' ? 'bilingual' : 'translation';
+      }
       if (touched.has('streaming')) next.streaming = streamingChk.checked;
       if (touched.has('contextAware')) next.contextAware = contextChk.checked;
       if (touched.has('qualityCheck')) next.qualityCheck = qualityChk.checked;
@@ -845,6 +876,9 @@ export function buildConfigForm(
     save();
   });
 
+  // 自定义引擎勾上「支持图片模型」后，图片识别模型 / 图上译文两项才应该现身。
+  customVisionChk.addEventListener('change', () => fill());
+
   modelSel.addEventListener('change', () => {
     const custom = modelSel.value === customModelValue;
     modelText.hidden = !custom;
@@ -873,6 +907,8 @@ export function buildConfigForm(
     glossaryChk,
     glossaryInput,
     customVisionChk,
+    visionModelInput,
+    imageRenderSel,
     streamingChk,
     contextChk,
     qualityChk,
@@ -919,6 +955,7 @@ export function buildConfigForm(
     glossaryInput,
     fallbackInput,
     strongModelInput,
+    visionModelInput,
   ].forEach((el) => {
     el.addEventListener('input', () => {
       const f = el.getAttribute('data-f') || '';

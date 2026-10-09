@@ -66,6 +66,37 @@ export async function putImageJob(id: string, result: ImageResult): Promise<void
   }
 }
 
+// 只读不删除（v0.2.15）：结果页现在支持「切换渲染方式 / 导出图片 / 刷新页面
+// 后重看」，读取即消费会让刷新一下结果就没了。清理交给 TTL 与显式删除。
+export async function getImageJob(id: string): Promise<ImageResult | null> {
+  const db = await openDb();
+  try {
+    return await new Promise<ImageResult | null>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const getReq = tx.objectStore(STORE_NAME).get(id);
+      getReq.onsuccess = () => resolve((getReq.result as StoredJob | undefined) ?? null);
+      getReq.onerror = () => reject(getReq.error ?? new Error('读取图片翻译任务失败'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+// 结果页关闭 / 用户主动清理时删除，避免大图白占 IndexedDB 配额。
+export async function deleteImageJob(id: string): Promise<void> {
+  const db = await openDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('清理图片翻译任务失败'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
 // 读取并一次性消费（读取后删除），避免任务结果长期占用存储。
 export async function takeImageJob(id: string): Promise<ImageResult | null> {
   const db = await openDb();

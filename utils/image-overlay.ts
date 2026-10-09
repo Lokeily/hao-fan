@@ -1,9 +1,12 @@
 // 图片翻译结果浮层（从 entrypoints/content.ts 拆分）。
-// 在页面图片旁叠加译文标记框与结果面板；返回清理函数，由调用方管理生命周期。
-// 视觉走与气泡/设置面板同一套 Liquid Glass JS 主题（applyGlassShell/applyThemeVars），
-// 深浅色由用户主题强制设置统一决定，不再依赖 CSS media query 的第二套色板。
+// v0.2.15：图片上的译文由 canvas 直接画出来——采样原区域底色抹掉原文、
+// 按原位重排译文，读起来就是「图被翻译了」，而不是盖一层半透明色块。
+// 侧边面板仍走与气泡/设置面板同一套 Liquid Glass JS 主题
+// （applyGlassShell/applyThemeVars），深浅色由用户主题强制设置统一决定。
 import type { ImageSegment } from './vision-parser.ts';
 import { applyGlassShell, applyThemeVars, themeColors } from './content-ui.ts';
+import { renderTranslatedImage, type ImageRenderMode } from './image-render.ts';
+import { normalizeConfig, type AppConfig } from './config.ts';
 
 export interface ImageOverlayResult {
   segments: ImageSegment[];
@@ -19,20 +22,23 @@ function findImage(srcUrl?: string): HTMLImageElement | null {
 export function mountImageResultOverlay(
   srcUrl: string | undefined,
   result: ImageOverlayResult,
+  cfg?: AppConfig,
 ): () => void {
   const img = findImage(srcUrl);
   const segments: ImageSegment[] = Array.isArray(result?.segments) ? result.segments : [];
+  const validSegments = segments.filter(
+    (s) =>
+      s &&
+      [s.x, s.y, s.w, s.h].every((n) => Number.isFinite(Number(n))) &&
+      typeof (s.translation || s.text) === 'string',
+  );
+  const mode: ImageRenderMode = cfg?.imageRenderMode === 'bilingual' ? 'bilingual' : 'translation';
 
-  const boxes: HTMLElement[] = [];
-  if (img) {
-    segments.forEach((s) => {
-      const box = document.createElement('div');
-      box.className = 'ot-img-seg';
-      box.textContent = s.translation || s.text;
-      document.body.appendChild(box);
-      boxes.push(box);
-    });
-  }
+  // canvas 覆盖层：贴在图片上（fixed 定位 + 视口坐标），不进页面布局流，
+  // 也不会像旧版 div 那样被站点的 flex/grid 挤变形。
+  const canvas = document.createElement('canvas');
+  canvas.className = 'ot-img-canvas';
+  if (img) document.body.appendChild(canvas);
 
   const panel = document.createElement('div');
   panel.className = 'ot-img-panel';
@@ -61,12 +67,17 @@ export function mountImageResultOverlay(
   toggleLabel.appendChild(document.createTextNode('\u5728\u56FE\u4E0A\u6807\u8BB0\u8BD1\u6587')); // " 在图上标记译文"
   panel.appendChild(toggleLabel);
 
+  const hint = document.createElement('div');
+  hint.className = 'ot-img-hint';
+  hint.textContent = '\u60AC\u505C\u56FE\u4E0A\u6587\u5B57\u53EF\u67E5\u770B\u539F\u6587'; // "悬停图上文字可查看原文"
+  panel.appendChild(hint);
+
   const list = document.createElement('div');
   list.className = 'ot-img-list';
-  if (segments.length === 0) {
+  if (validSegments.length === 0) {
     list.innerHTML = '<div class="ot-img-empty">\u672A\u8BC6\u522B\u5230\u6587\u5B57</div>'; // "未识别到文字"
   } else {
-    segments.forEach((s) => {
+    validSegments.forEach((s) => {
       const item = document.createElement('div');
       item.className = 'ot-img-item';
       const src = document.createElement('div');
@@ -88,15 +99,23 @@ export function mountImageResultOverlay(
     if (cleaned) return;
     cleaned = true;
     panel.remove();
-    boxes.forEach((b) => b.remove());
+    canvas.remove();
     window.removeEventListener('scroll', reposition, true);
     window.removeEventListener('resize', reposition);
+    resizeObserver?.disconnect();
   }
   close.addEventListener('click', cleanup);
-  toggle.addEventListener('change', () => {
-    boxes.forEach((b) => (b.style.display = toggle.checked ? '' : 'none'));
-  });
+  toggle.addEventListener('change', reposition);
 
+  // 图片尺寸变化（懒加载完成、CSS 缩放、窗口变化）都要重画，
+  // 否则译文框会停在旧尺寸上——旧版只在 scroll/resize 时重算，懒加载必然错位。
+  const resizeObserver =
+    typeof ResizeObserver !== 'undefined' && img
+      ? new ResizeObserver(() => reposition())
+      : null;
+  if (img && resizeObserver) resizeObserver.observe(img);
+
+  let painted = false;
   function reposition() {
     if (!img) {
       panel.style.right = '16px';
@@ -118,20 +137,27 @@ export function mountImageResultOverlay(
     panel.style.top = Math.max(8, top) + 'px';
     panel.style.right = 'auto';
 
-    const iw = r.width;
-    const ih = r.height;
-    boxes.forEach((b, i) => {
-      const s = segments[i];
-      if (!s) return;
-      b.style.left = r.left + s.x * iw + 'px';
-      b.style.top = r.top + s.y * ih + 'px';
-      b.style.width = s.w * iw + 'px';
-      b.style.height = s.h * ih + 'px';
-    });
+    if (!img.complete || !img.naturalWidth) return;
+    // canvas 按「图片显示尺寸」绘制，CSS 再拉伸到同样的 CSS 尺寸：
+    // 既保证文字锐利（按 dpr 采样），又不改变页面布局。
+    if (!painted) {
+      renderTranslatedImage(canvas, img, validSegments, { mode });
+      painted = true;
+    }
+    canvas.style.width = `${r.width}px`;
+    canvas.style.height = `${r.height}px`;
+    canvas.style.left = `${r.left + window.scrollX}px`;
+    canvas.style.top = `${r.top + window.scrollY}px`;
+    canvas.style.display = toggle.checked ? 'block' : 'none';
   }
 
   reposition();
   window.addEventListener('scroll', reposition, true);
   window.addEventListener('resize', reposition);
   return cleanup;
+}
+
+// 供内容脚本调用前统一取一次配置（含用户选择的渲染方式）。
+export function currentImageRenderMode(cfg: AppConfig): ImageRenderMode {
+  return normalizeConfig(cfg).imageRenderMode === 'bilingual' ? 'bilingual' : 'translation';
 }

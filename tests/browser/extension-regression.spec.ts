@@ -332,6 +332,25 @@ test('image result page renders counts and toggles overlays', async ({ page }) =
   await expect(overlay).toBeHidden();
 });
 
+// v0.2.15：译文改为 canvas 直接画在图上（擦掉原文 + 原位重排），
+// 这里守住「canvas 真的画出来了」与「可切换双语 / 可导出」两条底线。
+test('image result page paints translations onto a canvas overlay', async ({ page }) => {
+  await page.goto('/tests/browser/image-regression.html?job=test&imageResult=1');
+  await expect(page.getByRole('heading', { name: '图片翻译' })).toBeVisible();
+  const canvas = page.locator('.ot-image-overlay');
+  await expect(canvas).toBeVisible();
+  // 画布必须按原图尺寸真的分配了像素（1×1 的测试图 → 至少 1px）
+  const size = await canvas.evaluate((el: HTMLCanvasElement) => ({
+    w: el.width,
+    h: el.height,
+  }));
+  expect(size.w).toBeGreaterThan(0);
+  expect(size.h).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: '保存图片' })).toBeVisible();
+  await page.locator('#render-mode').selectOption('bilingual');
+  await expect(canvas).toBeVisible();
+});
+
 test('image result page explains missing tasks instead of leaving a blank page', async ({
   page,
 }) => {
@@ -1514,7 +1533,11 @@ test('round11: full settings panel is a single-column list with one item per row
       value.split(' ').filter((part) => /px$/.test(part)).length;
     const form = root.querySelector('.ot-form') as HTMLElement;
     const grid = root.querySelector('.ot-field-grid') as HTMLElement;
-    const fields = Array.from(root.querySelectorAll('.ot-field')) as HTMLElement[];
+    // 只度量可见字段：v0.2.15 起设置表单含条件显示的行（图片识别模型 /
+    // 图上译文，仅视觉引擎可见），隐藏行宽度为 0，不应参与等宽断言。
+    const fields = (Array.from(root.querySelectorAll('.ot-field')) as HTMLElement[]).filter(
+      (field) => !field.hidden,
+    );
     const body = root.querySelector('.ot-full-settings-body') as HTMLElement;
     return {
       formDisplay: getComputedStyle(form).display,
@@ -1796,6 +1819,114 @@ test('round11: settings panel offers sticky section navigation', async ({ page }
       body.evaluate((element) => (element as HTMLElement).scrollTop),
     )
     .toBeGreaterThan(1200);
+});
+
+// v0.2.16：吸顶导航「断层」回归。旧版导航负 margin 只有 6px，而滚动容器
+// 内边距 20px——两侧各 14px 沟槽让内容从导航背后穿过，视觉上导航是断开的。
+test('v0.2.16: sticky settings nav spans the full scroll width (no seam)', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+  const body = full.locator('.ot-full-settings-body');
+  const nav = full.locator('.ot-settings-nav');
+  await body.evaluate((element) => {
+    (element as HTMLElement).scrollTop = 800;
+  });
+  // is-pinned 由 scroll 事件驱动（rAF 节流），设完 scrollTop 需等事件处理完
+  await expect
+    .poll(() => nav.evaluate((element) => element.classList.contains('is-pinned')))
+    .toBe(true);
+
+  const geo = await full.evaluate((host) => {
+    const root = (host as HTMLElement).shadowRoot!;
+    const bodyEl = root.querySelector('.ot-full-settings-body') as HTMLElement;
+    const navEl = root.querySelector('.ot-settings-nav') as HTMLElement;
+    const b = bodyEl.getBoundingClientRect();
+    const n = navEl.getBoundingClientRect();
+    return {
+      leftAligned: Math.abs(n.left - b.left) < 1,
+      fullBleed: Math.abs(n.width - b.width) < 1,
+      navVar: bodyEl.style.getPropertyValue('--ot-nav-h'),
+    };
+  });
+  expect(geo.leftAligned).toBe(true);
+  expect(geo.fullBleed).toBe(true);
+  // scroll-margin 跟随导航实际高度（跳转后分组标题不被吸顶导航压住）
+  expect(geo.navVar).not.toBe('');
+});
+
+// v0.2.16：滚动时高亮当前所在分组（此前导航只有跳转、没有位置反馈）
+test('v0.2.16: sticky settings nav highlights the current section', async ({ page }) => {
+  await page.goto('/tests/browser/selection-regression.html');
+  const full = await openFullSettings(page);
+  const nav = full.locator('.ot-settings-nav');
+
+  const activeText = await nav.evaluate(async (element) => {
+    // nav 在 shadow root 内部：host 要从 getRootNode() 拿，
+    // closest() 查不到 shadow 宿主（它不是 shadow 树内的祖先）。
+    const shadow = (element as HTMLElement).getRootNode() as ShadowRoot;
+    const sections = Array.from(shadow.querySelectorAll('.ot-form-section')) as HTMLElement[];
+    // 滚到「译文显示」（第 3 组）
+    const target = sections.find((section) =>
+      section.querySelector('h2')?.textContent?.includes('译文显示'),
+    )!;
+    target.scrollIntoView({ block: 'start' });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const active = shadow.querySelector('.ot-settings-nav-item.is-active');
+    return active?.textContent ?? null;
+  });
+  expect(activeText).toBe('译文显示');
+});
+
+// ===== 第 23 轮（v0.2.17）：Apple 官网实测两类排版事故回归 =====
+// 1) 色板名（56px 窄格）块级译文被挤成竖排乱码 → 行内形态；
+// 2) 绝对定位眉题的译文叠印在原文/标题上 → 行内优先 + 叠印检测。
+test('v0.2.17: tiny color labels render inline instead of vertical garbage', async ({ page }) => {
+  await page.goto('/tests/browser/tiny-anchor-regression.html');
+  await expect(page.locator('#ot-toolbar')).toBeVisible();
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+
+  const labels = page.locator('li.swatch.ot-translated');
+  await expect(labels).toHaveCount(3);
+  // 译文节点必须是行内形态且单行（竖排乱码的特征是高远大于宽）
+  for (let i = 0; i < 3; i++) {
+    const node = labels.nth(i).locator('xpath=./span[@data-inline="true"]');
+    await expect(node).toHaveCount(1);
+    const box = await node.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    // 事故特征是「一字一行的竖条」：宽被挤到 ~20px、高被拉到 5 行以上。
+    // 行内形态下即使译文较长换行，宽度也不会小于 ~24px。
+    expect(box.h).toBeLessThan(90);
+    expect(box.w).toBeGreaterThanOrEqual(24);
+  }
+});
+
+test('v0.2.17: absolute eyebrow translation never overlaps the headline', async ({ page }) => {
+  await page.goto('/tests/browser/tiny-anchor-regression.html');
+  await page.locator('#ot-toolbar').click();
+  await expect(page.locator('#ot-toolbar')).toHaveAttribute('aria-busy', 'false');
+
+  const eyebrows = page.locator('h3.eyebrow-abs.ot-translated');
+  await expect(eyebrows).toHaveCount(2);
+  const overlaps = await page.evaluate(() => {
+    const intersect = (a: DOMRect, b: DOMRect) =>
+      Math.min(a.right, b.right) - Math.max(a.left, b.left) > 4 &&
+      Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 4;
+    const results: boolean[] = [];
+    document.querySelectorAll('a.card').forEach((card) => {
+      const headline = card.querySelector('.headline')!;
+      const hr = headline.getBoundingClientRect();
+      // 译文节点：眉题内部的行内节点，或紧随其后的兄弟节点
+      document
+        .querySelectorAll<HTMLElement>('.ot-translation')
+        .forEach((n) => results.push(intersect(n.getBoundingClientRect(), hr)));
+    });
+    return results;
+  });
+  expect(overlaps.length).toBeGreaterThan(0);
+  expect(overlaps.every((bad) => !bad)).toBe(true);
 });
 
 // ===== 第 18 轮（v0.2.11）：Liquid Glass 全面强化回归 =====

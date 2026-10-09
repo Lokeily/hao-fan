@@ -118,6 +118,12 @@ export function localSkipReason(
   const targetKey = TARGET_LANG_KEY[targetLanguage];
   if (!targetKey) return null;
 
+  // 拉丁系目标语言不能按「字母系统」跳过：英/法/德/西共享拉丁字母，粗粒度
+  // 检测无法区分，会把英文原文误判成法语「已是目标语言」，整页 0 请求漏译
+  // （Apple 官网英→法实测全页不翻）。只有目标就是 English 时保留跳过——
+  // 此时检测为 latin 的文本几乎必然是英文，跳过既防英→英中译中又省 Token。
+  if (targetKey === 'latin' && targetLanguage !== 'English') return null;
+
   // 检测到已是目标语言 → 本地跳过（0 Token，绝无中译中）。
   if (detectLang(trimmed) === targetKey) return 'targetLanguage';
   return null;

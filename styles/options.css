@@ -157,7 +157,9 @@ h1 {
 }
 
 .ot-form-section {
-  margin: 14px 0;
+  /* v0.2.16：分组之间原来只有 14px 留白，七张同色卡片堆叠时分不清层界。
+     加大间距 + 给标题一条独立的「标题条」背景与分隔线，层与层一眼可辨。 */
+  margin: 18px 0;
   padding: 0;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-card);
@@ -169,18 +171,30 @@ h1 {
   box-shadow: var(--glass-highlight), var(--shadow-card);
 }
 
-.ot-form-section h2 {
+.ot-form-section > h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
-  padding: 16px 16px 2px;
-  color: var(--text-2);
-  font-size: 13px;
+  padding: 13px 16px 11px;
+  border-bottom: 1px solid var(--separator);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13.5px;
   font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0;
+  line-height: 1.35;
+  letter-spacing: 0.2px;
 }
 
-.ot-form-section > h2:first-child {
-  padding-top: 13px;
+/* 左侧 accent 竖条：给每一层一个明确的起点标记（此前标题是次要灰色小字，
+   与字段标签的层级拉不开，扫读时分不清哪一段属于哪个分组）。 */
+.ot-form-section > h2::before {
+  content: '';
+  flex: 0 0 3px;
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 /* ===== 字段列表：一行一项（标签居左 / 控件居右）=====
@@ -1489,27 +1503,45 @@ h1 {
 }
 
 /* ===== 高级设置折叠面板 ===== */
+/* v0.2.16：折叠分组的标题此前字号/字重/颜色与普通分组的 h2 全都不一样
+   （14px/650 vs 13px/700 灰字），七个分组里唯独它长得不同，层级混乱。
+   这里与普通分组标题完全对齐，箭头移到右侧 ::after，左侧留给 accent 竖条。 */
 details.ot-advanced-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  padding: 16px 16px 14px;
-  border-bottom: 1px solid transparent;
+  margin: 0;
+  padding: 13px 16px 11px;
+  border-bottom: 1px solid var(--separator);
+  background: var(--surface-2);
   color: var(--text);
-  font-size: 14px;
-  font-weight: 650;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.2px;
   list-style: none;
   user-select: none;
 }
-details.ot-advanced-section[open] > summary {
-  border-bottom-color: var(--separator);
+details.ot-advanced-section > summary::-webkit-details-marker {
+  display: none;
 }
 details.ot-advanced-section > summary::before {
-  content: '▸';
-  display: inline-block;
-  width: 16px;
-  color: var(--accent);
+  content: '';
+  flex: 0 0 3px;
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
 }
-details.ot-advanced-section[open] > summary::before {
-  content: '▾';
+details.ot-advanced-section > summary::after {
+  content: '\25B8';
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 11px;
+}
+details.ot-advanced-section[open] > summary::after {
+  content: '\25BE';
 }
 
 

@@ -450,7 +450,13 @@ export default defineBackground(() => {
         if (!term || !translation) return { learned: false };
         // 与 content.ts 的 learnGlossaryTerm 相同的净化：术语表是「每行 源词=译文」
         // 结构，源词/译文里混入换行或分隔符会破坏整库解析。
-        const safeTerm = term.replace(/\s*[\r\n]+\s*/g, ' ').replace(/[=＝]/g, '-').trim();
+        // 注意：分隔符不止 = ——parseCustomGlossary 还认 => / -> / ： / : / \t，
+        // 源词里残留任何一个都会让这行术语在解析时被腰斩。
+        const safeTerm = term
+          .replace(/\s*[\r\n]+\s*/g, ' ')
+          .replace(/=>|->|[=＝:：\t]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
         const safeTranslation = translation.replace(/\s*[\r\n]+\s*/g, ' ').trim();
         if (!safeTerm || !safeTranslation) return { learned: false };
         const current = await configItem.getValue();
@@ -473,6 +479,9 @@ export default defineBackground(() => {
         const srcUrl = typeof payload?.srcUrl === 'string' ? payload.srcUrl : undefined;
         const dataUrl = typeof payload?.dataUrl === 'string' ? payload.dataUrl : undefined;
         const result = await doTranslateImage(srcUrl, dataUrl);
+        // v0.2.15：图片翻译此前完全不计入用量统计（月度预算对它形同虚设），
+        // 现在 OCR 请求 + 文本翻译请求的 Token 一并归集。
+        if (result.stats) await recordUsage(result.stats);
         // 弹窗上传的图片没有网页中的图元素可锚定，仍用结果页展示。
         // 结果可能包含数 MB 的 base64 原图，存入 IndexedDB 规避 storage.local 配额限制。
         const id = randomId();
@@ -577,13 +586,15 @@ export default defineBackground(() => {
       ensureContent(tab.id)
         .then(() => assertSiteEnabled(tab.url))
         .then(() => doTranslateImage(info.srcUrl))
-        .then((result) =>
-          browser.tabs.sendMessage(tab.id!, {
+        .then((result) => {
+          // 右键图片路径同样计入用量（此前两条路径都漏记）。
+          if (result.stats) void recordUsage(result.stats);
+          return browser.tabs.sendMessage(tab.id!, {
             type: 'SHOW_IMAGE_RESULT',
             // 页面只需要坐标和译文，不重复传输可能数 MB 的 base64 原图。
             payload: { srcUrl: info.srcUrl, result: { segments: result.segments } },
-          }),
-        )
+          });
+        })
         .catch((error) => {
           console.error('好翻图片翻译失败', error);
           browser.tabs

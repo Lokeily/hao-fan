@@ -8,14 +8,16 @@
 //   - 点路径 a.b.c
 //   - 内部有驼峰的 camelCase / PascalCase（useState / onClick / GitHub / JavaScript）
 //   - 全大写缩写（API / HTTP / CSS / DOM）
-//   - 含数字（v2 / utf8 / base64）
+//   - 字母与数字混合（v2 / utf8 / base64）；纯数字（15 / 2026）不遮罩——
+//     模型不会把数字翻译成别的东西，遮罩反而增加「漏抄占位符丢字」的风险
+//     （v0.2.14：iPhone 15 的「15」此前会被替换成占位符，模型漏抄后标题缺字）。
 
 // 用私有区字符做占位符：模型不会把它当自然语言翻译，也不会与正文冲突。
 const OPEN = String.fromCharCode(0xf000);
 const CLOSE = String.fromCharCode(0xf001);
 
 const IDENT_RE =
-  /[A-Za-z0-9]*(?:_[A-Za-z0-9]+)+|[A-Za-z0-9]*(?:-[A-Za-z0-9]+)+|[A-Za-z][\w]*(?:\.[A-Za-z][\w]*)+|[A-Za-z]+(?:[A-Z][a-z0-9]+)+|\b[A-Z]{2,}\b|[A-Za-z0-9]*\d[A-Za-z0-9]*/g;
+  /[A-Za-z0-9]*(?:_[A-Za-z0-9]+)+|[A-Za-z0-9]*(?:-[A-Za-z0-9]+)+|[A-Za-z][\w]*(?:\.[A-Za-z][\w]*)+|[A-Za-z]+(?:[A-Z][a-z0-9]+)+|\b[A-Z]{2,}\b|(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]*\d[A-Za-z0-9]*/g;
 
 // 单大写专名（React/Vue/Linux…）：与句首英文词同形，通用正则无法安全区分，
 // 用「常见库/框架/平台专名名单」精确保护，避免 React→反应 这类乱翻。

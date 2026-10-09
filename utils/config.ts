@@ -42,6 +42,9 @@ export interface AppConfig {
   strongThreshold: number; // 长文路由字符阈值
   monthlyTokenBudget: number; // 月度 Token 预算（0 = 不限）。BYOK 用户自付 API 费，超预算即警告
   budgetWarnPercent: number; // 预算告警阈值百分比（默认 80：用到 80% 时提醒）
+  // ===== 0.2.15 图片翻译（OCR + 图上重排）=====
+  visionModel: string; // 图片识别专用模型（空 = 由引擎自动挑选视觉模型）
+  imageRenderMode: 'translation' | 'bilingual'; // 图上渲染：仅译文 / 原文+译文对照
 }
 
 export type StoredAppConfig = Partial<AppConfig> & { apiKey?: string };
@@ -96,6 +99,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   strongThreshold: 1200,
   monthlyTokenBudget: 0,
   budgetWarnPercent: 80,
+  visionModel: '',
+  imageRenderMode: 'translation',
 };
 
 export function normalizeConfig(stored?: StoredAppConfig | null): AppConfig {

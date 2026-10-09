@@ -53,8 +53,8 @@ import {
 import { UI_SURFACE_SELECTOR } from '../utils/dom.ts';
 import { normalizeConfig, getProviderApiKey, type AppConfig } from '../utils/config.ts';
 import { buildConfigForm } from '../utils/ui.ts';
-// 设置页样式直接打包进内容脚本（?raw），完整设置面板无需 fetch 扩展资源。
-import fullSettingsCss from '../styles/options.css?raw';
+// v0.2.16：完整设置面板（含设置页样式打包）已抽到 utils/full-settings-panel.ts。
+import { openFullSettingsPanel as createFullSettingsPanel } from '../utils/full-settings-panel.ts';
 import { LANGUAGES } from '../utils/languages.ts';
 import { PROVIDERS } from '../utils/providers.ts';
 import { createSpeakButton, stopSpeaking } from '../utils/speech.ts';
@@ -815,6 +815,9 @@ export default defineContentScript({
         existing.dataset.source = sourceText ?? existing.dataset.source ?? '';
         return;
       }
+      // 先算放置策略再建节点：极窄锚点（色板名）与绝对定位锚点（卡片眉题）
+      // 要用行内形态节点——块级节点事后再改 display 压不住 shadow 内部排版。
+      const strategies = computePlacementStrategies(el);
       const node = createTranslationNode(translation, el, {
         sourceText,
         onEdit: (next) => handleTranslationEdit(el, next),
@@ -824,6 +827,7 @@ export default defineContentScript({
         lineHeight: currentLineHeight > 0 ? currentLineHeight : undefined,
         opacity: currentOpacity > 0 ? currentOpacity : undefined,
         color: currentColor || undefined,
+        inline: strategies[0] === 'inline',
       });
       translationNodes.set(el, node);
       // 第 17 轮：隐藏态下新插入的译文必须跟随隐藏——否则「已隐藏译文」时
@@ -866,7 +870,7 @@ export default defineContentScript({
       // 普通流中紧邻原文插入；Flex/Grid 直接子项、float、CSS 多列、绝对定位锚点
       // 等会视觉错位的场景首选嵌入原文块内部。每种策略渲染后做几何校验
       // （应位于锚点正下方、未跨列、未被裁剪），不达标自动降级到下一策略。
-      applyWithFallback(el, node, computePlacementStrategies(el));
+      applyWithFallback(el, node, strategies);
     }
 
     // ===== 0.2.2 对照模式：below / translation-only / hover-original =====
@@ -955,7 +959,7 @@ export default defineContentScript({
       });
     }
 
-    type PlacementStrategy = 'inside' | 'afterend';
+    type PlacementStrategy = 'inside' | 'afterend' | 'inline';
 
     // 「嵌入原文块内部」时，若锚点自身是行向 flex/grid 容器，直接 append 会让
     // 译文排到右侧而不是下方。沿最后一个元素子级向下潜行，直到找到纵向堆叠
@@ -1018,19 +1022,46 @@ export default defineContentScript({
         }
       }
       if (ownHorizontalFlex) return ['afterend'];
-      if (parentCreatesLayout || ownFloat || ownAbs || columnAncestor) {
+      // 极窄锚点（色板名、小徽标，Apple 官网 iPhone 卡片的颜色选择器实测）：
+      // 宽度不到 96px 的元素塞「下方块级对照」会把译文挤成竖排乱码，
+      // 且任何外部落点都会与相邻格子相撞——改为锚点内部的行内标注。
+      // 高度上限不能写死：grid/flex 的 align-items:stretch 会把同行格子里
+      // 被邻居撑高的锚点一起拉高（实测 56px 格被拉到 110px），导致判定漏网
+      // 同一行的其余格子。放宽为「高度不超过宽度的一定倍数」——窄而特长的
+      // 纵向列表仍走常规落点，窄格子无论被拉伸多少都命中行内形态。
+      const rect = el.getBoundingClientRect();
+      const tiny = rect.width < 96 && rect.height < Math.max(44, rect.width * 2.2);
+      if (tiny) return ['inline'];
+      // 绝对定位锚点（卡片眉题、悬浮文案）：afterend 落进父级文档流后经常与
+      // 同样绝对定位的兄弟元素叠印；行内标注紧跟原文文字，视觉最稳。
+      if (ownAbs) return ['inline', 'inside', 'afterend'];
+      if (parentCreatesLayout || ownFloat || columnAncestor) {
         return ['inside', 'afterend'];
       }
       return ['afterend', 'inside'];
     }
 
     // 几何校验：译文应大致位于锚点正下方且未跨列、未被 overflow 裁剪成不可见。
-    function isPlacementOk(anchor: Element, node: HTMLElement): boolean {
+    // strategy 用于区分判定口径：'afterend' 需要额外做与锚点的矩形相交检查
+    // （此前深色卡片的译文被叠印在原文上，就是缺了这条）；'inside'/'inline'
+    // 的节点本就在锚点内部，相交是预期的。
+    function isPlacementOk(anchor: Element, node: HTMLElement, strategy: PlacementStrategy): boolean {
       if (!node.isConnected) return false;
       const a = anchor.getBoundingClientRect();
       const n = node.getBoundingClientRect();
       if (n.width === 0 && n.height === 0) return false; // 被裁剪或渲染失败
+      if (strategy === 'inline') {
+        // 行内标注：不与原文文字水平重叠、且未被裁剪到不可读即可
+        if (n.height < 6 || n.width < 8) return false;
+        return true;
+      }
       if (n.top < a.top - 12) return false; // 跑到了锚点上方
+      // 叠印检测：节点与锚点矩形实际相交（>4px）说明压在了原文上
+      if (strategy === 'afterend') {
+        const overlapX = Math.min(a.right, n.right) - Math.max(a.left, n.left);
+        const overlapY = Math.min(a.bottom, n.bottom) - Math.max(a.top, n.top);
+        if (overlapX > 4 && overlapY > 4) return false;
+      }
       const drifted =
         n.right < a.left - 8 || n.left > a.right + Math.max(a.width * 0.75, 60);
       if (drifted) return false; // 落进相邻列视为错位
@@ -1058,7 +1089,10 @@ export default defineContentScript({
     ): void {
       const strategy = strategies[index];
       if (!strategy) return;
-      if (strategy === 'inside') {
+      if (strategy === 'inline') {
+        // 行内标注：插进锚点元素内部、随原文文字流排列（节点已带行内样式）
+        el.appendChild(node);
+      } else if (strategy === 'inside') {
         // 行向 flex/grid 容器内沿最后子级纵向下潜，避免译文排到右侧
         findVerticalHost(el).appendChild(node);
       } else {
@@ -1067,7 +1101,7 @@ export default defineContentScript({
       // 渲染后测量真实几何位置；错位则移除并尝试下一策略（最多两轮降级）。
       requestAnimationFrame(() => {
         if (!node.isConnected) return;
-        if (index + 1 < strategies.length && !isPlacementOk(el, node)) {
+        if (index + 1 < strategies.length && !isPlacementOk(el, node, strategy)) {
           node.remove();
           applyWithFallback(el, node, strategies, index + 1);
         }
@@ -1297,7 +1331,7 @@ export default defineContentScript({
       // 移除图片翻译层，并释放其滚动/缩放监听。
       activeImageCleanup?.();
       activeImageCleanup = null;
-      document.querySelectorAll('.ot-img-panel, .ot-img-seg').forEach((el) => el.remove());
+      document.querySelectorAll('.ot-img-panel, .ot-img-seg, .ot-img-canvas').forEach((el) => el.remove());
       translatedCount = 0;
       pageTotalFound = 0;
       estimatedTokensSaved = 0;
@@ -1561,11 +1595,29 @@ export default defineContentScript({
         // 译文直接嵌入原文下方（<span>+display:block，见 makeTranslationNode），形成双语对照
         let inserted = 0;
         const stale: TranslationItem[] = [];
+        const failedItems: TranslationItem[] = [];
         items.forEach((x, k) => {
           const t = typeof translations[k] === 'string' ? translations[k] : '';
-          // 即使无需翻译也记住原文，避免组件重建时重复走消息与模型链路。
-          if (requestConfigRevision === translationConfigRevision) {
+          const issue = res.issues?.[k];
+          // 后台显式标记的失败段（issues 非空且译文为空/等于原文）：
+          // 不写会话缓存（否则本次会话内永远复用原文）、不标记已翻译，
+          // 走失败卡 + 自动重试，和请求级异常同等对待（v0.2.14）。
+          const failed =
+            Array.isArray(issue) && issue.length > 0 && (!t.trim() || t === x.text);
+          if (requestConfigRevision === translationConfigRevision && !failed) {
+            // 即使无需翻译也记住原文，避免组件重建时重复走消息与模型链路。
             sessionTranslations.remember(x.text, t || x.text);
+          }
+          if (failed) {
+            (x.el as HTMLElement).classList.remove(PENDING_CLASS);
+            const attempts = retryCounts.get(x.el) || 0;
+            (x.el as HTMLElement).dataset.retryable = 'true';
+            renderFailCard(x.el, issue![0] || '该段翻译失败');
+            if (x.el.isConnected && attempts < MAX_TRANSLATION_RETRIES) {
+              retryCounts.set(x.el, attempts + 1);
+              failedItems.push({ el: x.el, text: x.text });
+            }
+            return;
           }
           const outcome = applyTranslation(x.el, x.text, t);
           if (outcome === 'inserted') inserted++;
@@ -1575,7 +1627,6 @@ export default defineContentScript({
             if (currentText.length >= 2) stale.push({ el: x.el, text: currentText });
           }
           // 质量自检发现原文符号缺失：标记该译文，提示用户核对。
-          const issue = res.issues?.[k];
           if (issue && Array.isArray(issue) && issue.length > 0) {
             const node = translationNodes.get(x.el);
             node?.setAttribute('data-quality', 'warn');
@@ -1583,6 +1634,11 @@ export default defineContentScript({
           }
           retryCounts.delete(x.el);
         });
+        if (failedItems.length > 0 && (!jobId || activePageJobId === jobId)) {
+          setTimeout(() => {
+            if (!jobId || activePageJobId === jobId) observeForLazyTranslation(failedItems);
+          }, 500);
+        }
         if (stale.length > 0 && (!jobId || activePageJobId === jobId)) {
           observeForLazyTranslation(stale);
         }
@@ -1963,7 +2019,7 @@ export default defineContentScript({
         if (
           !root.isConnected ||
           root.closest(
-            '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
+            '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, .ot-img-canvas, #ot-toolbar, #ot-status, .ot-selbtn',
           )
         )
           return;
@@ -2124,7 +2180,7 @@ export default defineContentScript({
             const target = m.target as Element;
             if (
               target.closest(
-                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
+                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, .ot-img-canvas, #ot-toolbar, #ot-status, .ot-selbtn',
               )
             )
               continue;
@@ -2155,7 +2211,7 @@ export default defineContentScript({
             // 页面内容变化，否则每次清理译文都会触发一次 +8s 的幽灵重译唤醒。
             if (
               el.closest?.(
-                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, #ot-toolbar, #ot-status, .ot-selbtn',
+                '#ot-error-modal, .ot-translation, .ot-img-panel, .ot-img-seg, .ot-img-canvas, #ot-toolbar, #ot-status, .ot-selbtn',
               )
             )
               return;
@@ -2190,6 +2246,7 @@ export default defineContentScript({
               cls?.contains(PENDING_CLASS) ||
               cls?.contains('ot-img-panel') ||
               cls?.contains('ot-img-seg') ||
+              cls?.contains('ot-img-canvas') ||
               el.id === 'ot-toolbar'
             ) {
               return;
@@ -2958,247 +3015,42 @@ export default defineContentScript({
     }
 
     // ===== 页面内完整设置大面板（网页中央弹窗） =====
-    let fullSettingsHost: HTMLElement | null = null;
+    // v0.2.16：面板外壳 / 吸顶导航 / 滚动锁全部抽到 utils/full-settings-panel.ts，
+    // 这里只负责「读存储 → 建表单 → 挂回调」，content.ts 不再堆 250 行 DOM 代码。
+    let fullSettingsPanel: ReturnType<typeof createFullSettingsPanel> | null = null;
     let fullSettingsFormApi: ReturnType<typeof buildConfigForm> | null = null;
     // 表单构建代际号：防止「关闭→重开」竞态下旧异步构建覆盖新面板的 formApi。
     let fullSettingsBuildSeq = 0;
-    let fullSettingsEsc: ((e: KeyboardEvent) => void) | null = null;
-    let fullSettingsWheelLock: ((e: WheelEvent) => void) | null = null;
-    let fullSettingsTouchLock: ((e: TouchEvent) => void) | null = null;
 
     function closeFullSettings() {
       // 使在途的异步表单构建失效（代际号推进）
       fullSettingsBuildSeq++;
-      if (fullSettingsEsc) {
-        document.removeEventListener('keydown', fullSettingsEsc, true);
-        fullSettingsEsc = null;
-      }
-      if (fullSettingsWheelLock) {
-        window.removeEventListener('wheel', fullSettingsWheelLock, true);
-        fullSettingsWheelLock = null;
-      }
-      if (fullSettingsTouchLock) {
-        window.removeEventListener('touchmove', fullSettingsTouchLock, true);
-        fullSettingsTouchLock = null;
-      }
-      fullSettingsFormApi?.dispose();
-      fullSettingsHost?.remove();
-      fullSettingsHost = null;
+      fullSettingsPanel?.close();
+      fullSettingsPanel = null;
       fullSettingsFormApi = null;
-    }
-
-    // 按表单里实际存在的分组标题生成吸顶导航（不写死文案：
-    // ui.ts 增删分组时导航自动跟随，不会出现"导航有、内容没有"的错位）。
-    function buildSettingsNav(nav: HTMLElement, mount: HTMLElement) {
-      nav.replaceChildren();
-      const sections = Array.from(mount.querySelectorAll<HTMLElement>('.ot-form-section'));
-      for (const section of sections) {
-        const label = section.querySelector('h2, summary')?.textContent?.trim();
-        if (!label) continue;
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'ot-settings-nav-item';
-        item.textContent = label;
-        item.addEventListener('click', () => {
-          section.scrollIntoView({ block: 'start', behavior: 'smooth' });
-        });
-        nav.appendChild(item);
-      }
-      nav.hidden = nav.childElementCount === 0;
     }
 
     function openFullSettingsPanel() {
       closeSettingsPanel();
       closeFullSettings();
-      const theme = themeColors();
-      const dark = theme.text === '#f5f5f7';
-      // 遮罩层：全屏半透明 + 背景模糊，点击空白处关闭
-      const host = document.createElement('div');
-      host.id = 'ot-full-settings';
-      host.dataset.haofanUi = 'true';
-      host.style.setProperty('all', 'initial', 'important');
-      host.style.setProperty('position', 'fixed', 'important');
-      host.style.setProperty('inset', '0', 'important');
-      host.style.setProperty('z-index', '2147483646', 'important');
-      host.style.setProperty('background', dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.45)', 'important');
-      host.style.setProperty('backdrop-filter', 'blur(12px) saturate(110%)', 'important');
-      host.style.setProperty('-webkit-backdrop-filter', 'blur(12px) saturate(110%)', 'important');
-      host.style.setProperty('display', 'flex', 'important');
-      host.style.setProperty('align-items', 'center', 'important');
-      host.style.setProperty('justify-content', 'center', 'important');
-      host.style.setProperty('animation', 'ot-modal-fade 0.18s ease', 'important');
-
-      const shadow = host.attachShadow({ mode: 'open' });
-      const style = document.createElement('style');
-      style.textContent = `
-        :host { color-scheme: light dark; }
-        * { box-sizing: border-box; }
-        @keyframes ot-modal-fade { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes ot-modal-pop {
-          from { opacity: 0; transform: scale(0.96) translateY(10px); }
-          to { opacity: 1; transform: none; }
-        }
-        .modal {
-          display: flex; flex-direction: column;
-          width: min(640px, calc(100vw - 48px));
-          /* 只保留一个 max-height：原先后一条 calc(100vh - 48px) 覆盖了
-             min(80vh, 720px)，等于没有高度上限，长表单会把面板拉到贴边。 */
-          max-height: min(80vh, 720px);
-          border-radius: 20px;
-          background: ${theme.surface};
-          color: ${theme.text};
-          border: 1px solid ${theme.border};
-          box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 48px 120px rgba(0,0,0,0.45);
-          overflow: hidden;
-          animation: ot-modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        .head {
-          display: flex; align-items: center; gap: 8px;
-          padding: 12px 16px;
-          border-bottom: 1px solid ${theme.border};
-          user-select: none;
-        }
-        .title { flex: 1; font-size: 15px; font-weight: 700; letter-spacing: 0; }
-        .close {
-          width: 30px; height: 30px; padding: 0;
-          border: 0; border-radius: 9px;
-          background: transparent; color: ${theme.text2};
-          font-size: 20px; line-height: 1; cursor: pointer;
-        }
-        .close:hover { background: rgba(128,128,128,0.18); color: ${theme.text}; }
-        .ot-full-settings-body {
-          flex: 1; min-height: 0;
-          overflow-y: auto;
-          overscroll-behavior: contain;
-          padding: 4px 20px 36px;
-        }
-        .foot {
-          display: flex; align-items: center; justify-content: center; gap: 12px;
-          padding: 10px 16px;
-          border-top: 1px solid ${theme.border};
-        }
-        .foot-hint { color: ${theme.text2}; font-size: 11px; }
-        /* 分组快捷导航：单列列表后内容约 4 屏高，顶部吸顶便于直接跳转 */
-        .ot-settings-nav {
-          position: sticky; top: 0; z-index: 3;
-          display: flex; flex-wrap: wrap; gap: 6px;
-          margin: 0 -6px 10px; padding: 8px 6px;
-          background: ${theme.surface};
-          backdrop-filter: ${theme.backdrop};
-          -webkit-backdrop-filter: ${theme.backdrop};
-          border-bottom: 1px solid ${theme.hairline};
-        }
-        .ot-settings-nav[hidden] { display: none; }
-        .ot-settings-nav-item {
-          padding: 5px 11px;
-          border: 0; border-radius: 999px;
-          background: ${theme.surface2}; color: ${theme.text2};
-          font-family: inherit; font-size: 12.5px; font-weight: 600;
-          white-space: nowrap; cursor: pointer;
-          transition: background 0.15s ease, color 0.15s ease;
-        }
-        .ot-settings-nav-item:hover {
-          color: ${theme.text};
-          background: ${theme.accentSoft};
-        }
-        .ot-settings-nav-item:focus-visible {
-          outline: 2px solid ${theme.accentSoft}; outline-offset: 1px;
-        }
-        /* 抵消吸顶导航的高度，跳转后分组标题不被遮住 */
-        .ot-form-section { scroll-margin-top: 60px; }
-      `;
-      const head = document.createElement('div');
-      head.className = 'head';
-      const title = document.createElement('div');
-      title.className = 'title';
-      title.textContent = '好翻 · 完整设置';
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.className = 'close';
-      close.textContent = '×';
-      close.setAttribute('aria-label', '关闭完整设置');
-      close.addEventListener('click', closeFullSettings);
-      head.append(title, close);
-
-      const body = document.createElement('div');
-      body.className = 'ot-full-settings-body';
-      // 分组快捷导航：表单项是异步构建的，所以先占位、构建完成后再按实际分组标题填充
-      const nav = document.createElement('nav');
-      nav.className = 'ot-settings-nav';
-      nav.setAttribute('aria-label', '设置分组');
-      nav.hidden = true;
-      const mount = document.createElement('div');
-      body.append(nav, mount);
-      const foot = document.createElement('div');
-      foot.className = 'foot';
-      const hint = document.createElement('span');
-      hint.className = 'foot-hint';
-      hint.textContent = '设置自动保存 · 快捷键 Alt+T 翻译当前网页';
-      foot.appendChild(hint);
-      // 关键：head/body/foot 必须包在 .modal 容器内——遮罩 host 是 flex 居中，
-      // 直接平铺会把三者拉成水平一排（此前"排版一团糟"的根因）。
-      const modal = document.createElement('div');
-      modal.className = 'modal';
-      modal.append(head, body, foot);
-      shadow.append(style, modal);
-      document.documentElement.appendChild(host);
-      fullSettingsHost = host;
-
-      // 点击遮罩空白处关闭；Esc 关闭。
-      // 注意：不能用 e.target === host——Shadow DOM 事件重定向会把面板内部的
-      // 点击目标重定向为 host，导致"点击输入框/下拉就关闭面板"。
-      // composedPath() 返回真实目标（不重定向），用它判断点击是否落在面板外。
-      host.addEventListener('pointerdown', (e) => {
-        const path = e.composedPath();
-        if (path[0] === host) closeFullSettings();
-      });
-      const escHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') closeFullSettings();
-      };
-      fullSettingsEsc = escHandler;
-      document.addEventListener('keydown', escHandler, true);
-      // 弹窗打开期间锁定页面滚动：滚轮/触摸落在面板外（遮罩上）时阻止，
-      // 面板内部滚动不受影响。Shadow DOM 会把事件 target 重定向为宿主元素，
-      // 必须用 composedPath 拿到 shadow 内的真实目标才能正确判断。
-      const inModal = (e: Event) => {
-        return (e.composedPath() as EventTarget[]).includes(modal);
-      };
-      fullSettingsWheelLock = (e: WheelEvent) => {
-        if (!inModal(e)) e.preventDefault();
-      };
-      fullSettingsTouchLock = (e: TouchEvent) => {
-        if (!inModal(e)) e.preventDefault();
-      };
-      window.addEventListener('wheel', fullSettingsWheelLock, true);
-      window.addEventListener('touchmove', fullSettingsTouchLock, true);
-
-      // 样式直接来自打包进内容脚本的 options.css（?raw），不依赖网络。
-      const sheet = document.createElement('style');
-      sheet.textContent = fullSettingsCss
-        .replace(/:root/g, ':host')
-        .replace(/\bbody\b/g, '.ot-full-settings-body');
-      shadow.prepend(sheet);
-
-      // 站点偏好初始状态。代际守卫：面板可能在存储读取期间被关闭又重开，
-      // 旧 IIFE 恢复后不得覆盖新面板的 formApi（否则关闭时 dispose 的是死对象，
-      // 活表单的监听永远不被退订）。
-      const buildSeq = ++fullSettingsBuildSeq;
-      void (async () => {
-        const [disabledSites, autoSites] = await Promise.all([
-          disabledSitesItem.getValue(),
-          autoSitesItem.getValue(),
-        ]);
-        if (buildSeq !== fullSettingsBuildSeq) return;
-        try {
+      const seq = ++fullSettingsBuildSeq;
+      fullSettingsPanel = createFullSettingsPanel({
+        build: async (mount) => {
+          const [disabledSites, autoSites, alwaysSites, neverSites] = await Promise.all([
+            disabledSitesItem.getValue(),
+            autoSitesItem.getValue(),
+            alwaysSitesItem.getValue(),
+            neverSitesItem.getValue(),
+          ]);
+          if (seq !== fullSettingsBuildSeq) return;
+          // 与自动翻译运行时判断（autoSites === null || ...）保持同一语义：
+          // null = 从未配置 = 默认自动翻译。漏掉前缀会让开关显示与实际行为相反。
           fullSettingsFormApi = buildConfigForm(mount, false, {
             host: location.host,
-            // 与自动翻译运行时判断（autoSites === null || ...）保持同一语义：
-            // null = 从未配置 = 默认自动翻译。漏掉前缀会让开关显示与实际行为相反。
             autoTranslate: autoSites === null || isSiteDisabled(autoSites, location.href),
             paused: isSiteDisabled(disabledSites, location.href),
-            // 0.2.2 网站规则：始终翻译白名单 / 敏感页面排除
-            always: isAlwaysSite(await alwaysSitesItem.getValue(), location.href),
-            never: isNeverSite(await neverSitesItem.getValue(), location.href),
+            always: isAlwaysSite(alwaysSites, location.href),
+            never: isNeverSite(neverSites, location.href),
             onAuto: (enabled) => {
               enqueueSettingsWrite(async () => {
                 const sites = await autoSitesItem.getValue();
@@ -3227,13 +3079,13 @@ export default defineContentScript({
               });
             },
           });
-          buildSettingsNav(nav, mount);
-        } catch {
-          // 表单构建失败：面板保留头部与关闭按钮，不崩溃内容脚本
-          mount.textContent = '设置加载失败，请重新打开';
-          mount.style.cssText = 'padding:12px;font-size:13px;color:#ff3b30;';
-        }
-      })();
+          return { dispose: () => fullSettingsFormApi?.dispose() };
+        },
+        onClose: () => {
+          fullSettingsFormApi?.dispose();
+          fullSettingsFormApi = null;
+        },
+      });
     }
 
     async function openSettingsPanel(anchorX: number, anchorY: number, anchorTop = anchorY) {
@@ -4177,9 +4029,11 @@ export default defineContentScript({
 });
 
 // ===== 图片翻译结果浮层（实现见 utils/image-overlay.ts）=====
-function showImageResult(srcUrl: string | undefined, result: any) {
+async function showImageResult(srcUrl: string | undefined, result: any) {
   activeImageCleanup?.();
-  activeImageCleanup = mountImageResultOverlay(srcUrl, result);
+  // 渲染方式（仅译文 / 原文+译文）来自用户配置，挂载前读一次即可。
+  const cfg = normalizeConfig(await configItem.getValue());
+  activeImageCleanup = mountImageResultOverlay(srcUrl, result, cfg);
 }
 
 // ===== 颜色工具：hex 强调色按比例提亮，生成渐变主按钮底色 =====

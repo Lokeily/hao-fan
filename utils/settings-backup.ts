@@ -52,6 +52,7 @@ export function sanitizeImportedConfig(raw: unknown): AppConfig {
     result.translateMode = 'manual';
   }
   if (result.themeMode !== 'light' && result.themeMode !== 'dark') result.themeMode = 'auto';
+  if (result.imageRenderMode !== 'bilingual') result.imageRenderMode = 'translation';
   return normalizeConfig(result);
 }
 

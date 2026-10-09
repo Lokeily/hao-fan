@@ -208,25 +208,81 @@ input:focus-visible {
   border-radius: 8px;
 }
 
-/* 图片上叠加的译文段框：玻璃质地（不再用 color-mix，兼容性更稳） */
+/* v0.2.15：译文由 canvas 直接画在图上（擦掉原文 + 原位重排），
+   底下的 <img> 只作尺寸基准与兜底，被 canvas 完全遮住。 */
+.ot-image-overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.ot-image-overlay.is-hidden {
+  display: none;
+}
+
+/* 透明命中层：不画字（字在 canvas 上），只负责悬停显示原文 tooltip */
 .ot-image-segment {
   position: absolute;
   overflow: hidden;
-  padding: 2px 4px;
-  border: 1px solid var(--image-accent);
-  border-radius: 6px;
-  background: var(--image-surface);
-  color: var(--image-text);
-  font-size: 12px;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  transition: border-color 0.15s ease, filter 0.15s ease;
+  border-radius: 4px;
+  background: transparent;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .ot-image-segment:hover {
-  filter: brightness(1.1);
+  background: rgba(0, 122, 255, 0.12);
+  box-shadow: inset 0 0 0 1px var(--image-accent);
+}
+
+.ot-image-seg-toggle,
+.ot-image-mode {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--image-text-2, #6e6e73);
+}
+
+.ot-image-mode select {
+  padding: 4px 8px;
+  border: 1px solid var(--image-border);
+  border-radius: 8px;
+  background: var(--image-surface);
+  color: var(--image-text);
+  font-size: 12px;
+}
+
+.ot-image-save,
+.ot-image-close-job {
+  padding: 5px 12px;
+  border: 1px solid var(--image-border);
+  border-radius: 999px;
+  background: var(--image-surface);
+  color: var(--image-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ot-image-save:hover,
+.ot-image-close-job:hover {
+  border-color: var(--image-accent);
+}
+
+.ot-image-save:disabled,
+.ot-image-close-job:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ot-image-close-job {
+  width: 26px;
+  padding: 5px 0;
+  text-align: center;
 }
 
 .ot-image-list-shell {

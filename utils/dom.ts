@@ -91,6 +91,7 @@ const OWN_SELECTOR = [
   '.ot-translation',
   '.ot-img-panel',
   '.ot-img-seg',
+  '.ot-img-canvas',
   '#ot-error-modal',
   '#ot-selection-ui',
   '#ot-full-settings',
@@ -108,6 +109,11 @@ const OWN_SELECTOR = [
 export const UI_SURFACE_SELECTOR = OWN_SELECTOR;
 
 const PAGE_CHROME_SELECTOR = ['[role="banner"]', '[role="toolbar"]', '[role="search"]'].join(',');
+
+// 站点显式声明「不要翻译」的事实标准标记（Google 翻译时代沿用至今）：
+// translate="no" 属性与 notranslate 类。遵守它们可以避免误译品牌名、
+// 代码串、刻意保留原文的营销文案（v0.2.14）。
+const NO_TRANSLATE_SELECTOR = '[translate="no"], .notranslate';
 
 function isDirectPageChrome(element: Element): boolean {
   if (element.closest(PAGE_CHROME_SELECTOR)) return true;
@@ -161,7 +167,8 @@ function rejectsSubtree(element: Element): boolean {
     isPageChrome(element) ||
     html.matches?.(OWN_SELECTOR) ||
     html.isContentEditable ||
-    html.getAttribute('aria-hidden') === 'true'
+    html.getAttribute('aria-hidden') === 'true' ||
+    Boolean(html.closest?.(NO_TRANSLATE_SELECTOR))
   );
 }
 
@@ -198,6 +205,15 @@ function isCandidate(element: Element): boolean {
 }
 
 function isExcludedControlText(parent: Element): boolean {
+  // 文本所在的最近语义块若不被任何控件（button / CTA 链接）包含 → 这是正文
+  //（含正文里的链接），照常翻译。此分支必须最先判断：Apple 官网的卡片是
+  // <a class="tile"><h2>…</h2><p>…</p></a> 整块链接结构，标题/段落都在
+  // <a> 内部——按旧逻辑 anchor.closest(SEMANTIC_BLOCK_SELECTOR) 向上找不到
+  // 语义块，整张卡片的文字会被当 CTA 全部漏译（v0.2.14 修复）。
+  const semantic = parent.closest(SEMANTIC_BLOCK_SELECTOR);
+  if (semantic && !semantic.closest('button, [role="button"]')) return false;
+  // 走到这里只剩两种情况：纯控件文案（无语义块包裹），或语义块本身被塞在
+  // <button> 内部（罕见，译文进按钮会撑变形，继续按控件排除）。
   const control = parent.closest('button, [role="button"]');
   if (control && !control.matches(INTERACTIVE_SELECTOR)) return true;
   // 独立作为 CTA 的链接（不在任何语义段落里）视为按钮：Apple 官网的
@@ -248,7 +264,7 @@ export function textOfBlock(element: Element): string {
       if (!parent || !node.textContent?.trim()) return NodeFilter.FILTER_REJECT;
       if (isPageChrome(parent)) return NodeFilter.FILTER_REJECT;
       const excluded = parent.closest(
-        `${OWN_SELECTOR},script,style,noscript,textarea,input,select,option,code,pre,svg`,
+        `${OWN_SELECTOR},${NO_TRANSLATE_SELECTOR},script,style,noscript,textarea,input,select,option,code,pre,svg`,
       );
       if (excluded || isExcludedControlText(parent)) return NodeFilter.FILTER_REJECT;
       const nearestBlock = parent.closest(CANDIDATE_SELECTOR);
@@ -297,6 +313,13 @@ function splitPlainBlockUnits(element: Element): Element[] | null {
     if (t.length >= 2) units.push(c);
   }
   if (units.length < 2) return null;
+  // 拆分有效性校验：行单元文本合计应覆盖父块的大部分文本（v0.2.14）。
+  // 两类情况会覆盖不足：子行是被排除的控件文案（一排链接按钮，拆出来全是
+  // 空单元），或父块下有未包行内元素的裸文本节点（拆分会把这段文本丢掉）。
+  // 覆盖率过低时回退为整块处理，宁可少拆也不漏译。
+  const unitsLength = units.reduce((sum, unit) => sum + textOfBlock(unit).length, 0);
+  const parentLength = textOfBlock(element).length;
+  if (parentLength > 0 && unitsLength / parentLength < 0.6) return null;
   // 注意：不能给单元加任何已处理标记——收集逻辑的 isRejected 会把标记元素当
   // 已处理跳过，导致拆出的行单元全部落空。拆分单元必然是非语义行内元素
   // （否则 hasSemanticChild 为 true 不会拆分），TreeWalker 不会单独访问它们。

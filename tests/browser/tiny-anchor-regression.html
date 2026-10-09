@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Tiny anchor and absolute eyebrow placement regression</title>
+<style>
+  body { margin: 24px; font: 15px/1.6 system-ui; }
+  /* 模拟 Apple 官网 iPhone 卡片的两类高危结构（与真实 DOM 同构）：
+     1) 色板名：56px 窄格 <li> 里的小标签——块级「下方对照」会挤成竖排乱码；
+     2) 卡片眉题：绝对定位 <h3> 小字——afterend 落进父级文档流会与标题叠印。
+     卡片本身是 <a>（非候选块），与 Apple 实际结构一致：只有内部的 h3/h2/li
+     会成为翻译锚点。 */
+  a.card {
+    position: relative;
+    display: block;
+    width: 320px;
+    padding: 48px 16px 16px;
+    margin: 24px 0;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+  }
+  h3.eyebrow-abs {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #666;
+    white-space: nowrap;
+  }
+  h2.headline { margin: 8px 0 6px; font-size: 20px; }
+  ul.colors {
+    display: grid;
+    grid-template-columns: 56px 56px;
+    gap: 4px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  li.swatch { width: 56px; }
+  .swatch-label {
+    display: block;
+    font-size: 11px;
+    color: #444;
+  }
+</style>
+<script src="./browser-mock.js"></script>
+</head>
+<body>
+  <h1>Tiny anchor placement test</h1>
+  <a href="#" class="card">
+    <h3 class="eyebrow-abs">Cutting-Edge Cameras</h3>
+    <h2 class="headline">Picture your best photos and videos.</h2>
+    <ul class="colors">
+      <li class="swatch"><span class="swatch-label">Midnight</span></li>
+      <li class="swatch"><span class="swatch-label">Starlight</span></li>
+    </ul>
+  </a>
+  <a href="#" class="card">
+    <h3 class="eyebrow-abs">Apple Trade In</h3>
+    <h2 class="headline">Save on a new iPhone with a trade-in.</h2>
+    <ul class="colors">
+      <li class="swatch"><span class="swatch-label">Deep Blue</span></li>
+    </ul>
+  </a>
+  <script src="../../.output/chrome-mv3/content-scripts/content.js"></script>
+</body>
+</html>
