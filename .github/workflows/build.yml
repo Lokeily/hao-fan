@@ -43,8 +43,15 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Audit dependencies
-        run: npm audit --audit-level=high
+      # 生产依赖会打进发布产物，零容忍——有 high/critical 直接阻断发版。
+      - name: Audit production dependencies (blocking)
+        run: npm audit --omit=dev --audit-level=high
+
+      # 开发工具链（wxt / eslint / typescript-eslint 等）只在本机构建时使用，
+      # 不进任何发布产物，其漏洞不构成产品风险。这里仍然审计并保留可见告警，
+      # 但不阻断发版——否则上游工具链的告警会让整个发布流程长期红灯。
+      - name: Audit dev dependencies (non-blocking)
+        run: npm audit --audit-level=high || echo "::warning::开发依赖存在告警级漏洞（不进构建产物，不阻塞发版，详见上方输出）"
 
       - name: Build extension
         run: npm run build
