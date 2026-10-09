@@ -13,7 +13,7 @@
 ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox MV2](https://img.shields.io/badge/Firefox-MV2-FF7139?logo=firefoxbrowser&logoColor=white)
 ![Edge](https://img.shields.io/badge/Edge-compatible-0078D7?logo=microsoftedge&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-87%20unit%20%2B%2065%20e2e-brightgreen)
+![Tests](https://img.shields.io/badge/tests-91%20unit%20%2B%2079%20e2e-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 [功能特性](#-功能特性) · [快速开始](#-快速开始) · [安装](#-安装) · [配置参考](#-配置参考) · [隐私与安全](#-隐私与安全) · [参与贡献](#-参与贡献)
@@ -26,7 +26,7 @@
 
 与云端聚合翻译服务不同，好翻**直连你自己配置的翻译服务商**——请求不经过任何中转服务器，API Key 只保存在本机浏览器，不向第三方上传浏览内容。
 
-- **无中心** — 谁给你翻译，由你决定：12 家国内外 AI 服务商 + 任意 OpenAI 兼容接口 + 3 家传统机翻
+- **无中心** — 谁给你翻译，由你决定：10 家国内外大模型 + Ollama 本地 + 任意 OpenAI 兼容接口 + 4 家传统机翻（其中 3 家免 Key）
 - **无遥测** — 不采集使用行为，无广告追踪，无使用额度
 - **可解释** — 每项行为都能在源码中找到对应实现，透明可审计
 
@@ -120,6 +120,10 @@ npm run build:firefox # Firefox MV2 → .output/firefox-mv2
 | 快捷键 | 功能 |
 | --- | --- |
 | <kbd>Alt</kbd>+<kbd>T</kbd> | 翻译当前网页（可在浏览器扩展快捷键设置中自定义） |
+| <kbd>Alt</kbd>+<kbd>S</kbd> | 显示 / 隐藏译文（纯显隐，不重新翻译，不产生请求） |
+
+> 两个快捷键都可在浏览器扩展快捷键设置中自行修改。
+> 也可以在页面任意位置**右键** →「显示 / 隐藏译文（好翻）」达到同样效果。
 
 ## ⚙️ 配置参考
 
@@ -156,7 +160,8 @@ npm run build:firefox # Firefox MV2 → .output/firefox-mv2
 - API Key 仅存本地浏览器（`storage.local`），按服务商隔离，仅经 `Authorization` 头直发所选服务商
 - 待译文本以「数据而非指令」边界包裹，双层防护 Prompt Injection
 - 全仓零 `innerHTML`：译文一律 `textContent` + Shadow DOM 注入，无 XSS 注入面
-- 权限最小化（`storage` / `activeTab` / `contextMenus` / `scripting` 四项均有明确用例）
+- 权限四项，均有明确用例：`storage`（配置与缓存）、`activeTab`（当前页翻译）、`contextMenus`（右键菜单）、`scripting`（注入内容脚本）
+- 另需 `<all_urls>` 主机权限：这是「任意网页可翻译」的前提——内容脚本要能在你访问的页面上取文本、插译文。**好翻不因此获得"上传你的数据"的能力**：取到的文本只发往你自己配置的服务商，除翻译外不外发、不落库、不做统计
 - 无遥测、无广告追踪；缓存 30 天 LRU 2000 条上限，可在设置中清空或关闭
 
 ## 🧪 开发与质量保障
@@ -171,9 +176,10 @@ npm run test:all       # 一键执行全部门禁
 | --- | --- |
 | `check:version` | 版本一致性（package / lock / README / changelog） |
 | `lint` + `typecheck` | ESLint 0 警告 · TypeScript 严格模式 0 错误 |
-| `test` | 66 项单元测试（协议 / 缓存 / 术语 / 流式 / 恢复 / 注入防护 / 备份 / 历史） |
+| `test` | 91 项单元测试（协议 / 缓存 / 术语 / 流式 / 恢复 / 注入防护 / 备份 / 历史 / 用量） |
 | `build` × 2 | Chrome MV3 与 Firefox MV2 双平台构建 |
-| `test:browser` | 33 项 Playwright 浏览器回归（布局 / 竞态 / 同步 / 性能基准 2001 段） |
+| `test:browser` | 79 项 Playwright 浏览器回归（布局 / 竞态 / 同步 / 主题 / 性能基准 2001 段） |
+| `release` | 发版一键门禁：上述全部 + 双平台打包（`npm run release`，详见 [RELEASE.md](./RELEASE.md)） |
 
 架构与工作原理详见 [docs/features.html](./docs/features.html) 与审计档案（`功能审计-*.md` / `验证报告-*.md`）。
 
