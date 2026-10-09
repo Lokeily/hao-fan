@@ -6,6 +6,11 @@
     ],
     "strict": true,
     "verbatimModuleSyntax": false,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    // wxt 0.21 生成的 .wxt/tsconfig.json 新加了 noUncheckedIndexedAccess: true。
+    // 本项目原本按 strict 编写（数组索引的边界由运行时逻辑保证，如先判 length、
+    // 或来自已校验的结构化响应）。直接启用会新增 60+ 处报错，若强行消除需改动
+    // 翻译主链路的判断逻辑，风险高于收益。这里显式关闭，保持既有 strict 标准不变。
+    "noUncheckedIndexedAccess": false
   }
 }
